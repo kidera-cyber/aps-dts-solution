@@ -285,7 +285,7 @@
 
           <div class="form-section" id="mediaImportSection">
             <h4>求人媒体CSV取込（Indeed等）</h4>
-            <p class="hint">求人媒体から出力した応募者CSVをそのまま取込めます。職種・ステータス・評価は自動マッピング、質問1〜15はメモに集約、メール/電話/名前+応募日で重複判定して自動上書きします。</p>
+            <p class="hint">Indeedなど求人媒体から出力した応募者CSVはこちらから取り込んでください。列名「名前」「メールアドレス」「電話番号」「職種名」「応募経路」などを自動判定します。質問1〜15はメモに集約、メール/電話/名前+応募日で重複判定して自動上書きします。</p>
             <div class="action-row" style="margin-top:10px;margin-bottom:10px;">
               <label class="btn btn-soft btn-file">求人媒体CSVを選択<input type="file" id="inputMediaCSV" accept=".csv,text/csv" /></label>
               <span id="mediaFileName" style="color:var(--muted);font-size:12px;">未選択</span>
@@ -300,8 +300,8 @@
           </div>
 
           <div class="form-section">
-            <h4>応募者データ（Indeed形式 / APSテンプレート形式 自動判定）</h4>
-            <p class="hint" style="margin-bottom:10px;">Indeed形式（列：名前・メールアドレス・電話番号・職種名・応募経路 等）とAPSテンプレート形式（列：応募者名・id 等）を自動判定して取込みます。職種・ステータス・評価・電話番号は自動マッピング・整形され、メール/電話/名前+応募日で重複判定して上書き更新します。</p>
+            <h4>応募者データ（APSテンプレート形式 / Indeed形式 自動判定）</h4>
+            <p class="hint" style="margin-bottom:10px;">このシステムから出力した応募者CSVを再取込する場合はこちらを使ってください。Indeed等の求人媒体CSVを誤ってこちらで選んでも、ヘッダ列を自動判定して取込みます。<br>対応列：応募者名 / 名前 / 氏名 / name｜メールアドレス / email｜電話番号 / phone / 携帯番号｜希望職種 / 職種名 / 求人タイトル｜応募経路 / 媒体 / source｜選考ステータス / ステータス｜応募日 / 日付。職種・ステータス・評価・電話番号は自動整形され、メール/電話/名前+応募日で重複判定して上書き更新します。</p>
             <div class="action-row" style="margin-bottom:10px;">
               <button class="btn btn-primary" id="btnExportCandidatesCSV">応募者CSVを出力</button>
               <label class="btn btn-soft btn-file">応募者CSVを選択<input type="file" id="inputCandidatesCSV" accept=".csv,text/csv" /></label>
@@ -1493,6 +1493,26 @@
 
     function getRadioValue(name){ const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : 'merge'; }
 
+    // ===== ヘッダ列名のゆらぎ吸収 =====
+    function normalizeHeaderName(s){
+      return String(s || '').replace(/[\s　]+/g, '').toLowerCase();
+    }
+    function findHeader(headers, candidates){
+      const normMap = new Map();
+      headers.forEach(h => { normMap.set(normalizeHeaderName(h), h); });
+      for(const cand of candidates){
+        const hit = normMap.get(normalizeHeaderName(cand));
+        if(hit) return hit;
+      }
+      return '';
+    }
+    function pickValue(row, candidates){
+      for(const c of candidates){
+        if(row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== '') return String(row[c]).trim();
+      }
+      return '';
+    }
+
     // ===== 2ステップ取込：状態変数 =====
     let selectedCandidateCsvFile = null;
     let selectedPlanCsvFile = null;
@@ -1635,28 +1655,41 @@
           console.log('[CSV IMPORT] parsed rows:', rows.length);
           if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
           const headers = rows[0].map(h => String(h || '').trim());
-          const hasName = headers.includes('名前');
-          const hasAps = headers.includes('応募者名') || headers.includes('id');
-          if(!hasName && !hasAps) throw new Error('必須列「名前」または「応募者名」が見つかりません。Indeed形式（名前列）またはAPSテンプレート形式（応募者名列）でご用意ください。');
+          console.log('[CSV IMPORT] headers:', headers);
+
+          // 列名ゆらぎ対応
+          const apsName = findHeader(headers, ['応募者名']);
+          const mediaName = findHeader(headers, ['名前','氏名','name','Name']);
+          const nameColumn = apsName || mediaName;
+          if(!nameColumn){
+            throw new Error('必須列「応募者名」または「名前」が見つかりません。APSテンプレート形式の場合は「応募者名」、Indeed等の求人媒体CSVの場合は「名前」列が必要です。');
+          }
+          console.log('[CSV IMPORT] name column:', nameColumn);
+
+          // 形式判定
+          const hasMediaSignals = !!findHeader(headers, ['ステータス','職種名','質問1','質問1の回答']);
+          const hasApsSignals = !!findHeader(headers, ['応募者名','希望職種','選考ステータス']);
+          const detectedFormat = (apsName && (hasApsSignals && !hasMediaSignals)) ? 'APSテンプレート形式'
+                              : (mediaName && hasMediaSignals) ? '求人媒体CSV形式'
+                              : (apsName ? 'APSテンプレート形式' : '求人媒体CSV形式');
+          console.log('[CSV IMPORT] detected format:', detectedFormat);
+
           const objects = rowsToObjects(rows);
           if(!objects.length) throw new Error('取込対象データがありません。');
           result.totalRows = objects.length;
-          const formatLabel = (hasName && !hasAps) ? 'Indeed形式' : 'APSテンプレート形式';
-          console.log(`[CSV IMPORT] format detected: ${formatLabel}`);
 
-          if(hasName && !hasAps){
-            // ===== Indeed形式 =====
+          if(detectedFormat === '求人媒体CSV形式'){
+            // ===== 求人媒体形式 =====
             const mode = getRadioValue('candImportMode');
             if(mode === 'replace'){
-              if(!confirm(`既存応募者${candidates.length}件を全削除して取込みます。よろしいですか？`)){
-                throw new Error('ユーザーがキャンセルしました');
-              }
+              if(!confirm(`既存応募者${candidates.length}件を全削除して取込みます。よろしいですか？`)) throw new Error('ユーザーがキャンセルしました');
               candidates = [];
             }
             let fallbackJobs = 0;
             objects.forEach(row => {
               try{
-                const incoming = buildIncomingFromMediaRow(row);
+                // 列名ゆらぎ対応で値を取得
+                const incoming = buildFlexibleMediaRow(row);
                 if(!incoming){ result.skipped++; return; }
                 if(incoming._jobFallback) fallbackJobs++;
                 const dup = findDuplicateCandidate(incoming);
@@ -1694,18 +1727,26 @@
             const existingIds = new Set(candidates.map(c => c.id));
             objects.forEach(o => {
               try{
-                if(!o['応募者名']){ result.skipped++; return; }
+                const name = pickValue(o, ['応募者名','名前','氏名','name','Name']);
+                if(!name){ result.skipped++; return; }
                 const id = o['id'] || uid();
                 incoming.push(normalizeCandidate({
                   id,
-                  name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
-                  job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
-                  license: o['免許区分'] || '', area: o['希望勤務地'] || '',
-                  interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
+                  name,
+                  phone: pickValue(o, ['電話番号','phone','Phone','携帯番号']),
+                  email: pickValue(o, ['メールアドレス','email','Email']),
+                  job: pickValue(o, ['希望職種','職種名','求人タイトル']),
+                  source: pickValue(o, ['応募経路','媒体','source','Source']) || 'indeed',
+                  workType: o['雇用形態'] || '',
+                  license: o['免許区分'] || '', area: pickValue(o, ['希望勤務地','勤務地','応募者の居住地']),
+                  interviewAt: o['面接日時'] || '', status: pickValue(o, ['選考ステータス','ステータス','status']),
+                  rating: o['評価'] || '',
                   nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
                   resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
-                  appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
-                  createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
+                  appliedAt: pickValue(o, ['応募日','日付','appliedAt']),
+                  offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
+                  createdAt: pickValue(o, ['登録日','createdAt']) || nowDateTime(),
+                  updatedAt: o['更新日'] || nowDateTime()
                 }));
                 if(o['id'] && existingIds.has(id)) result.updated++; else result.added++;
                 result.imported++;
@@ -1716,7 +1757,8 @@
             else candidates = mergeOrReplace(candidates, incoming, mode);
           }
           result.afterCount = candidates.length;
-          await afterImportSuccess(result, 'candidateCsvImportMessage', `応募者CSV（${formatLabel}）`);
+          console.log('[CSV IMPORT] result:', result);
+          await afterImportSuccess(result, 'candidateCsvImportMessage', `応募者CSV（${detectedFormat}）`);
           if(result._fallbackJobs > 0){
             showToast(`職種が判定不能で「中型ドライバー」に仮設定された応募者：${result._fallbackJobs}件\nメモに元の求人タイトルを記録しています。`, 'warning', 8000);
           }
@@ -1727,6 +1769,48 @@
           showToast(`応募者CSV取込エラー：${err.message}`, 'error');
         }
       });
+    }
+
+    // 列名ゆらぎ対応版の媒体CSV1行→応募者オブジェクト
+    function buildFlexibleMediaRow(row){
+      const name = pickValue(row, ['名前','氏名','応募者名','name','Name']);
+      if(!name) return null;
+      const rawJob = pickValue(row, ['職種名','希望職種','求人タイトル']);
+      const jobInfo = classifyMediaJob(rawJob);
+      const rawStatus = pickValue(row, ['ステータス','選考ステータス','status']);
+      const status = mapMediaStatus(rawStatus);
+      const rating = mapMediaRating(pickValue(row, ['採用の見込み']));
+      const phone = normalizePhone(pickValue(row, ['電話番号','phone','Phone','携帯番号']));
+      const email = pickValue(row, ['メールアドレス','email','Email']);
+      const area = pickValue(row, ['応募者の居住地','勤務地']);
+      const appliedDate = pickValue(row, ['応募日','日付','appliedAt']);
+      // 経路判定（メールドメイン優先）
+      let source;
+      if(email.toLowerCase().includes('indeed')) source = 'indeed';
+      else{
+        const rawSrc = pickValue(row, ['応募経路','媒体','source','Source']);
+        if(/indeed/i.test(rawSrc) || /スポンサー/.test(rawSrc)) source = 'indeed';
+        else if(/plex/i.test(rawSrc)) source = 'PLEX';
+        else if(/xmile/i.test(rawSrc) || /エックスマイル/.test(rawSrc)) source = 'XMile';
+        else if(/リファラル/.test(rawSrc)) source = 'リファラル';
+        else if(/紹介/.test(rawSrc)) source = '紹介';
+        else source = rawSrc || 'indeed';
+      }
+      const memo = buildMediaMemo(row);
+      return {
+        name, phone, email,
+        job: jobInfo.job,
+        source,
+        workType: '未確認', license: '未確認', area,
+        interviewAt: '', nextDate: '',
+        status, rating,
+        owner: '', memo,
+        resumeName: '', resumeUrl: '',
+        appliedAt: appliedDate,
+        _appliedDate: appliedDate,
+        _jobOriginal: jobInfo.original,
+        _jobFallback: jobInfo.fallback
+      };
     }
 
     // ===== 採用計画CSV =====
