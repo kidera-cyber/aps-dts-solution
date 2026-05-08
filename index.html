@@ -300,7 +300,8 @@
           </div>
 
           <div class="form-section">
-            <h4>応募者データ（APSテンプレート形式）</h4>
+            <h4>応募者データ（Indeed形式 / APSテンプレート形式 自動判定）</h4>
+            <p class="hint" style="margin-bottom:10px;">Indeed形式（列：名前・メールアドレス・電話番号・職種名・応募経路 等）とAPSテンプレート形式（列：応募者名・id 等）を自動判定して取込みます。職種・ステータス・評価・電話番号は自動マッピング・整形され、メール/電話/名前+応募日で重複判定して上書き更新します。</p>
             <div class="action-row" style="margin-bottom:10px;">
               <button class="btn btn-primary" id="btnExportCandidatesCSV">応募者CSVを出力</button>
               <label class="btn btn-soft btn-file">応募者CSVを選択<input type="file" id="inputCandidatesCSV" accept=".csv,text/csv" /></label>
@@ -1634,42 +1635,96 @@
           console.log('[CSV IMPORT] parsed rows:', rows.length);
           if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
           const headers = rows[0].map(h => String(h || '').trim());
-          if(!headers.includes('応募者名') && !headers.includes('id')) throw new Error('必須列「応募者名」が見つかりません。');
+          const hasName = headers.includes('名前');
+          const hasAps = headers.includes('応募者名') || headers.includes('id');
+          if(!hasName && !hasAps) throw new Error('必須列「名前」または「応募者名」が見つかりません。Indeed形式（名前列）またはAPSテンプレート形式（応募者名列）でご用意ください。');
           const objects = rowsToObjects(rows);
           if(!objects.length) throw new Error('取込対象データがありません。');
           result.totalRows = objects.length;
-          const incoming = [];
-          const existingIds = new Set(candidates.map(c => c.id));
-          objects.forEach(o => {
-            try{
-              if(!o['応募者名']){ result.skipped++; return; }
-              const id = o['id'] || uid();
-              incoming.push(normalizeCandidate({
-                id,
-                name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
-                job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
-                license: o['免許区分'] || '', area: o['希望勤務地'] || '',
-                interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
-                nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
-                resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
-                appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
-                createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
-              }));
-              if(o['id'] && existingIds.has(id)) result.updated++; else result.added++;
-              result.imported++;
-            }catch(rowErr){ console.error('[CSV IMPORT] row error', rowErr); result.errors++; }
-          });
-          const mode = getRadioValue('candImportMode');
-          if(mode === 'replace') candidates = [...incoming];
-          else candidates = mergeOrReplace(candidates, incoming, mode);
+          const formatLabel = (hasName && !hasAps) ? 'Indeed形式' : 'APSテンプレート形式';
+          console.log(`[CSV IMPORT] format detected: ${formatLabel}`);
+
+          if(hasName && !hasAps){
+            // ===== Indeed形式 =====
+            const mode = getRadioValue('candImportMode');
+            if(mode === 'replace'){
+              if(!confirm(`既存応募者${candidates.length}件を全削除して取込みます。よろしいですか？`)){
+                throw new Error('ユーザーがキャンセルしました');
+              }
+              candidates = [];
+            }
+            let fallbackJobs = 0;
+            objects.forEach(row => {
+              try{
+                const incoming = buildIncomingFromMediaRow(row);
+                if(!incoming){ result.skipped++; return; }
+                if(incoming._jobFallback) fallbackJobs++;
+                const dup = findDuplicateCandidate(incoming);
+                if(dup){
+                  const baseMemo = (dup.memo || '').replace(/【求人媒体CSV取込情報】[\s\S]*$/, '').trim();
+                  const mergedMemo = baseMemo ? (baseMemo + '\n\n' + incoming.memo) : incoming.memo;
+                  const updatedRecord = normalizeCandidate({
+                    ...dup,
+                    name: incoming.name || dup.name,
+                    phone: incoming.phone || dup.phone,
+                    email: incoming.email || dup.email,
+                    job: incoming.job || dup.job,
+                    source: incoming.source || dup.source,
+                    area: incoming.area || dup.area,
+                    status: incoming.status || dup.status,
+                    rating: (dup.rating && dup.rating !== '未評価') ? dup.rating : incoming.rating,
+                    appliedAt: incoming.appliedAt || dup.appliedAt,
+                    memo: mergedMemo,
+                    updatedAt: nowDateTime()
+                  });
+                  candidates = candidates.map(c => c.id === dup.id ? updatedRecord : c);
+                  result.updated++;
+                }else{
+                  const createdAt = incoming._appliedDate ? `${incoming._appliedDate.replace(/-/g,'/')} 00:00:00` : nowDateTime();
+                  candidates.unshift(normalizeCandidate({ ...incoming, createdAt, updatedAt: nowDateTime() }));
+                  result.added++;
+                }
+                result.imported++;
+              }catch(rowErr){ console.error('[CSV IMPORT] row error', rowErr); result.errors++; }
+            });
+            result._fallbackJobs = fallbackJobs;
+          }else{
+            // ===== APSテンプレート形式 =====
+            const incoming = [];
+            const existingIds = new Set(candidates.map(c => c.id));
+            objects.forEach(o => {
+              try{
+                if(!o['応募者名']){ result.skipped++; return; }
+                const id = o['id'] || uid();
+                incoming.push(normalizeCandidate({
+                  id,
+                  name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
+                  job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
+                  license: o['免許区分'] || '', area: o['希望勤務地'] || '',
+                  interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
+                  nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
+                  resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
+                  appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
+                  createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
+                }));
+                if(o['id'] && existingIds.has(id)) result.updated++; else result.added++;
+                result.imported++;
+              }catch(rowErr){ console.error('[CSV IMPORT] row error', rowErr); result.errors++; }
+            });
+            const mode = getRadioValue('candImportMode');
+            if(mode === 'replace') candidates = [...incoming];
+            else candidates = mergeOrReplace(candidates, incoming, mode);
+          }
           result.afterCount = candidates.length;
-          await afterImportSuccess(result, 'candidateCsvImportMessage', '応募者CSV');
+          await afterImportSuccess(result, 'candidateCsvImportMessage', `応募者CSV（${formatLabel}）`);
+          if(result._fallbackJobs > 0){
+            showToast(`職種が判定不能で「中型ドライバー」に仮設定された応募者：${result._fallbackJobs}件\nメモに元の求人タイトルを記録しています。`, 'warning', 8000);
+          }
           clearCandidateCsvSelection();
         }catch(err){
           console.error('[CSV IMPORT] failed:', err);
           setImportMessage('candidateCsvImportMessage', `応募者CSV取込エラー：${err.message}`, 'error');
           showToast(`応募者CSV取込エラー：${err.message}`, 'error');
-          const btn = $('btnExecuteCandidateCsvImport'); if(btn){ btn.disabled = !selectedCandidateCsvFile; btn.textContent = '応募者CSV取込を実行'; }
         }
       });
     }
