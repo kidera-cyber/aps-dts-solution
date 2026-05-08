@@ -1,0 +1,2281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>採用管理APS｜中型ドライバー・運行管理者</title>
+  <style>
+    :root {
+      --bg:#f4f7fb;--panel:#fff;--navy:#0f2747;--blue:#2563eb;--blue2:#1d4ed8;--blueSoft:#eaf2ff;
+      --cyan:#06b6d4;--green:#16a34a;--greenSoft:#dcfce7;--amberSoft:#fef3c7;--red:#dc2626;
+      --redSoft:#fee2e2;--purpleSoft:#ede9fe;--text:#1f2937;--muted:#64748b;--line:#e2e8f0;
+      --shadow:0 18px 45px rgba(15,39,71,.10);--shadowSoft:0 8px 24px rgba(15,39,71,.08);--radius:22px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;color:var(--text);background:radial-gradient(circle at top left,rgba(37,99,235,.14),transparent 32%),radial-gradient(circle at top right,rgba(6,182,212,.10),transparent 28%),var(--bg);min-height:100vh}
+    button,input,select,textarea{font:inherit}
+    .app-shell{display:grid;grid-template-columns:268px minmax(0,1fr);min-height:100vh}
+    aside{position:sticky;top:0;height:100vh;padding:22px;background:linear-gradient(180deg,#0b1f38,#12355d 56%,#0f2747);color:#fff;overflow-y:auto}
+    .brand{display:flex;gap:12px;align-items:center;margin-bottom:26px}
+    .brand-mark{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#60a5fa,#22d3ee);font-weight:900;box-shadow:0 12px 28px rgba(96,165,250,.35)}
+    .brand h1{font-size:17px;margin:0;line-height:1.35}.brand p{margin:3px 0 0;color:#cbd5e1;font-size:12px}
+    .nav-group-title{color:#93a4b8;font-size:11px;letter-spacing:.12em;margin:24px 8px 10px;font-weight:800}
+    .tab-btn{width:100%;display:flex;align-items:center;gap:10px;border:0;background:transparent;color:#dbeafe;padding:12px;border-radius:15px;cursor:pointer;font-weight:800;text-align:left;transition:.18s ease}
+    .tab-btn:hover{background:rgba(255,255,255,.08);transform:translateX(2px)}.tab-btn.active{background:#fff;color:var(--navy);box-shadow:var(--shadowSoft)}
+    .tab-icon{width:26px;height:26px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.12)}
+    .side-note{margin-top:28px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);color:#dbeafe;font-size:12px;line-height:1.7;border:1px solid rgba(255,255,255,.12)}
+    main{min-width:0;padding:28px}.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:22px}
+    .eyebrow{color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.12em;margin-bottom:8px}.topbar h2{font-size:clamp(26px,3vw,42px);line-height:1.18;color:var(--navy);margin:0 0 8px;letter-spacing:-.03em}.topbar p{color:var(--muted);margin:0;line-height:1.7}
+    .quick-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .btn{border:0;border-radius:999px;padding:11px 16px;cursor:pointer;font-weight:900;display:inline-flex;align-items:center;gap:8px;transition:.18s ease;background:var(--panel);color:var(--navy);box-shadow:var(--shadowSoft);white-space:nowrap}
+    .btn:hover{transform:translateY(-1px)}.btn-primary{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff}.btn-danger{background:var(--red);color:#fff}.btn-soft{background:var(--blueSoft);color:var(--blue2);box-shadow:none}.btn-ghost{background:#eef2f7;color:var(--text);box-shadow:none}.btn-small{padding:7px 10px;font-size:12px}
+    .btn-file{position:relative;overflow:hidden}.btn-file input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+    .panel{display:none}.panel.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
+    .card{background:rgba(255,255,255,.92);border:1px solid rgba(226,232,240,.9);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;backdrop-filter:blur(10px)}
+    .metric{grid-column:span 2;padding:18px;position:relative;overflow:hidden}.metric .label{color:var(--muted);font-size:12px;font-weight:900;margin-bottom:8px}.metric .value{color:var(--navy);font-size:34px;font-weight:950;letter-spacing:-.04em}.metric .sub{color:var(--muted);font-size:12px;margin-top:6px}
+    .wide{grid-column:span 8}.side{grid-column:span 4}.full{grid-column:1/-1}
+    .card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.card h3{margin:0;color:var(--navy);font-size:19px;letter-spacing:-.02em}.hint{color:var(--muted);font-size:12px;font-weight:700;line-height:1.7;margin:4px 0 0}
+    .filters,.form-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px}.form-grid-2{display:grid;grid-template-columns:repeat(2,minmax(200px,1fr));gap:14px}
+    label.field{display:block;font-size:12px;color:#475569;font-weight:900}label.field input,label.field select,label.field textarea{width:100%;margin-top:7px;border:1px solid #dbe4ef;background:#fff;color:var(--text);border-radius:14px;padding:12px 13px;outline:none;transition:.15s ease;min-height:43px}
+    textarea{resize:vertical;min-height:110px}.table-wrap{overflow-x:auto;border-radius:18px;border:1px solid var(--line)}
+    table{width:100%;border-collapse:collapse;background:#fff;min-width:1040px}th,td{padding:14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle;font-size:13px}th{background:#f8fbff;color:#475569;font-size:11px;letter-spacing:.08em;font-weight:950;white-space:nowrap}tbody tr:hover td{background:#fbfdff}
+    .person{display:flex;align-items:center;gap:10px;min-width:190px}.avatar{width:38px;height:38px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#dbeafe,#cffafe);color:var(--navy);font-weight:950}.person strong{display:block;color:var(--navy);font-size:14px}.person small{color:var(--muted)}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.badge-blue{background:var(--blueSoft);color:var(--blue2)}.badge-green{background:var(--greenSoft);color:#15803d}.badge-yellow{background:var(--amberSoft);color:#a16207}.badge-red{background:var(--redSoft);color:#b91c1c}.badge-gray{background:#f1f5f9;color:#475569}
+    .action-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.empty{padding:28px;border:1px dashed #cbd5e1;border-radius:18px;color:var(--muted);text-align:center;background:#fff}
+    .kanban{display:grid;grid-template-columns:repeat(10,minmax(210px,1fr));gap:14px;overflow-x:auto;padding-bottom:8px}.kanban-col{min-height:520px;border-radius:22px;padding:14px;background:#f6f9fd;border:1px solid var(--line)}.kanban-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;color:var(--navy);font-weight:950}
+    .candidate-card{background:#fff;border:1px solid #dfe7f0;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 8px 18px rgba(15,39,71,.07)}.candidate-card strong{color:var(--navy);display:block;margin-bottom:7px}.candidate-card p{margin:6px 0;color:var(--muted);font-size:12px;line-height:1.55}.candidate-card select{width:100%;border-radius:12px;border:1px solid var(--line);padding:9px 10px;margin-top:8px}
+    .form-section{border:1px solid var(--line);background:#fbfdff;border-radius:20px;padding:18px;margin-bottom:16px}.form-section h4{margin:0 0 14px;color:var(--navy)}
+    .notice{border-radius:18px;padding:14px 16px;line-height:1.75;font-size:13px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}.notice.success{background:#dcfce7;color:#166534;border-color:#bbf7d0}.notice.error{background:#fee2e2;color:#b91c1c;border-color:#fecaca}.notice.info{background:#eaf2ff;color:#1d4ed8;border-color:#bfdbfe}.success{color:#166534;font-weight:900}.error{color:#b91c1c;font-weight:900}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.52);display:none;align-items:center;justify-content:center;padding:22px;z-index:80}.modal-backdrop.active{display:flex}.modal{width:min(920px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:28px;box-shadow:0 28px 90px rgba(15,23,42,.30);padding:24px}.modal-header{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}.modal-header h3{margin:0;color:var(--navy)}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.detail-item{background:#f8fafc;border:1px solid var(--line);border-radius:16px;padding:13px}.detail-item small{color:var(--muted);font-size:11px;font-weight:900;display:block;margin-bottom:5px}
+    .resume-box{display:grid;gap:12px}.resume-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.resume-preview{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff;min-height:220px}.resume-preview iframe{width:100%;height:520px;border:0;display:block}
+    .radio-row{display:flex;gap:14px;align-items:center;font-size:13px;font-weight:700;color:var(--muted);flex-wrap:wrap}.radio-row label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+    .sync-card{font-size:13px;line-height:1.8;color:var(--text)}.sync-card strong{color:var(--navy);font-size:16px}.sync-state{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-weight:900;font-size:12px;margin-bottom:10px}.sync-state.idle{background:#f1f5f9;color:#475569}.sync-state.ok{background:#dcfce7;color:#15803d}.sync-state.ng{background:#fee2e2;color:#b91c1c}
+    @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
+    @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside>
+      <div class="brand"><div class="brand-mark">APS</div><div><h1>採用管理APS</h1><p>中型ドライバー・運行管理者</p></div></div>
+      <div class="nav-group-title">MENU</div>
+      <div class="tab-list">
+        <button type="button" class="tab-btn active" data-tab="dashboard"><span class="tab-icon">📊</span>ダッシュボード</button>
+        <button type="button" class="tab-btn" data-tab="list"><span class="tab-icon">👥</span>応募者一覧</button>
+        <button type="button" class="tab-btn" data-tab="kanban"><span class="tab-icon">🧭</span>選考状況</button>
+        <button type="button" class="tab-btn" data-tab="form"><span class="tab-icon">✍️</span>手動登録</button>
+        <button type="button" class="tab-btn" data-tab="plan"><span class="tab-icon">🎯</span>採用計画</button>
+        <button type="button" class="tab-btn" data-tab="media"><span class="tab-icon">💴</span>掲載費用</button>
+        <button type="button" class="tab-btn" data-tab="report"><span class="tab-icon">📈</span>月次レポート</button>
+        <button type="button" class="tab-btn" data-tab="settings"><span class="tab-icon">⚙️</span>設定・データ操作</button>
+      </div>
+      <div class="side-note"><strong>共有モード対応</strong><br>設定画面でApps Script WebアプリURLとAPI Keyを入力すると、複数PCで同じスプレッドシートのデータを共有できます。未入力ならローカル保存だけで動作します。</div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <div><div class="eyebrow">RECRUITMENT OPERATIONS</div><h2 id="pageTitle">採用状況をひと目で把握</h2><p id="pageLead">応募者・面接日時・選考ステータス・媒体別効果を確認できます。</p></div>
+        <div class="quick-actions">
+          <button type="button" class="btn btn-primary" id="btnQuickForm">＋ 手動登録</button>
+          <button type="button" class="btn btn-soft" id="btnQuickReload">クラウド再読込</button>
+          <button type="button" class="btn" id="btnQuickCSV">CSV出力</button>
+          <button type="button" class="btn" id="btnQuickImport">CSV取込</button>
+        </div>
+      </div>
+
+      <section id="dashboard" class="panel active">
+        <div class="grid" id="metricGrid"></div>
+        <div class="grid" style="margin-top:18px;">
+          <div class="card wide"><div class="card-head"><div><h3>職種別 応募状況</h3><p class="hint">中型ドライバー・運行管理者のみを集計します</p></div></div><div id="jobBars"></div></div>
+          <div class="card side"><div class="card-head"><div><h3>応募経路別 効果</h3><p class="hint">indeed / PLEX / XMile / リファラル / 紹介</p></div></div><div id="sourceBars"></div></div>
+          <div class="card wide"><div class="card-head"><div><h3>採用計画の進捗</h3><p class="hint">内定承諾数を目標と比較します</p></div></div><div id="planSummary"></div></div>
+          <div class="card side"><div class="card-head"><div><h3>共有ステータス</h3><p class="hint">クラウド共有モードの接続状態</p></div></div><div id="syncCard" class="sync-card"></div></div>
+          <div class="card full"><div class="card-head"><div><h3>今月の採用費用</h3><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く</button></div><div class="grid" id="thisMonthCards"></div></div>
+        </div>
+      </section>
+
+      <section id="list" class="panel">
+        <div class="card">
+          <div class="card-head"><div><h3>応募者一覧</h3><p class="hint">検索・絞り込み・詳細確認・編集ができます</p></div><button type="button" class="btn btn-primary" id="btnListForm">＋ 手動登録</button></div>
+          <div class="filters" style="margin-bottom:16px;">
+            <label class="field">応募者名検索<input id="searchName" placeholder="例）山田" /></label>
+            <label class="field">職種<select id="filterJob"></select></label>
+            <label class="field">ステータス<select id="filterStatus"></select></label>
+            <label class="field">応募経路<select id="filterSource"></select></label>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>応募者</th><th>職種</th><th>経路</th><th>ステータス</th><th>面接日時</th><th>担当</th><th>履歴書</th><th>操作</th></tr></thead><tbody id="candidateTable"></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="kanban" class="panel"><div class="card"><div class="card-head"><div><h3>選考状況</h3><p class="hint">ステータス別に応募者を見ながら、進捗を動かせます</p></div></div><div class="kanban" id="kanbanBoard"></div></div></section>
+
+      <section id="form" class="panel">
+        <div class="card">
+          <div class="card-head"><div><h3 id="formTitle">応募者登録（手動）</h3><p class="hint">1名ずつ手入力で登録します。複数件は設定画面からCSV取込してください。</p></div></div>
+          <form id="candidateForm">
+            <input type="hidden" id="candidateId" />
+            <div class="form-section"><h4>基本情報</h4><div class="form-grid">
+              <label class="field">応募者名 ※<input id="name" required placeholder="例）山田 太郎" /></label>
+              <label class="field">電話番号<input id="phone" placeholder="090-0000-0000" /></label>
+              <label class="field">メールアドレス<input id="email" type="email" placeholder="example@example.com" /></label>
+              <label class="field">応募経路<select id="source"></select></label>
+            </div></div>
+            <div class="form-section"><h4>職種・資格</h4><div class="form-grid">
+              <label class="field">希望職種 ※<select id="job" required></select></label>
+              <label class="field">雇用形態<select id="workType"><option value="未確認">未確認</option><option value="正社員">正社員</option><option value="アルバイト">アルバイト</option></select></label>
+              <label class="field">免許区分<select id="license"><option value="未確認">未確認</option><option value="普通免許">普通免許</option><option value="準中型免許">準中型免許</option><option value="中型免許">中型免許</option><option value="大型免許">大型免許</option></select></label>
+              <label class="field">希望勤務地<input id="area" placeholder="例）大阪府内" /></label>
+            </div></div>
+            <div class="form-section"><h4>選考・面接</h4><div class="form-grid">
+              <label class="field">選考ステータス ※<select id="status" required></select></label>
+              <label class="field">評価<select id="rating"></select></label>
+              <label class="field">面接日時<input id="interviewAt" type="datetime-local" /></label>
+              <label class="field">次回対応日<input id="nextDate" type="date" /></label>
+              <label class="field">担当者<input id="owner" placeholder="例）木寺" /></label>
+            </div>
+            <div class="form-grid" style="margin-top:14px;">
+              <label class="field">応募日<input id="appliedAt" type="date" /></label>
+              <label class="field">内定日<input id="offerAt" type="date" /></label>
+              <label class="field">内定承諾日<input id="acceptedAt" type="date" /></label>
+              <label class="field">入社決定日<input id="joinedAt" type="date" /></label>
+            </div>
+            <label class="field" style="margin-top:14px;">メモ<textarea id="memo" placeholder="面接メモ、懸念点、次回アクションなど"></textarea></label></div>
+            <div class="form-section"><h4>履歴書・職務経歴書</h4><div class="form-grid">
+              <label class="field">履歴書ファイル名<input id="resumeName" placeholder="例）山田太郎_履歴書.pdf" /></label>
+              <label class="field" style="grid-column:span 3;">履歴書URL（共有リンクを貼り付け）<input id="resumeUrl" type="url" placeholder="https://drive.google.com/file/d/.../view など" /></label>
+            </div><p class="hint">※ ファイル本体ではなく共有リンクのみ保存します。Google Drive形式は詳細画面でプレビュー表示できます。</p></div>
+            <div class="action-row"><button type="submit" class="btn btn-primary">保存する</button><button type="button" class="btn btn-ghost" id="btnResetCandidateForm">新規登録に戻す</button></div>
+            <p id="formMessage" style="font-weight:900;"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="plan" class="panel">
+        <div class="card">
+          <div class="card-head"><div><h3>採用計画管理</h3><p class="hint">職種別の目標人数と内定承諾数を比較します</p></div></div>
+          <form id="planForm">
+            <input type="hidden" id="planId" />
+            <div class="form-grid">
+              <label class="field">職種名<select id="planJob" required></select></label>
+              <label class="field">今期目標人数<input id="planTotal" type="number" min="0" value="0" required /></label>
+              <label class="field">1Q目標<input id="q1" type="number" min="0" value="0" /></label>
+              <label class="field">2Q目標<input id="q2" type="number" min="0" value="0" /></label>
+              <label class="field">3Q目標<input id="q3" type="number" min="0" value="0" /></label>
+              <label class="field">4Q目標<input id="q4" type="number" min="0" value="0" /></label>
+            </div>
+            <div class="action-row" style="margin:16px 0;"><button class="btn btn-primary" type="submit" id="planSaveBtn">採用計画を保存</button><button class="btn btn-ghost" type="button" id="btnResetPlanForm">新規に戻す</button></div>
+          </form>
+          <div class="table-wrap"><table><thead><tr><th>職種</th><th>今期目標</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th><th>内定承諾</th><th>進捗率</th><th>不足</th><th>操作</th></tr></thead><tbody id="planTable"></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="media" class="panel">
+        <div class="card">
+          <div class="card-head"><div><h3>掲載費用管理</h3><p class="hint">媒体・紹介会社ごとに費用タイプを分けて管理し、応募者ステータスから成功報酬対象を自動計算します</p></div></div>
+          <div class="grid" id="mediaSummary" style="margin-bottom:18px;"></div>
+          <form id="mediaForm" class="form-section">
+            <input type="hidden" id="mediaId" />
+            <h4 id="mediaFormTitle">媒体費用を登録</h4>
+            <div class="form-grid">
+              <label class="field">費用タイプ ※<select id="mediaFeeType" required></select></label>
+              <label class="field">媒体名 / 紹介会社名 ※<input id="mediaName" required placeholder="例）indeed / PLEX / A紹介会社" /></label>
+              <label class="field">求人タイトル<input id="mediaJobTitle" placeholder="例）中型ドライバー(週休2日)" /></label>
+              <label class="field">対象職種<select id="mediaTargetJob"></select></label>
+              <label class="field">紐付き応募経路<input id="mediaSource" placeholder="candidate.source と一致する値（例：indeed）" /></label>
+              <label class="field">掲載開始日<input id="mediaStartDate" type="date" /></label>
+              <label class="field">掲載終了日<input id="mediaEndDate" type="date" /></label>
+              <label class="field">計上月（yyyy-mm）<input id="mediaCostMonth" type="month" /></label>
+              <label class="field">請求月（yyyy-mm）<input id="mediaBillingMonth" type="month" /></label>
+              <label class="field">月次配分方法<select id="mediaAllocationType"></select></label>
+            </div>
+            <div class="form-grid" style="margin-top:14px;">
+              <label class="field">掲載金額（円）<input id="mediaFixedListingCost" type="number" min="0" value="0" /></label>
+              <label class="field">その他費用（円）<input id="mediaOtherCost" type="number" min="0" value="0" /></label>
+              <label class="field">成功報酬計算方法<select id="mediaSuccessFeeType"></select></label>
+              <label class="field">1名あたり成功報酬（円）<input id="mediaSuccessFeePerHire" type="number" min="0" value="0" /></label>
+              <label class="field">理論年収（円）<input id="mediaAnnualSalary" type="number" min="0" value="0" /></label>
+              <label class="field">成功報酬率（%）<input id="mediaSuccessFeeRate" type="number" min="0" step="0.1" value="0" /></label>
+              <label class="field">成功報酬発生条件<select id="mediaFeeTriggerStatus"></select></label>
+              <label class="field">手動請求対象人数<input id="mediaManualBillableCount" type="number" min="0" value="0" /></label>
+            </div>
+            <label class="field" style="margin-top:14px;">手動月割り（JSON配列）<textarea id="mediaMonthlyAllocations" placeholder='例）[{"month":"2026-04","amount":50000},{"month":"2026-05","amount":50000}]' style="min-height:60px;"></textarea></label>
+            <div class="form-grid" style="margin-top:14px;">
+              <label class="field" style="grid-column:span 2;">請求条件メモ<input id="mediaBillingMemo" placeholder="例）入社後30日経過で請求" /></label>
+              <label class="field" style="grid-column:span 2;">メモ<input id="mediaMemo" placeholder="補足" /></label>
+            </div>
+            <div class="action-row" style="margin-top:14px;">
+              <button class="btn btn-primary" type="submit">保存する</button>
+              <button class="btn btn-ghost" type="button" id="btnResetMediaForm">新規に戻す</button>
+            </div>
+          </form>
+          <div class="card-head" style="margin-top:18px;"><h3>登録済み媒体・紹介会社</h3></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>費用タイプ</th><th>媒体/紹介会社</th><th>求人タイトル</th><th>職種</th><th>掲載期間</th><th>掲載金額</th><th>成功報酬条件</th><th>対象人数</th><th>成功報酬合計</th><th>その他</th><th>合計</th><th>応募</th><th>面接</th><th>内定</th><th>承諾</th><th>入社</th><th>応募単価</th><th>承諾単価</th><th>入社単価</th><th>操作</th></tr></thead>
+            <tbody id="mediaTable"></tbody>
+          </table></div>
+          <div class="card-head" style="margin-top:18px;"><h3>媒体別比較</h3></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>媒体/紹介会社</th><th>主な費用タイプ</th><th>合計費用</th><th>応募数</th><th>承諾数</th><th>入社数</th><th>応募単価</th><th>承諾単価</th><th>入社単価</th></tr></thead>
+            <tbody id="mediaCompareTable"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section id="report" class="panel">
+        <div class="card">
+          <div class="card-head"><div><h3>月次レポート</h3><p class="hint">月ごとの採用費用と応募/面接/承諾/入社の単価を集計します</p></div><button class="btn btn-soft" id="btnExportReportCSV">月次レポートCSV出力</button></div>
+          <div class="filters" style="margin-bottom:16px;">
+            <label class="field">対象年月<input id="reportMonth" type="month" /></label>
+            <label class="field">対象職種<select id="reportJob"></select></label>
+            <label class="field">媒体/紹介会社<select id="reportSource"></select></label>
+            <label class="field">費用タイプ<select id="reportFeeType"></select></label>
+          </div>
+          <div class="grid" id="reportSummary"></div>
+          <div class="card-head" style="margin-top:18px;"><h3>媒体別月次表</h3></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>対象月</th><th>媒体/紹介会社</th><th>費用タイプ</th><th>職種</th><th>掲載費用</th><th>成功報酬</th><th>その他</th><th>総費用</th><th>応募</th><th>面接</th><th>内定</th><th>承諾</th><th>入社</th><th>応募単価</th><th>面接単価</th><th>承諾単価</th><th>入社単価</th></tr></thead>
+            <tbody id="reportMediaTable"></tbody>
+          </table></div>
+          <div class="card-head" style="margin-top:18px;"><h3>月別推移（過去6か月）</h3></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>月</th><th>総費用</th><th>応募</th><th>面接</th><th>内定</th><th>承諾</th><th>入社</th><th>応募単価</th><th>承諾単価</th><th>入社単価</th></tr></thead>
+            <tbody id="reportTrendTable"></tbody>
+          </table></div>
+          <div class="card-head" style="margin-top:18px;"><h3>推移グラフ（簡易）</h3></div>
+          <div id="reportChart" style="display:grid;gap:14px;"></div>
+        </div>
+      </section>
+
+      <section id="settings" class="panel">
+        <div class="card">
+          <div class="card-head"><div><h3>設定・データ操作</h3><p class="hint">クラウド共有設定とCSV / JSONバックアップ操作</p></div></div>
+          <div class="notice info">複数PCで応募者データを共有するには、Apps Script WebアプリURLとAPI Keyを設定してください。未設定の場合はこのブラウザ内のみで保存します。</div>
+          <div id="dataMessage" style="margin-top:12px;"></div>
+
+          <div class="form-section" style="margin-top:16px;">
+            <h4>クラウド共有設定</h4>
+            <div class="form-grid-2">
+              <label class="field">Apps Script WebアプリURL<input id="apiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" /></label>
+              <label class="field">共有キー / API Key<input id="apiKey" type="text" placeholder="任意の長いランダム文字列" /></label>
+            </div>
+            <div class="action-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="btnSaveSettings">設定を保存</button>
+              <button class="btn btn-soft" id="btnTestConnection">接続確認</button>
+              <button class="btn" id="btnCloudReload">クラウドから再読込</button>
+              <button class="btn btn-ghost" id="btnCloudPush">現在データをクラウドへ反映</button>
+            </div>
+            <div class="radio-row" style="margin-top:14px;">自動更新（30秒ごと）：
+              <label><input type="checkbox" id="pollingToggle" checked /> ON</label>
+              <span style="color:var(--muted);font-size:12px;">他の人の変更を30秒ごとに自動取得します。フォーム入力中・編集中・モーダル表示中は自動的にスキップします。</span>
+            </div>
+          </div>
+
+          <div class="form-section" id="mediaImportSection">
+            <h4>求人媒体CSV取込（Indeed等）</h4>
+            <p class="hint">求人媒体から出力した応募者CSVをそのまま取込めます。職種・ステータス・評価は自動マッピング、質問1〜15はメモに集約、メール/電話/名前+応募日で重複判定して自動上書きします。</p>
+            <div class="action-row" style="margin-top:10px;margin-bottom:10px;">
+              <label class="btn btn-soft btn-file">求人媒体CSVを選択<input type="file" id="inputMediaCSV" accept=".csv,text/csv" /></label>
+              <span id="mediaFileName" style="color:var(--muted);font-size:12px;">未選択</span>
+              <button class="btn btn-primary" id="btnRunMediaImport">取込実行</button>
+              <button class="btn btn-ghost" id="btnClearMediaImport">クリア</button>
+            </div>
+            <div class="radio-row" style="margin-bottom:8px;">取込モード：
+              <label><input type="radio" name="mediaImportMode" value="merge" checked /> 追加取込（既存に追加・重複は上書き）</label>
+              <label><input type="radio" name="mediaImportMode" value="replace" /> 全上書き（既存応募者を全削除して取込）</label>
+            </div>
+            <div id="mediaImportResult" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
+            <h4>応募者データ（APSテンプレート形式）</h4>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExportCandidatesCSV">応募者CSVを出力</button>
+              <label class="btn btn-soft btn-file">応募者CSVを選択<input type="file" id="inputCandidatesCSV" accept=".csv,text/csv" /></label>
+              <span id="candidateCsvFileName" style="color:var(--muted);font-size:13px;font-weight:700;">CSVファイルが選択されていません</span>
+            </div>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExecuteCandidateCsvImport" disabled>取込実行</button>
+              <button class="btn btn-ghost" id="btnClearCandidateCsv">選択をクリア</button>
+            </div>
+            <div class="radio-row">取込モード：
+              <label><input type="radio" name="candImportMode" value="merge" checked /> 既存データを残して追加（IDが同じ場合は上書き）</label>
+              <label><input type="radio" name="candImportMode" value="replace" /> 既存データを削除して上書き</label>
+            </div>
+            <div id="candidateCsvMessage" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
+            <h4>採用計画データ</h4>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExportPlansCSV">採用計画CSVを出力</button>
+              <label class="btn btn-soft btn-file">採用計画CSVを選択<input type="file" id="inputPlansCSV" accept=".csv,text/csv" /></label>
+              <span id="planCsvFileName" style="color:var(--muted);font-size:13px;font-weight:700;">CSVファイルが選択されていません</span>
+            </div>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExecutePlanCsvImport" disabled>採用計画CSV取込を実行</button>
+              <button class="btn btn-ghost" id="btnClearPlanCsv">選択をクリア</button>
+            </div>
+            <div class="radio-row">取込モード：
+              <label><input type="radio" name="planImportMode" value="merge" checked /> 既存データを残して追加（IDが同じ場合は上書き）</label>
+              <label><input type="radio" name="planImportMode" value="replace" /> 既存データを削除して上書き</label>
+            </div>
+            <div id="planCsvImportMessage" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
+            <h4>媒体費用データ</h4>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExportMediaCSV">媒体費用CSVを出力</button>
+              <label class="btn btn-soft btn-file">媒体費用CSVを選択<input type="file" id="inputMediaCSV2" accept=".csv,text/csv" /></label>
+              <span id="mediaCostCsvFileName" style="color:var(--muted);font-size:13px;font-weight:700;">CSVファイルが選択されていません</span>
+            </div>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExecuteMediaCostCsvImport" disabled>媒体費用CSV取込を実行</button>
+              <button class="btn btn-ghost" id="btnClearMediaCostCsv">選択をクリア</button>
+            </div>
+            <div class="radio-row">取込モード：
+              <label><input type="radio" name="mediaImportMode2" value="merge" checked /> 残して追加（IDが同じ場合は上書き）</label>
+              <label><input type="radio" name="mediaImportMode2" value="replace" /> 削除して上書き</label>
+            </div>
+            <div id="mediaCostCsvImportMessage" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
+            <h4>全データJSONバックアップ</h4>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExportJSON">JSONバックアップ出力</button>
+              <label class="btn btn-soft btn-file">JSONバックアップを選択<input type="file" id="inputBackupJSON" accept=".json,application/json" /></label>
+              <span id="jsonBackupFileName" style="color:var(--muted);font-size:13px;font-weight:700;">JSONファイルが選択されていません</span>
+            </div>
+            <div class="action-row" style="margin-bottom:10px;">
+              <button class="btn btn-primary" id="btnExecuteJsonBackupImport" disabled>JSONバックアップ取込を実行</button>
+              <button class="btn btn-ghost" id="btnClearJsonBackup">選択をクリア</button>
+            </div>
+            <p class="hint">取込時、現在の応募者・採用計画・媒体費用データは全てバックアップ内容で上書きされます。</p>
+            <div id="jsonBackupImportMessage" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
+            <h4>その他</h4>
+            <div class="action-row">
+              <button class="btn btn-soft" id="btnLoadSample">サンプルデータを再投入</button>
+              <button class="btn btn-danger" id="btnResetAll">全データリセット</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop"><div class="modal"><div class="modal-header"><h3 id="modalTitle">応募者詳細</h3><button type="button" class="btn btn-ghost" id="btnCloseModal">閉じる</button></div><div id="modalBody"></div></div></div>
+
+  <script>
+    const STORAGE_CANDIDATES = 'apsLocal.candidates.v2';
+    const STORAGE_PLANS = 'apsLocal.plans.v2';
+    const STORAGE_MEDIA = 'apsLocal.mediaCosts.v1';
+    const STORAGE_API_URL = 'aps_api_url';
+    const STORAGE_API_KEY = 'aps_api_key';
+
+    let mediaCosts = [];
+
+    function normalizeMediaCost(m={}){
+      return {
+        id: m.id || uid(),
+        feeType: feeTypes.includes(m.feeType) ? m.feeType : '掲載課金型',
+        name: m.name || '',
+        jobTitle: m.jobTitle || '',
+        targetJob: m.targetJob || '',
+        source: m.source || '',
+        startDate: m.startDate || '',
+        endDate: m.endDate || '',
+        fixedListingCost: Number(m.fixedListingCost || 0),
+        successFeeType: successFeeTypes.includes(m.successFeeType) ? m.successFeeType : '固定金額',
+        successFeePerHire: Number(m.successFeePerHire || 0),
+        successFeeRate: Number(m.successFeeRate || 0),
+        annualSalaryEstimate: Number(m.annualSalaryEstimate || 0),
+        feeTriggerStatus: feeTriggerStatuses.includes(m.feeTriggerStatus) ? m.feeTriggerStatus : '内定承諾',
+        manualBillableCount: Number(m.manualBillableCount || 0),
+        otherCost: Number(m.otherCost || 0),
+        billingMemo: m.billingMemo || '',
+        memo: m.memo || '',
+        costMonth: m.costMonth || '',
+        billingMonth: m.billingMonth || '',
+        allocationType: allocationTypes.includes(m.allocationType) ? m.allocationType : '単月計上',
+        monthlyAllocations: Array.isArray(m.monthlyAllocations) ? m.monthlyAllocations : [],
+        createdAt: m.createdAt || nowDateTime(),
+        updatedAt: m.updatedAt || nowDateTime()
+      };
+    }
+
+    const jobs = ['中型ドライバー', '運行管理者'];
+    const sources = ['indeed', 'PLEX', 'XMile', 'リファラル', '紹介'];
+    const statuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退','不採用','保留'];
+    const kanbanStatuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退・不採用'];
+    const feeTypes = ['掲載課金型','成功報酬型','掲載＋成功報酬型','無料・リファラル','その他'];
+    const successFeeTypes = ['固定金額','理論年収の％','手入力'];
+    const feeTriggerStatuses = ['内定','内定承諾','入社決定','採用','手動'];
+    const allocationTypes = ['単月計上','掲載期間で日割り','手動月割り'];
+    const ratings = ['未評価','A：ぜひ進めたい','B：前向きに検討','C：懸念あり','D：見送り候補'];
+
+    let candidates = [];
+    let plans = [];
+    let syncState = { mode: 'idle', message: '', lastSyncedAt: '' };
+
+    // ===== 自動ポーリング =====
+    const POLLING_INTERVAL_MS = 30000;
+    let pollingTimer = null;
+    let pollingEnabled = true;
+
+    function isFormInUse(){
+      const cid = document.getElementById('candidateId');
+      if(cid && cid.value) return true;
+      const pid = document.getElementById('planId');
+      if(pid && pid.value) return true;
+      const active = document.activeElement;
+      if(active){
+        if(active.closest && (active.closest('#candidateForm') || active.closest('#planForm'))) return true;
+        if(active.tagName === 'INPUT' && active.type === 'file') return true;
+      }
+      const modal = document.getElementById('modalBackdrop');
+      if(modal && modal.classList.contains('active')) return true;
+      return false;
+    }
+
+    async function autoPoll(){
+      if(!isCloudConfigured()) return;
+      if(!pollingEnabled) return;
+      if(isFormInUse()) return;
+      try{ await cloudReload(true); }catch(err){ /* syncCard で表示済み */ }
+    }
+
+    function startAutoPolling(){
+      stopAutoPolling();
+      if(!isCloudConfigured() || !pollingEnabled) return;
+      pollingTimer = setInterval(autoPoll, POLLING_INTERVAL_MS);
+    }
+
+    function stopAutoPolling(){
+      if(pollingTimer){ clearInterval(pollingTimer); pollingTimer = null; }
+    }
+
+    const $ = id => document.getElementById(id);
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+    const todayISO = (offsetDays=0) => { const d = new Date(); d.setDate(d.getDate()+offsetDays); return d.toISOString().slice(0,10); };
+    const nowDateTime = () => {
+      const d = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+    const escapeHTML = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const formatDateTime = v => v ? String(v).replace('T',' ') : '-';
+    const csvEscape = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+
+    function isCloudConfigured(){
+      return !!(localStorage.getItem(STORAGE_API_URL) && localStorage.getItem(STORAGE_API_KEY));
+    }
+
+    async function callCloud(action, payload = {}){
+      const endpoint = localStorage.getItem(STORAGE_API_URL) || '';
+      const apiKey = localStorage.getItem(STORAGE_API_KEY) || '';
+      if(!endpoint || !apiKey){
+        throw new Error('Apps Script WebアプリURLとAPI Keyを設定してください。');
+      }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ key: apiKey, action, payload })
+      });
+      let data;
+      try{
+        data = await res.json();
+      }catch(parseErr){
+        throw new Error('Apps Scriptからの応答をJSONとして解釈できませんでした。デプロイ設定とコードを確認してください。');
+      }
+      if(!data || data.ok === false){
+        throw new Error(data && data.error ? data.error : 'クラウド通信に失敗しました。');
+      }
+      return data;
+    }
+
+    function setSyncState(mode, message){
+      syncState = { mode, message, lastSyncedAt: mode === 'ok' ? nowDateTime() : syncState.lastSyncedAt };
+      renderSyncCard();
+    }
+
+    function renderSyncCard(){
+      const el = $('syncCard'); if(!el) return;
+      if(!isCloudConfigured()){
+        el.innerHTML = `<div class="sync-state idle">共有モード：未設定</div><div>このPC内のローカルデータで動作中です。</div><div style="margin-top:8px;color:var(--muted);font-size:12px;">設定タブからWebアプリURLとAPI Keyを入力すると共有モードになります。</div>`;
+        return;
+      }
+      const pollingLabel = pollingEnabled
+        ? `自動更新：<strong>ON</strong>（${POLLING_INTERVAL_MS/1000}秒ごと）`
+        : `自動更新：<strong>OFF</strong>`;
+      if(syncState.mode === 'ok'){
+        el.innerHTML = `<div class="sync-state ok">共有モード：接続中</div><div>最終同期：<strong>${escapeHTML(syncState.lastSyncedAt || '-')}</strong></div><div style="margin-top:8px;font-size:12px;">${pollingLabel}</div><div style="margin-top:4px;color:var(--muted);font-size:12px;">${escapeHTML(syncState.message || '')}</div>`;
+        return;
+      }
+      if(syncState.mode === 'ng'){
+        el.innerHTML = `<div class="sync-state ng">共有モード：接続エラー</div><div class="error">エラー内容：${escapeHTML(syncState.message || '不明')}</div><div style="margin-top:8px;font-size:12px;">${pollingLabel}</div><div style="margin-top:4px;color:var(--muted);font-size:12px;">設定タブで「接続確認」を実行してください。</div>`;
+        return;
+      }
+      el.innerHTML = `<div class="sync-state idle">共有モード：待機中</div><div>クラウド設定済み。「クラウドから再読込」または「接続確認」を実行してください。</div><div style="margin-top:8px;font-size:12px;">${pollingLabel}</div>`;
+    }
+
+    function saveLocal(){
+      try{
+        localStorage.setItem(STORAGE_CANDIDATES, JSON.stringify(candidates));
+        localStorage.setItem(STORAGE_PLANS, JSON.stringify(plans));
+        localStorage.setItem(STORAGE_MEDIA, JSON.stringify(mediaCosts));
+      }catch(err){ console.error('localStorage保存エラー', err); }
+    }
+
+    function loadLocal(){
+      try{ candidates = JSON.parse(localStorage.getItem(STORAGE_CANDIDATES) || '[]').map(normalizeCandidate); }catch{ candidates = []; }
+      try{ plans = JSON.parse(localStorage.getItem(STORAGE_PLANS) || '[]').map(normalizePlan); }catch{ plans = []; }
+      try{ mediaCosts = JSON.parse(localStorage.getItem(STORAGE_MEDIA) || '[]').map(normalizeMediaCost); }catch{ mediaCosts = []; }
+      if(!candidates.length && !plans.length && !mediaCosts.length) loadSampleData();
+    }
+
+    async function persist(showCloudMessage = false){
+      saveLocal();
+      renderAll();
+      if(isCloudConfigured()){
+        try{
+          await callCloud('save', { candidates, plans, mediaCosts });
+          setSyncState('ok', '保存しました');
+          if(showCloudMessage) setDataMessage('クラウドへ保存しました', 'success');
+        }catch(err){
+          setSyncState('ng', err.message);
+          if(showCloudMessage) setDataMessage(`クラウド保存エラー：${err.message}`, 'error');
+        }
+      }
+    }
+
+    function normalizeCandidate(c={}){
+      return {
+        id: c.id || uid(),
+        name: c.name || '',
+        phone: c.phone || '',
+        email: c.email || '',
+        job: jobs.includes(c.job) ? c.job : '中型ドライバー',
+        source: c.source || 'indeed',
+        workType: c.workType || '未確認',
+        license: c.license || '未確認',
+        area: c.area || '',
+        interviewAt: c.interviewAt || '',
+        nextDate: c.nextDate || '',
+        status: statuses.includes(c.status) ? c.status : '応募受付',
+        rating: ratings.includes(c.rating) ? c.rating : '未評価',
+        owner: c.owner || '',
+        memo: c.memo || '',
+        resumeName: c.resumeName || '',
+        resumeUrl: c.resumeUrl || '',
+        appliedAt: c.appliedAt || '',
+        offerAt: c.offerAt || '',
+        acceptedAt: c.acceptedAt || '',
+        joinedAt: c.joinedAt || '',
+        createdAt: c.createdAt || nowDateTime(),
+        updatedAt: c.updatedAt || nowDateTime()
+      };
+    }
+
+    function autoFillStatusDate(c){
+      const today = todayISO();
+      if(c.status === '内定' && !c.offerAt) c.offerAt = today;
+      if(c.status === '内定承諾'){
+        if(!c.offerAt) c.offerAt = today;
+        if(!c.acceptedAt) c.acceptedAt = today;
+      }
+      if(c.status === '入社決定'){
+        if(!c.offerAt) c.offerAt = today;
+        if(!c.acceptedAt) c.acceptedAt = today;
+        if(!c.joinedAt) c.joinedAt = today;
+      }
+      if(!c.appliedAt) c.appliedAt = (c.createdAt || nowDateTime()).slice(0,10).replace(/\//g,'-');
+      return c;
+    }
+
+    function normalizePlan(p={}){
+      return {
+        id: p.id || uid(),
+        job: p.job || '中型ドライバー',
+        total: Number(p.total || 0),
+        q1: Number(p.q1 || 0),
+        q2: Number(p.q2 || 0),
+        q3: Number(p.q3 || 0),
+        q4: Number(p.q4 || 0)
+      };
+    }
+
+    function loadSampleData(){
+      candidates = [
+        normalizeCandidate({ name:'山田 太郎', phone:'090-1111-2222', email:'yamada@example.com', job:'中型ドライバー', source:'indeed', license:'中型免許', workType:'正社員', area:'大阪府内', interviewAt:todayISO(2)+'T10:00', nextDate:todayISO(2), status:'一次面接', rating:'B：前向きに検討', owner:'木寺', memo:'中型経験あり。休日条件を確認予定。' }),
+        normalizeCandidate({ name:'佐藤 花子', phone:'080-3333-4444', email:'sato@example.com', job:'運行管理者', source:'PLEX', license:'普通免許', workType:'正社員', area:'大阪市内', interviewAt:todayISO(4)+'T14:00', nextDate:todayISO(4), status:'書類選考中', rating:'A：ぜひ進めたい', owner:'採用担当', memo:'運行管理者資格あり。配車経験を確認。' }),
+        normalizeCandidate({ name:'鈴木 一郎', phone:'070-5555-6666', email:'suzuki@example.com', job:'中型ドライバー', source:'XMile', license:'中型免許', workType:'正社員', area:'関西圏', interviewAt:todayISO(1)+'T16:00', nextDate:todayISO(1), status:'最終面接', rating:'A：ぜひ進めたい', owner:'木寺', memo:'給与条件と入社可能日を確認。' })
+      ];
+      plans = [
+        normalizePlan({ job:'中型ドライバー', total:3, q1:1, q2:1, q3:1, q4:0 }),
+        normalizePlan({ job:'運行管理者', total:2, q1:0, q2:1, q3:1, q4:0 })
+      ];
+      saveLocal();
+    }
+
+    function fillSelect(id, items, includeAll=false){
+      const el = $(id); if(!el) return;
+      const current = el.value;
+      el.innerHTML = includeAll ? '<option value="">すべて</option>' : '';
+      items.forEach(item => el.innerHTML += `<option value="${escapeHTML(item)}">${escapeHTML(item)}</option>`);
+      if(current && [...el.options].some(o => o.value === current)) el.value = current;
+    }
+
+    function initSelects(){
+      ['job','planJob','mediaTargetJob'].forEach(id => fillSelect(id, jobs));
+      fillSelect('source', sources);
+      fillSelect('status', statuses);
+      fillSelect('rating', ratings);
+      fillSelect('filterJob', jobs, true);
+      fillSelect('filterStatus', statuses, true);
+      fillSelect('filterSource', sources, true);
+      fillSelect('mediaFeeType', feeTypes);
+      fillSelect('mediaSuccessFeeType', successFeeTypes);
+      fillSelect('mediaFeeTriggerStatus', feeTriggerStatuses);
+      fillSelect('mediaAllocationType', allocationTypes);
+      fillSelect('reportJob', jobs, true);
+      fillSelect('reportFeeType', feeTypes, true);
+      // reportSource は動的（候補者・媒体の source から生成）
+    }
+
+    function refreshReportSourceSelect(){
+      const el = $('reportSource'); if(!el) return;
+      const set = new Set();
+      candidates.forEach(c => { if(c.source) set.add(c.source); });
+      mediaCosts.forEach(m => { if(m.source) set.add(m.source); });
+      sources.forEach(s => set.add(s));
+      const list = Array.from(set).sort();
+      const current = el.value;
+      el.innerHTML = '<option value="">すべて</option>' + list.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+      if(current && list.includes(current)) el.value = current;
+    }
+
+    function statusClass(s){
+      if(['内定','内定承諾','入社決定'].includes(s)) return 'badge-green';
+      if(['一次面接','職場見学','二次面接','最終面接'].includes(s)) return 'badge-blue';
+      if(['書類選考中','保留'].includes(s)) return 'badge-yellow';
+      if(['辞退','不採用'].includes(s)) return 'badge-red';
+      return 'badge-gray';
+    }
+    function ratingClass(r=''){
+      if(r.startsWith('A')) return 'badge-green';
+      if(r.startsWith('B')) return 'badge-blue';
+      if(r.startsWith('C')) return 'badge-yellow';
+      if(r.startsWith('D')) return 'badge-red';
+      return 'badge-gray';
+    }
+
+    function renderMetrics(){
+      const target = $('metricGrid'); if(!target) return;
+      const groups = [
+        ['総応募者数', candidates.length, '登録済み'],
+        ['面接予定', candidates.filter(c => c.interviewAt).length, '日時設定済み'],
+        ['選考中', candidates.filter(c => !['内定承諾','辞退','不採用'].includes(c.status)).length, '対応対象'],
+        ['内定承諾', candidates.filter(c => c.status === '内定承諾').length, '採用確定'],
+        ['履歴書あり', candidates.filter(c => c.resumeUrl).length, 'URL登録済み'],
+        ['未評価', candidates.filter(c => c.rating === '未評価').length, '評価待ち']
+      ];
+      target.innerHTML = groups.map(([label, value, sub]) => `<div class="card metric"><div class="label">${escapeHTML(label)}</div><div class="value">${escapeHTML(value)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+    }
+
+    function renderBars(targetId, items){
+      const el = $(targetId); if(!el) return;
+      const max = Math.max(1, ...items.map(i => i.count));
+      el.innerHTML = items.length ? items.map(i => {
+        const width = Math.max(4, i.count / max * 100);
+        return `<div style="display:grid;grid-template-columns:160px 1fr 72px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #edf2f7;"><strong>${escapeHTML(i.label)}</strong><div style="height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden;"><div style="height:100%;width:${width}%;border-radius:999px;background:linear-gradient(90deg,#60a5fa,#22d3ee);"></div></div><span>${i.count}名</span></div>`;
+      }).join('') : '<div class="empty">データがありません</div>';
+    }
+
+    function renderJobBars(){ renderBars('jobBars', jobs.map(job => ({ label: job, count: candidates.filter(c => c.job === job).length }))); }
+    function renderSourceBars(){ renderBars('sourceBars', sources.map(source => ({ label: source, count: candidates.filter(c => c.source === source).length }))); }
+
+    function countAcceptedByJob(){ return candidates.filter(c => c.status === '内定承諾').reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {}); }
+
+    function renderPlanSummary(){
+      const accepted = countAcceptedByJob();
+      const items = plans.map(p => ({ label: p.job, count: accepted[p.job] || 0, total: p.total }));
+      const el = $('planSummary'); if(!el) return;
+      el.innerHTML = items.length ? items.map(i => {
+        const pct = i.total > 0 ? Math.round((i.count / i.total) * 100) : 0;
+        return `<div style="display:grid;grid-template-columns:160px 1fr 110px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #edf2f7;"><strong>${escapeHTML(i.label)}</strong><div style="height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden;"><div style="height:100%;width:${Math.min(100,pct)}%;border-radius:999px;background:linear-gradient(90deg,#60a5fa,#22d3ee);"></div></div><span>${i.count}/${i.total}名（${pct}%）</span></div>`;
+      }).join('') : '<div class="empty">採用計画が未登録です</div>';
+    }
+
+    function getFilteredCandidates(){
+      const name = $('searchName') ? $('searchName').value.trim().toLowerCase() : '';
+      const job = $('filterJob') ? $('filterJob').value : '';
+      const status = $('filterStatus') ? $('filterStatus').value : '';
+      const source = $('filterSource') ? $('filterSource').value : '';
+      return candidates.filter(c =>
+        (!name || String(c.name || '').toLowerCase().includes(name)) &&
+        (!job || c.job === job) &&
+        (!status || c.status === status) &&
+        (!source || c.source === source)
+      );
+    }
+
+    function renderTable(){
+      const tbody = $('candidateTable'); if(!tbody) return;
+      const list = getFilteredCandidates();
+      if(!list.length){ tbody.innerHTML = '<tr><td colspan="8"><div class="empty">該当する応募者がいません</div></td></tr>'; return; }
+      tbody.innerHTML = list.map(c => `<tr>
+        <td><div class="person"><div class="avatar">${escapeHTML((c.name || '?').slice(0,1))}</div><div><strong>${escapeHTML(c.name)}</strong><small>${escapeHTML(c.phone || '-')}<br>${escapeHTML(c.email || '-')}</small></div></div></td>
+        <td>${escapeHTML(c.job)}</td>
+        <td><span class="badge badge-gray">${escapeHTML(c.source || '-')}</span></td>
+        <td><span class="badge ${statusClass(c.status)}">${escapeHTML(c.status)}</span></td>
+        <td>${escapeHTML(formatDateTime(c.interviewAt))}</td>
+        <td>${escapeHTML(c.owner || '-')}</td>
+        <td>${c.resumeUrl ? '<span class="badge badge-green">あり</span>' : '<span class="badge badge-gray">なし</span>'}</td>
+        <td><div class="action-row"><button type="button" class="btn btn-small btn-soft" data-action="detail" data-id="${c.id}">詳細</button><button type="button" class="btn btn-small" data-action="edit" data-id="${c.id}">編集</button><button type="button" class="btn btn-small btn-danger" data-action="delete" data-id="${c.id}">削除</button></div></td>
+      </tr>`).join('');
+    }
+
+    function normalizeKanbanStatus(s){
+      if(['辞退','不採用'].includes(s)) return '辞退・不採用';
+      return kanbanStatuses.includes(s) ? s : '応募受付';
+    }
+
+    function renderKanban(){
+      const board = $('kanbanBoard'); if(!board) return;
+      board.innerHTML = kanbanStatuses.map(status => {
+        const list = candidates.filter(c => normalizeKanbanStatus(c.status) === status);
+        return `<div class="kanban-col"><div class="kanban-title"><span>${escapeHTML(status)}</span><span class="badge badge-gray">${list.length}名</span></div>${list.map(c => `<div class="candidate-card"><strong>${escapeHTML(c.name)}</strong><p>${escapeHTML(c.job)}｜${escapeHTML(c.source || '-')}</p><p>面接：${escapeHTML(formatDateTime(c.interviewAt))}</p><p><span class="badge ${ratingClass(c.rating)}">${escapeHTML(c.rating)}</span></p><select data-action="status" data-id="${c.id}">${statuses.map(s => `<option value="${escapeHTML(s)}" ${s === c.status ? 'selected' : ''}>${escapeHTML(s)}</option>`).join('')}</select><div class="action-row" style="margin-top:10px;"><button type="button" class="btn btn-small btn-soft" data-action="detail" data-id="${c.id}">詳細</button></div></div>`).join('') || '<div class="empty">応募者なし</div>'}</div>`;
+      }).join('');
+    }
+
+    function renderPlanTable(){
+      const tbody = $('planTable'); if(!tbody) return;
+      const accepted = countAcceptedByJob();
+      if(!plans.length){ tbody.innerHTML = '<tr><td colspan="10"><div class="empty">採用計画がありません</div></td></tr>'; return; }
+      tbody.innerHTML = plans.map(p => {
+        const count = accepted[p.job] || 0;
+        const pct = p.total > 0 ? Math.round(count / p.total * 100) : 0;
+        return `<tr><td><strong>${escapeHTML(p.job)}</strong></td><td>${p.total}名</td><td>${p.q1}名</td><td>${p.q2}名</td><td>${p.q3}名</td><td>${p.q4}名</td><td>${count}名</td><td><span class="badge ${pct >= 100 ? 'badge-green' : pct >= 50 ? 'badge-blue' : 'badge-yellow'}">${pct}%</span></td><td>${Math.max(0, p.total - count)}名</td><td><div class="action-row"><button type="button" class="btn btn-small" data-action="editPlan" data-id="${p.id}">編集</button><button type="button" class="btn btn-small btn-danger" data-action="deletePlan" data-id="${p.id}">削除</button></div></td></tr>`;
+      }).join('');
+    }
+
+    // ===== 媒体費用 計算ロジック =====
+    function calcSuccessFeePerHire(m){
+      if(m.successFeeType === '理論年収の％') return Math.round((m.annualSalaryEstimate * m.successFeeRate) / 100);
+      return m.successFeePerHire || 0;
+    }
+
+    function countCandidatesForMedia(m, statusFilter){
+      const list = candidates.filter(c => c.source && m.source && c.source === m.source);
+      if(!statusFilter) return list.length;
+      return list.filter(c => statusFilter(c.status)).length;
+    }
+
+    function getMediaStats(m){
+      const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      const isOffer = s => ['内定','内定承諾','入社決定'].includes(s);
+      const isAccepted = s => ['内定承諾','入社決定'].includes(s);
+      const isJoined = s => s === '入社決定';
+      const applied = countCandidatesForMedia(m);
+      const interview = countCandidatesForMedia(m, isInterview);
+      const offered = countCandidatesForMedia(m, isOffer);
+      const accepted = countCandidatesForMedia(m, isAccepted);
+      const joined = countCandidatesForMedia(m, isJoined);
+      let billable = 0;
+      switch(m.feeTriggerStatus){
+        case '内定': billable = offered; break;
+        case '内定承諾': case '採用': billable = accepted; break;
+        case '入社決定': billable = joined; break;
+        case '手動': billable = m.manualBillableCount || 0; break;
+      }
+      const perHire = calcSuccessFeePerHire(m);
+      const successFeeTotal = (['成功報酬型','掲載＋成功報酬型','その他'].includes(m.feeType)) ? perHire * billable : 0;
+      let total = 0;
+      switch(m.feeType){
+        case '掲載課金型': total = m.fixedListingCost + m.otherCost; break;
+        case '成功報酬型': total = successFeeTotal + m.otherCost; break;
+        case '掲載＋成功報酬型': total = m.fixedListingCost + successFeeTotal + m.otherCost; break;
+        case '無料・リファラル': total = m.otherCost; break;
+        default: total = m.fixedListingCost + successFeeTotal + m.otherCost;
+      }
+      return { applied, interview, offered, accepted, joined, billable, perHire, successFeeTotal, total };
+    }
+
+    const yen = n => `¥${Number(n||0).toLocaleString()}`;
+    const cpa = (cost, count) => count > 0 ? yen(Math.round(cost / count)) : '-';
+
+    function renderMediaSummary(){
+      const target = $('mediaSummary'); if(!target) return;
+      let totalCost = 0, listingTotal = 0, successTotal = 0;
+      mediaCosts.forEach(m => {
+        const s = getMediaStats(m);
+        totalCost += s.total;
+        if(['掲載課金型','掲載＋成功報酬型'].includes(m.feeType)) listingTotal += m.fixedListingCost;
+        successTotal += s.successFeeTotal;
+      });
+      const applied = candidates.length;
+      const accepted = candidates.filter(c => ['内定承諾','入社決定'].includes(c.status)).length;
+      const joined = candidates.filter(c => c.status === '入社決定').length;
+      const groups = [
+        ['総費用', yen(totalCost), '全媒体合計'],
+        ['掲載費用', yen(listingTotal), '固定掲載'],
+        ['成功報酬', yen(successTotal), '採用連動'],
+        ['応募数', applied, '全体'],
+        ['内定承諾数', accepted, '全体'],
+        ['入社決定数', joined, '全体'],
+        ['応募単価', cpa(totalCost, applied), '総費用÷応募'],
+        ['内定承諾単価', cpa(totalCost, accepted), '総費用÷承諾'],
+        ['入社決定単価', cpa(totalCost, joined), '総費用÷入社']
+      ];
+      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+    }
+
+    function renderMediaTable(){
+      const tbody = $('mediaTable'); if(!tbody) return;
+      if(!mediaCosts.length){ tbody.innerHTML = '<tr><td colspan="20"><div class="empty">媒体費用が未登録です</div></td></tr>'; return; }
+      tbody.innerHTML = mediaCosts.map(m => {
+        const s = getMediaStats(m);
+        const period = (m.startDate || '-') + '〜' + (m.endDate || '-');
+        const trigger = m.feeTriggerStatus + (m.successFeeType === '理論年収の％' ? `（${m.successFeeRate}%）` : (m.successFeePerHire ? `（${yen(m.successFeePerHire)}/名）` : ''));
+        return `<tr>
+          <td><span class="badge badge-blue">${escapeHTML(m.feeType)}</span></td>
+          <td><strong>${escapeHTML(m.name || '-')}</strong></td>
+          <td>${escapeHTML(m.jobTitle || '-')}</td>
+          <td>${escapeHTML(m.targetJob || '-')}</td>
+          <td>${escapeHTML(period)}</td>
+          <td>${yen(m.fixedListingCost)}</td>
+          <td>${escapeHTML(trigger)}</td>
+          <td>${s.billable}名</td>
+          <td>${yen(s.successFeeTotal)}</td>
+          <td>${yen(m.otherCost)}</td>
+          <td><strong>${yen(s.total)}</strong></td>
+          <td>${s.applied}</td>
+          <td>${s.interview}</td>
+          <td>${s.offered}</td>
+          <td>${s.accepted}</td>
+          <td>${s.joined}</td>
+          <td>${cpa(s.total, s.applied)}</td>
+          <td>${cpa(s.total, s.accepted)}</td>
+          <td>${cpa(s.total, s.joined)}</td>
+          <td><div class="action-row"><button class="btn btn-small" data-action="editMedia" data-id="${m.id}">編集</button><button class="btn btn-small btn-danger" data-action="deleteMedia" data-id="${m.id}">削除</button></div></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderMediaCompareTable(){
+      const tbody = $('mediaCompareTable'); if(!tbody) return;
+      const map = new Map();
+      mediaCosts.forEach(m => {
+        const key = m.source || m.name;
+        const s = getMediaStats(m);
+        const cur = map.get(key) || { name: m.name, source: m.source, feeTypeSet: new Set(), total: 0, applied: 0, accepted: 0, joined: 0 };
+        cur.feeTypeSet.add(m.feeType);
+        cur.total += s.total;
+        cur.applied += s.applied;
+        cur.accepted += s.accepted;
+        cur.joined += s.joined;
+        map.set(key, cur);
+      });
+      const rows = Array.from(map.values());
+      if(!rows.length){ tbody.innerHTML = '<tr><td colspan="9"><div class="empty">比較データがありません</div></td></tr>'; return; }
+      tbody.innerHTML = rows.map(r => `<tr>
+        <td><strong>${escapeHTML(r.name)}</strong>${r.source && r.source !== r.name ? `<br><small>${escapeHTML(r.source)}</small>` : ''}</td>
+        <td>${Array.from(r.feeTypeSet).map(t => `<span class="badge badge-gray">${escapeHTML(t)}</span>`).join(' ')}</td>
+        <td><strong>${yen(r.total)}</strong></td>
+        <td>${r.applied}</td><td>${r.accepted}</td><td>${r.joined}</td>
+        <td>${cpa(r.total, r.applied)}</td>
+        <td>${cpa(r.total, r.accepted)}</td>
+        <td>${cpa(r.total, r.joined)}</td>
+      </tr>`).join('');
+    }
+
+    function renderThisMonth(){
+      const target = $('thisMonthCards'); if(!target) return;
+      const ym = todayYM();
+      const labelEl = $('thisMonthLabel'); if(labelEl) labelEl.textContent = `対象月：${ym}`;
+      let listing = 0, success = 0, other = 0;
+      mediaCosts.forEach(m => { const c = getMediaMonthlyCost(m, ym); listing += c.listing; success += c.successFee; other += c.other; });
+      const total = listing + success + other;
+      const stats = getMonthlyApplicantStats(ym, '', '');
+      const groups = [
+        ['今月の総費用', yen(total), '掲載+成功報酬+その他'],
+        ['今月の応募数', stats.applied, '応募ベース'],
+        ['今月の内定承諾数', stats.accepted, '採用確定'],
+        ['今月の応募単価', cpa(total, stats.applied), '総費用÷応募'],
+        ['今月の内定承諾単価', cpa(total, stats.accepted), '総費用÷承諾'],
+        ['今月の入社決定単価', cpa(total, stats.joined), '総費用÷入社']
+      ];
+      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+    }
+
+    function renderAll(){
+      renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard(); renderTable(); renderKanban(); renderPlanTable();
+      refreshReportSourceSelect();
+      renderMediaSummary(); renderMediaTable(); renderMediaCompareTable();
+      renderMonthlyReport();
+      renderThisMonth();
+    }
+
+    function collectFormData(){
+      const existingId = $('candidateId') ? $('candidateId').value : '';
+      const existing = existingId ? candidates.find(c => c.id === existingId) : null;
+      return normalizeCandidate({
+        ...(existing || {}),
+        id: existingId || uid(),
+        name: $('name') ? $('name').value.trim() : '',
+        phone: $('phone') ? $('phone').value.trim() : '',
+        email: $('email') ? $('email').value.trim() : '',
+        source: $('source') ? $('source').value : 'indeed',
+        job: $('job') ? $('job').value : '中型ドライバー',
+        workType: $('workType') ? $('workType').value : '未確認',
+        license: $('license') ? $('license').value : '未確認',
+        area: $('area') ? $('area').value.trim() : '',
+        status: $('status') ? $('status').value : '応募受付',
+        rating: $('rating') ? $('rating').value : '未評価',
+        interviewAt: $('interviewAt') ? $('interviewAt').value : '',
+        nextDate: $('nextDate') ? $('nextDate').value : '',
+        owner: $('owner') ? $('owner').value.trim() : '',
+        memo: $('memo') ? $('memo').value.trim() : '',
+        resumeName: $('resumeName') ? $('resumeName').value.trim() : '',
+        resumeUrl: $('resumeUrl') ? $('resumeUrl').value.trim() : '',
+        appliedAt: $('appliedAt') ? $('appliedAt').value : '',
+        offerAt: $('offerAt') ? $('offerAt').value : '',
+        acceptedAt: $('acceptedAt') ? $('acceptedAt').value : '',
+        joinedAt: $('joinedAt') ? $('joinedAt').value : '',
+        createdAt: (existing && existing.createdAt) || nowDateTime(),
+        updatedAt: nowDateTime()
+      });
+    }
+
+    async function handleCandidateSubmit(e){
+      e.preventDefault();
+      const data = autoFillStatusDate(collectFormData());
+      if(!data.name || !data.job || !data.status){
+        if($('formMessage')){ $('formMessage').textContent = '応募者名・希望職種・選考ステータスは必須です。'; $('formMessage').className = 'error'; }
+        return;
+      }
+      const exists = candidates.some(c => c.id === data.id);
+      if(exists){
+        candidates = candidates.map(c => c.id === data.id ? { ...c, ...data } : c);
+        if($('formMessage')) $('formMessage').textContent = '応募者情報を更新しました。';
+      }else{
+        candidates.unshift(data);
+        if($('formMessage')) $('formMessage').textContent = '応募者を登録しました。';
+      }
+      if($('formMessage')) $('formMessage').className = 'success';
+      await persist();
+      if(!exists) resetFormMode(false);
+    }
+
+    function editCandidate(id){
+      const c = candidates.find(x => x.id === id); if(!c) return;
+      if($('candidateId')) $('candidateId').value = c.id;
+      ['name','phone','email','source','job','workType','license','area','status','rating','interviewAt','nextDate','owner','memo','resumeName','resumeUrl','appliedAt','offerAt','acceptedAt','joinedAt'].forEach(k => { if($(k)) $(k).value = c[k] || ''; });
+      if($('formTitle')) $('formTitle').textContent = '応募者編集';
+      switchTab('form'); window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetFormMode(clearMessage = true){
+      const form = $('candidateForm'); if(form) form.reset();
+      if($('candidateId')) $('candidateId').value = '';
+      if($('formTitle')) $('formTitle').textContent = '応募者登録（手動）';
+      if($('status')) $('status').value = '応募受付';
+      if($('rating')) $('rating').value = '未評価';
+      if(clearMessage && $('formMessage')) $('formMessage').textContent = '';
+    }
+
+    async function deleteCandidate(id){
+      const c = candidates.find(x => x.id === id);
+      if(!c || !confirm(`${c.name}さんのデータを削除しますか？`)) return;
+      candidates = candidates.filter(x => x.id !== id);
+      await persist();
+    }
+
+    async function changeStatus(id, status){
+      candidates = candidates.map(c => c.id === id ? autoFillStatusDate(normalizeCandidate({ ...c, status, updatedAt: nowDateTime() })) : c);
+      await persist();
+    }
+
+    function detailItem(label, value){ return `<div class="detail-item"><small>${escapeHTML(label)}</small><div>${value}</div></div>`; }
+
+    function toDrivePreviewUrl(url){
+      if(!url) return '';
+      let m = url.match(/\/file\/d\/([^/?#]+)/);
+      if(m) return `https://drive.google.com/file/d/${m[1]}/preview`;
+      m = url.match(/[?&]id=([^&]+)/);
+      if(m && url.includes('drive.google.com')) return `https://drive.google.com/file/d/${m[1]}/preview`;
+      return url;
+    }
+
+    function resumeBlockHTML(c){
+      if(!c.resumeUrl) return '<div class="empty">履歴書URLは未登録です（編集画面で入力できます）</div>';
+      const previewUrl = toDrivePreviewUrl(c.resumeUrl);
+      const isDrive = c.resumeUrl.includes('drive.google.com');
+      return `<div class="resume-box">
+        <div class="resume-actions">
+          <a class="btn btn-soft" href="${escapeHTML(c.resumeUrl)}" target="_blank" rel="noopener">別タブで開く</a>
+          <span style="color:var(--muted);font-size:12px;">${escapeHTML(c.resumeName || '-')}</span>
+        </div>
+        ${isDrive ? `<div class="resume-preview"><iframe src="${escapeHTML(previewUrl)}" title="履歴書プレビュー"></iframe></div>` : '<div class="empty" style="font-size:12px;">この共有形式は画面内プレビューに非対応です。「別タブで開く」を使ってください。</div>'}
+      </div>`;
+    }
+
+    function showDetail(id){
+      const c = candidates.find(x => x.id === id); if(!c) return;
+      if($('modalTitle')) $('modalTitle').textContent = `${c.name}さんの詳細`;
+      if($('modalBody')) $('modalBody').innerHTML = `<div class="detail-grid">
+        ${detailItem('応募者名', escapeHTML(c.name))}
+        ${detailItem('希望職種', escapeHTML(c.job))}
+        ${detailItem('電話番号', escapeHTML(c.phone || '-'))}
+        ${detailItem('メールアドレス', escapeHTML(c.email || '-'))}
+        ${detailItem('応募経路', escapeHTML(c.source || '-'))}
+        ${detailItem('雇用形態', escapeHTML(c.workType || '-'))}
+        ${detailItem('免許区分', escapeHTML(c.license || '-'))}
+        ${detailItem('希望勤務地', escapeHTML(c.area || '-'))}
+        ${detailItem('面接日時', escapeHTML(formatDateTime(c.interviewAt)))}
+        ${detailItem('次回対応日', escapeHTML(c.nextDate || '-'))}
+        ${detailItem('選考ステータス', `<span class="badge ${statusClass(c.status)}">${escapeHTML(c.status)}</span>`)}
+        ${detailItem('評価', `<span class="badge ${ratingClass(c.rating)}">${escapeHTML(c.rating)}</span>`)}
+        ${detailItem('担当者', escapeHTML(c.owner || '-'))}
+        ${detailItem('更新日', escapeHTML(c.updatedAt || '-'))}
+        <div class="detail-item" style="grid-column:1/-1;"><small>履歴書・職務経歴書</small>${resumeBlockHTML(c)}</div>
+        <div class="detail-item" style="grid-column:1/-1;"><small>メモ</small><div>${escapeHTML(c.memo || '-').replace(/\n/g, '<br>')}</div></div>
+      </div>
+      <div class="action-row" style="margin-top:16px;"><button type="button" class="btn btn-primary" id="btnEditFromModal" data-id="${c.id}">編集する</button></div>`;
+      if($('modalBackdrop')) $('modalBackdrop').classList.add('active');
+    }
+
+    function closeModal(){ if($('modalBackdrop')) $('modalBackdrop').classList.remove('active'); }
+
+    async function handlePlanSubmit(e){
+      e.preventDefault();
+      const id = $('planId') ? $('planId').value : '';
+      const data = normalizePlan({
+        id: id || uid(),
+        job: $('planJob') ? $('planJob').value : '中型ドライバー',
+        total: Number($('planTotal') ? $('planTotal').value : 0),
+        q1: Number($('q1') ? $('q1').value : 0),
+        q2: Number($('q2') ? $('q2').value : 0),
+        q3: Number($('q3') ? $('q3').value : 0),
+        q4: Number($('q4') ? $('q4').value : 0)
+      });
+      if(id) plans = plans.map(p => p.id === id ? data : p);
+      else plans.unshift(data);
+      resetPlanForm();
+      await persist();
+    }
+
+    function editPlan(id){
+      const p = plans.find(x => x.id === id); if(!p) return;
+      if($('planId')) $('planId').value = p.id;
+      if($('planJob')) $('planJob').value = p.job;
+      if($('planTotal')) $('planTotal').value = p.total;
+      if($('q1')) $('q1').value = p.q1; if($('q2')) $('q2').value = p.q2; if($('q3')) $('q3').value = p.q3; if($('q4')) $('q4').value = p.q4;
+      if($('planSaveBtn')) $('planSaveBtn').textContent = '採用計画を更新';
+      const form = $('planForm'); if(form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function deletePlan(id){
+      const p = plans.find(x => x.id === id);
+      if(!p || !confirm(`${p.job}の採用計画を削除しますか？`)) return;
+      plans = plans.filter(x => x.id !== id);
+      await persist();
+    }
+
+    function resetPlanForm(){
+      const form = $('planForm'); if(form) form.reset();
+      if($('planId')) $('planId').value = '';
+      if($('planTotal')) $('planTotal').value = 0;
+      ['q1','q2','q3','q4'].forEach(id => { if($(id)) $(id).value = 0; });
+      if($('planSaveBtn')) $('planSaveBtn').textContent = '採用計画を保存';
+    }
+
+    // ===== 媒体費用 フォーム =====
+    function collectMediaForm(){
+      let monthlyAllocations = [];
+      try{ const t = ($('mediaMonthlyAllocations') && $('mediaMonthlyAllocations').value || '').trim(); if(t) monthlyAllocations = JSON.parse(t); }catch(e){ /* invalid JSON ignored */ }
+      const id = $('mediaId') && $('mediaId').value || '';
+      const existing = id ? mediaCosts.find(m => m.id === id) : null;
+      return normalizeMediaCost({
+        ...(existing || {}),
+        id: id || uid(),
+        feeType: $('mediaFeeType').value,
+        name: $('mediaName').value.trim(),
+        jobTitle: $('mediaJobTitle').value.trim(),
+        targetJob: $('mediaTargetJob').value,
+        source: $('mediaSource').value.trim() || $('mediaName').value.trim(),
+        startDate: $('mediaStartDate').value,
+        endDate: $('mediaEndDate').value,
+        costMonth: $('mediaCostMonth').value,
+        billingMonth: $('mediaBillingMonth').value,
+        allocationType: $('mediaAllocationType').value,
+        fixedListingCost: Number($('mediaFixedListingCost').value || 0),
+        otherCost: Number($('mediaOtherCost').value || 0),
+        successFeeType: $('mediaSuccessFeeType').value,
+        successFeePerHire: Number($('mediaSuccessFeePerHire').value || 0),
+        annualSalaryEstimate: Number($('mediaAnnualSalary').value || 0),
+        successFeeRate: Number($('mediaSuccessFeeRate').value || 0),
+        feeTriggerStatus: $('mediaFeeTriggerStatus').value,
+        manualBillableCount: Number($('mediaManualBillableCount').value || 0),
+        billingMemo: $('mediaBillingMemo').value.trim(),
+        memo: $('mediaMemo').value.trim(),
+        monthlyAllocations,
+        createdAt: (existing && existing.createdAt) || nowDateTime(),
+        updatedAt: nowDateTime()
+      });
+    }
+
+    async function handleMediaSubmit(e){
+      e.preventDefault();
+      const data = collectMediaForm();
+      if(!data.name){ alert('媒体名/紹介会社名は必須です'); return; }
+      const exists = mediaCosts.some(m => m.id === data.id);
+      if(exists) mediaCosts = mediaCosts.map(m => m.id === data.id ? data : m);
+      else mediaCosts.unshift(data);
+      resetMediaForm();
+      await persist();
+    }
+
+    function editMedia(id){
+      const m = mediaCosts.find(x => x.id === id); if(!m) return;
+      $('mediaId').value = m.id;
+      $('mediaFormTitle').textContent = '媒体費用を編集';
+      $('mediaFeeType').value = m.feeType;
+      $('mediaName').value = m.name; $('mediaJobTitle').value = m.jobTitle; $('mediaTargetJob').value = m.targetJob;
+      $('mediaSource').value = m.source; $('mediaStartDate').value = m.startDate; $('mediaEndDate').value = m.endDate;
+      $('mediaCostMonth').value = m.costMonth; $('mediaBillingMonth').value = m.billingMonth; $('mediaAllocationType').value = m.allocationType;
+      $('mediaFixedListingCost').value = m.fixedListingCost; $('mediaOtherCost').value = m.otherCost;
+      $('mediaSuccessFeeType').value = m.successFeeType; $('mediaSuccessFeePerHire').value = m.successFeePerHire;
+      $('mediaAnnualSalary').value = m.annualSalaryEstimate; $('mediaSuccessFeeRate').value = m.successFeeRate;
+      $('mediaFeeTriggerStatus').value = m.feeTriggerStatus; $('mediaManualBillableCount').value = m.manualBillableCount;
+      $('mediaBillingMemo').value = m.billingMemo; $('mediaMemo').value = m.memo;
+      $('mediaMonthlyAllocations').value = m.monthlyAllocations.length ? JSON.stringify(m.monthlyAllocations) : '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function deleteMedia(id){
+      const m = mediaCosts.find(x => x.id === id);
+      if(!m || !confirm(`${m.name}の費用データを削除しますか？`)) return;
+      mediaCosts = mediaCosts.filter(x => x.id !== id);
+      await persist();
+    }
+
+    function resetMediaForm(){
+      const f = $('mediaForm'); if(f) f.reset();
+      $('mediaId').value = ''; $('mediaFormTitle').textContent = '媒体費用を登録';
+      $('mediaFixedListingCost').value = 0; $('mediaOtherCost').value = 0;
+      $('mediaSuccessFeePerHire').value = 0; $('mediaAnnualSalary').value = 0;
+      $('mediaSuccessFeeRate').value = 0; $('mediaManualBillableCount').value = 0;
+    }
+
+    // ===== 月次レポート =====
+    function ymOf(value){ return String(value || '').slice(0,7).replace(/\//g,'-'); }
+    function todayYM(){ return todayISO().slice(0,7); }
+
+    function getCandidateAppliedYM(c){ return ymOf(c.appliedAt || c.createdAt || ''); }
+
+    function getMonthlyApplicantStats(yyyyMm, jobFilter, sourceFilter){
+      const list = candidates.filter(c => {
+        if(getCandidateAppliedYM(c) !== yyyyMm) return false;
+        if(jobFilter && c.job !== jobFilter) return false;
+        if(sourceFilter && c.source !== sourceFilter) return false;
+        return true;
+      });
+      const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      return {
+        applied: list.length,
+        interview: list.filter(c => isInterview(c.status)).length,
+        offered: list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length,
+        accepted: list.filter(c => ['内定承諾','入社決定'].includes(c.status)).length,
+        joined: list.filter(c => c.status === '入社決定').length
+      };
+    }
+
+    function prorateForMonth(startDate, endDate, totalAmount, targetMonth){
+      if(!startDate || !endDate || !targetMonth) return 0;
+      const s = new Date(startDate), e = new Date(endDate);
+      if(isNaN(s) || isNaN(e)) return 0;
+      const totalDays = Math.max(1, Math.round((e - s) / 86400000) + 1);
+      const [yy, mm] = targetMonth.split('-').map(Number);
+      if(!yy || !mm) return 0;
+      const monthStart = new Date(yy, mm - 1, 1);
+      const monthEnd = new Date(yy, mm, 0);
+      const overlapStart = s > monthStart ? s : monthStart;
+      const overlapEnd = e < monthEnd ? e : monthEnd;
+      if(overlapEnd < overlapStart) return 0;
+      const overlapDays = Math.round((overlapEnd - overlapStart) / 86400000) + 1;
+      return Math.round(totalAmount * overlapDays / totalDays);
+    }
+
+    function getMediaMonthlyCost(m, yyyyMm){
+      let listing = 0;
+      if(['掲載課金型','掲載＋成功報酬型'].includes(m.feeType)){
+        if(m.allocationType === '単月計上'){
+          if(m.costMonth === yyyyMm) listing = m.fixedListingCost;
+        }else if(m.allocationType === '掲載期間で日割り'){
+          listing = prorateForMonth(m.startDate, m.endDate, m.fixedListingCost, yyyyMm);
+        }else if(m.allocationType === '手動月割り'){
+          const a = (m.monthlyAllocations || []).find(x => x.month === yyyyMm);
+          if(a) listing = Number(a.amount || 0);
+        }
+      }
+      let successFee = 0;
+      if(['成功報酬型','掲載＋成功報酬型','その他'].includes(m.feeType)){
+        const perHire = calcSuccessFeePerHire(m);
+        if(m.feeTriggerStatus === '手動'){
+          if(m.costMonth === yyyyMm) successFee = perHire * (m.manualBillableCount || 0);
+        }else{
+          const dateField = m.feeTriggerStatus === '内定' ? 'offerAt' : (m.feeTriggerStatus === '入社決定' ? 'joinedAt' : 'acceptedAt');
+          const isBillable = c => {
+            if(m.source && c.source !== m.source) return false;
+            switch(m.feeTriggerStatus){
+              case '内定': return ['内定','内定承諾','入社決定'].includes(c.status);
+              case '内定承諾': case '採用': return ['内定承諾','入社決定'].includes(c.status);
+              case '入社決定': return c.status === '入社決定';
+            }
+            return false;
+          };
+          candidates.filter(isBillable).forEach(c => {
+            const d = c[dateField] || c.updatedAt || '';
+            if(ymOf(d) === yyyyMm) successFee += perHire;
+          });
+        }
+      }
+      let other = 0;
+      if(m.costMonth === yyyyMm) other = m.otherCost;
+      return { listing, successFee, other, total: listing + successFee + other };
+    }
+
+    function renderMonthlyReport(){
+      const target = $('reportSummary'); if(!target) return;
+      let ym = $('reportMonth') && $('reportMonth').value || '';
+      if(!ym){ ym = todayYM(); if($('reportMonth')) $('reportMonth').value = ym; }
+      const jobFilter = $('reportJob') && $('reportJob').value || '';
+      const sourceFilter = $('reportSource') && $('reportSource').value || '';
+      const feeTypeFilter = $('reportFeeType') && $('reportFeeType').value || '';
+
+      // 費用集計
+      const mediaInScope = mediaCosts.filter(m => {
+        if(jobFilter && m.targetJob && m.targetJob !== jobFilter) return false;
+        if(sourceFilter && m.source && m.source !== sourceFilter && m.name !== sourceFilter) return false;
+        if(feeTypeFilter && m.feeType !== feeTypeFilter) return false;
+        return true;
+      });
+      let listingTotal = 0, successTotal = 0, otherTotal = 0;
+      mediaInScope.forEach(m => {
+        const c = getMediaMonthlyCost(m, ym);
+        listingTotal += c.listing; successTotal += c.successFee; otherTotal += c.other;
+      });
+      const totalCost = listingTotal + successTotal + otherTotal;
+      const stats = getMonthlyApplicantStats(ym, jobFilter, sourceFilter);
+
+      const groups = [
+        ['月次総費用', yen(totalCost), ym],
+        ['月次掲載費用', yen(listingTotal), ''],
+        ['月次成功報酬', yen(successTotal), ''],
+        ['月次応募数', stats.applied, ''],
+        ['月次面接数', stats.interview, ''],
+        ['月次内定数', stats.offered, ''],
+        ['月次内定承諾数', stats.accepted, ''],
+        ['月次入社決定数', stats.joined, ''],
+        ['月次応募単価', cpa(totalCost, stats.applied), ''],
+        ['月次内定承諾単価', cpa(totalCost, stats.accepted), ''],
+        ['月次入社決定単価', cpa(totalCost, stats.joined), '']
+      ];
+      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+
+      // 媒体別月次表
+      const mTbody = $('reportMediaTable');
+      if(mTbody){
+        if(!mediaInScope.length){ mTbody.innerHTML = '<tr><td colspan="17"><div class="empty">対象データがありません</div></td></tr>'; }
+        else{
+          mTbody.innerHTML = mediaInScope.map(m => {
+            const c = getMediaMonthlyCost(m, ym);
+            const ms = getMonthlyApplicantStats(ym, jobFilter, m.source || m.name);
+            return `<tr><td>${escapeHTML(ym)}</td><td><strong>${escapeHTML(m.name)}</strong></td><td>${escapeHTML(m.feeType)}</td><td>${escapeHTML(m.targetJob || '-')}</td><td>${yen(c.listing)}</td><td>${yen(c.successFee)}</td><td>${yen(c.other)}</td><td><strong>${yen(c.total)}</strong></td><td>${ms.applied}</td><td>${ms.interview}</td><td>${ms.offered}</td><td>${ms.accepted}</td><td>${ms.joined}</td><td>${cpa(c.total, ms.applied)}</td><td>${cpa(c.total, ms.interview)}</td><td>${cpa(c.total, ms.accepted)}</td><td>${cpa(c.total, ms.joined)}</td></tr>`;
+          }).join('');
+        }
+      }
+
+      // 月別推移（過去6か月）
+      const trendTbody = $('reportTrendTable');
+      const trendData = [];
+      const [yy, mm] = ym.split('-').map(Number);
+      for(let i = 5; i >= 0; i--){
+        const d = new Date(yy, mm - 1 - i, 1);
+        const tym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        let l=0, sf=0, o=0;
+        mediaInScope.forEach(m => { const c = getMediaMonthlyCost(m, tym); l+=c.listing; sf+=c.successFee; o+=c.other; });
+        const tot = l + sf + o;
+        const st = getMonthlyApplicantStats(tym, jobFilter, sourceFilter);
+        trendData.push({ ym: tym, total: tot, ...st });
+      }
+      if(trendTbody){
+        trendTbody.innerHTML = trendData.map(r => `<tr><td><strong>${r.ym}</strong></td><td>${yen(r.total)}</td><td>${r.applied}</td><td>${r.interview}</td><td>${r.offered}</td><td>${r.accepted}</td><td>${r.joined}</td><td>${cpa(r.total, r.applied)}</td><td>${cpa(r.total, r.accepted)}</td><td>${cpa(r.total, r.joined)}</td></tr>`).join('');
+      }
+
+      // 簡易グラフ
+      const chartEl = $('reportChart');
+      if(chartEl){
+        const series = [
+          { label: '総費用', data: trendData.map(r => r.total) },
+          { label: '応募数', data: trendData.map(r => r.applied) },
+          { label: '内定承諾数', data: trendData.map(r => r.accepted) },
+          { label: '入社決定数', data: trendData.map(r => r.joined) }
+        ];
+        chartEl.innerHTML = series.map(s => {
+          const max = Math.max(1, ...s.data);
+          const bars = s.data.map((v, i) => `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;"><div style="height:80px;display:flex;align-items:flex-end;width:100%;justify-content:center;"><div style="width:60%;height:${Math.max(2, v/max*100)}%;background:linear-gradient(180deg,#60a5fa,#22d3ee);border-radius:6px 6px 0 0;"></div></div><div style="font-size:10px;color:var(--muted);">${trendData[i].ym.slice(5)}</div><div style="font-size:11px;font-weight:900;color:var(--navy);">${typeof v === 'number' && v > 1000 ? yen(v) : v}</div></div>`).join('');
+          return `<div class="card" style="padding:14px;"><h4 style="margin:0 0 10px;color:var(--navy);">${escapeHTML(s.label)}</h4><div style="display:flex;gap:6px;align-items:flex-end;">${bars}</div></div>`;
+        }).join('');
+      }
+    }
+
+    function exportMonthlyReportCSV(){
+      const ym = $('reportMonth') && $('reportMonth').value || todayYM();
+      const jobFilter = $('reportJob') && $('reportJob').value || '';
+      const sourceFilter = $('reportSource') && $('reportSource').value || '';
+      const feeTypeFilter = $('reportFeeType') && $('reportFeeType').value || '';
+      const mediaInScope = mediaCosts.filter(m => {
+        if(jobFilter && m.targetJob && m.targetJob !== jobFilter) return false;
+        if(sourceFilter && m.source && m.source !== sourceFilter && m.name !== sourceFilter) return false;
+        if(feeTypeFilter && m.feeType !== feeTypeFilter) return false;
+        return true;
+      });
+      const headers = ['対象月','媒体/紹介会社','費用タイプ','職種','掲載費用','成功報酬','その他費用','総費用','応募数','面接数','内定数','内定承諾数','入社決定数','応募単価','面接単価','内定承諾単価','入社決定単価'];
+      const rows = mediaInScope.map(m => {
+        const c = getMediaMonthlyCost(m, ym);
+        const ms = getMonthlyApplicantStats(ym, jobFilter, m.source || m.name);
+        return [ym, m.name, m.feeType, m.targetJob, c.listing, c.successFee, c.other, c.total, ms.applied, ms.interview, ms.offered, ms.accepted, ms.joined, ms.applied?Math.round(c.total/ms.applied):0, ms.interview?Math.round(c.total/ms.interview):0, ms.accepted?Math.round(c.total/ms.accepted):0, ms.joined?Math.round(c.total/ms.joined):0];
+      });
+      const csv = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+      downloadFile(`aps_monthly_report_${ym}.csv`, '\ufeff' + csv, 'text/csv;charset=utf-8;');
+      setDataMessage(`月次レポートCSVを出力しました（${mediaInScope.length}行）`, 'success');
+    }
+
+    function downloadFile(filename, content, mime){
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function parseCsv(text){
+      text = String(text || '').replace(/^\ufeff/, '');
+      const rows = []; let cur = [], field = '', inQuotes = false;
+      for(let i=0;i<text.length;i++){
+        const ch = text[i];
+        if(inQuotes){
+          if(ch === '"' && text[i+1] === '"'){ field += '"'; i++; }
+          else if(ch === '"') inQuotes = false;
+          else field += ch;
+        }else{
+          if(ch === '"') inQuotes = true;
+          else if(ch === ','){ cur.push(field); field=''; }
+          else if(ch === '\n'){ cur.push(field); rows.push(cur); cur=[]; field=''; }
+          else if(ch === '\r'){ /* skip */ }
+          else field += ch;
+        }
+      }
+      if(field || cur.length){ cur.push(field); rows.push(cur); }
+      return rows.filter(r => r.some(c => c !== ''));
+    }
+
+    function rowsToObjects(rows){
+      if(rows.length < 2) return [];
+      const headers = rows[0].map(h => String(h || '').trim());
+      return rows.slice(1).map(r => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (r[i] || '').trim(); });
+        return obj;
+      });
+    }
+
+    const CAND_HEADERS = ['id','応募者名','電話番号','メールアドレス','希望職種','応募経路','雇用形態','免許区分','希望勤務地','面接日時','選考ステータス','評価','次回対応日','担当者','メモ','履歴書ファイル名','履歴書URL','応募日','内定日','内定承諾日','入社決定日','登録日','更新日'];
+    const CAND_KEYS = ['id','name','phone','email','job','source','workType','license','area','interviewAt','status','rating','nextDate','owner','memo','resumeName','resumeUrl','appliedAt','offerAt','acceptedAt','joinedAt','createdAt','updatedAt'];
+    const PLAN_HEADERS = ['id','職種','今期目標人数','1Q目標','2Q目標','3Q目標','4Q目標'];
+    const PLAN_KEYS = ['id','job','total','q1','q2','q3','q4'];
+
+    function exportCandidatesCSV(){
+      const rows = [CAND_HEADERS, ...candidates.map(c => CAND_KEYS.map(k => c[k] ?? ''))];
+      const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+      downloadFile(`aps_candidates_${todayISO()}.csv`, '\ufeff' + csv, 'text/csv;charset=utf-8;');
+      setDataMessage(`応募者CSVを出力しました（${candidates.length}件）`, 'success');
+    }
+
+    const MEDIA_HEADERS = ['id','費用タイプ','媒体/紹介会社名','求人タイトル','対象職種','紐付き応募経路','掲載開始日','掲載終了日','計上月','請求月','月次配分方法','掲載金額','その他費用','成功報酬計算方法','1名あたり成功報酬額','理論年収','成功報酬率','成功報酬発生条件','手動請求対象人数','手動月割りJSON','請求条件メモ','メモ','登録日','更新日'];
+    const MEDIA_KEYS = ['id','feeType','name','jobTitle','targetJob','source','startDate','endDate','costMonth','billingMonth','allocationType','fixedListingCost','otherCost','successFeeType','successFeePerHire','annualSalaryEstimate','successFeeRate','feeTriggerStatus','manualBillableCount','monthlyAllocations','billingMemo','memo','createdAt','updatedAt'];
+
+    function exportMediaCSV(){
+      const rows = [MEDIA_HEADERS, ...mediaCosts.map(m => MEDIA_KEYS.map(k => k === 'monthlyAllocations' ? JSON.stringify(m[k] || []) : (m[k] ?? '')))];
+      const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+      downloadFile(`aps_media_${todayISO()}.csv`, '\ufeff' + csv, 'text/csv;charset=utf-8;');
+      setDataMessage(`媒体費用CSVを出力しました（${mediaCosts.length}件）`, 'success');
+    }
+
+    async function importMediaCSV(file){
+      try{
+        const text = await readFileText(file);
+        const rows = parseCsv(text);
+        const objects = rowsToObjects(rows);
+        if(!objects.length) throw new Error('データ行が見つかりません');
+        const incoming = objects.map(o => {
+          let monthlyAllocations = [];
+          try{ monthlyAllocations = JSON.parse(o['手動月割りJSON'] || '[]'); }catch(e){ monthlyAllocations = []; }
+          return normalizeMediaCost({
+            id: o['id'] || uid(),
+            feeType: o['費用タイプ'] || '',
+            name: o['媒体/紹介会社名'] || '',
+            jobTitle: o['求人タイトル'] || '',
+            targetJob: o['対象職種'] || '',
+            source: o['紐付き応募経路'] || '',
+            startDate: o['掲載開始日'] || '',
+            endDate: o['掲載終了日'] || '',
+            costMonth: o['計上月'] || '',
+            billingMonth: o['請求月'] || '',
+            allocationType: o['月次配分方法'] || '',
+            fixedListingCost: Number(o['掲載金額'] || 0),
+            otherCost: Number(o['その他費用'] || 0),
+            successFeeType: o['成功報酬計算方法'] || '',
+            successFeePerHire: Number(o['1名あたり成功報酬額'] || 0),
+            annualSalaryEstimate: Number(o['理論年収'] || 0),
+            successFeeRate: Number(o['成功報酬率'] || 0),
+            feeTriggerStatus: o['成功報酬発生条件'] || '',
+            manualBillableCount: Number(o['手動請求対象人数'] || 0),
+            monthlyAllocations,
+            billingMemo: o['請求条件メモ'] || '',
+            memo: o['メモ'] || '',
+            createdAt: o['登録日'] || nowDateTime(),
+            updatedAt: o['更新日'] || nowDateTime()
+          });
+        }).filter(m => m.name);
+        const mode = (document.querySelector('input[name="mediaImportMode2"]:checked') || {}).value || 'merge';
+        mediaCosts = mergeOrReplace(mediaCosts, incoming, mode);
+        await persist();
+        setDataMessage(`媒体費用CSVを取込みました（${incoming.length}件、モード：${mode === 'replace' ? '上書き' : '追加'}）`, 'success');
+      }catch(err){ setDataMessage(`媒体費用CSV取込エラー：${err.message}`, 'error'); }
+    }
+
+    function exportPlansCSV(){
+      const rows = [PLAN_HEADERS, ...plans.map(p => PLAN_KEYS.map(k => p[k] ?? ''))];
+      const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+      downloadFile(`aps_plans_${todayISO()}.csv`, '\ufeff' + csv, 'text/csv;charset=utf-8;');
+      setDataMessage(`採用計画CSVを出力しました（${plans.length}件）`, 'success');
+    }
+
+    function exportJSONBackup(){
+      const data = { version: 'aps-local-v3', exportedAt: nowDateTime(), candidates, plans, mediaCosts };
+      downloadFile(`aps_backup_${todayISO()}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8;');
+      setDataMessage(`JSONバックアップを出力しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
+    }
+
+    function getRadioValue(name){ const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : 'merge'; }
+
+    // ===== 2ステップ取込：状態変数 =====
+    let selectedCandidateCsvFile = null;
+    let selectedPlanCsvFile = null;
+    let selectedMediaCostCsvFile = null;
+    let selectedJsonBackupFile = null;
+
+    function setImportMessage(elId, message, type){
+      const el = $(elId); if(!el) return;
+      if(!message){ el.textContent=''; el.className=''; return; }
+      el.textContent = message;
+      el.className = 'notice' + (type ? ' ' + type : '');
+    }
+
+    function setImportMessageHTML(elId, html, type){
+      const el = $(elId); if(!el) return;
+      if(!html){ el.innerHTML=''; el.className=''; return; }
+      el.innerHTML = html;
+      el.className = 'notice' + (type ? ' ' + type : '');
+    }
+
+    // ===== 応募者CSV =====
+    function handleCandidateCsvFileSelect(event){
+      const f = event.target.files[0];
+      if(!f) return;
+      selectedCandidateCsvFile = f;
+      const nameEl = $('candidateCsvFileName'); if(nameEl) nameEl.textContent = `選択中のファイル：${f.name}`;
+      const btn = $('btnExecuteCandidateCsvImport'); if(btn) btn.disabled = false;
+      setImportMessage('candidateCsvImportMessage', `ファイル「${f.name}」を選択しました。「取込実行」を押すと反映されます。`, 'info');
+    }
+
+    function clearCandidateCsvSelection(){
+      selectedCandidateCsvFile = null;
+      const inp = $('inputCandidatesCSV'); if(inp) inp.value = '';
+      const nameEl = $('candidateCsvFileName'); if(nameEl) nameEl.textContent = 'CSVファイルが選択されていません';
+      const btn = $('btnExecuteCandidateCsvImport'); if(btn) btn.disabled = true;
+      setImportMessage('candidateCsvImportMessage', '', '');
+    }
+
+    async function executeCandidateCsvImport(){
+      if(!selectedCandidateCsvFile){ setImportMessage('candidateCsvImportMessage','CSVファイルが選択されていません。', 'error'); return; }
+      try{
+        const text = await readFileText(selectedCandidateCsvFile);
+        const rows = parseCsv(text);
+        if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
+        const headers = rows[0].map(h => String(h || '').trim());
+        if(!headers.includes('応募者名') && !headers.includes('id')) throw new Error('必須列「応募者名」が不足しています。');
+        const objects = rowsToObjects(rows);
+        if(!objects.length) throw new Error('取込対象データがありません。');
+        let added = 0, updated = 0, skipped = 0;
+        const incoming = [];
+        const existingIds = new Set(candidates.map(c => c.id));
+        objects.forEach(o => {
+          if(!o['応募者名']){ skipped++; return; }
+          const id = o['id'] || uid();
+          incoming.push(normalizeCandidate({
+            id,
+            name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
+            job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
+            license: o['免許区分'] || '', area: o['希望勤務地'] || '',
+            interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
+            nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
+            resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
+            appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
+            createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
+          }));
+          if(o['id'] && existingIds.has(id)) updated++; else added++;
+        });
+        const mode = getRadioValue('candImportMode');
+        if(mode === 'replace'){ candidates = [...incoming]; }
+        else { candidates = mergeOrReplace(candidates, incoming, mode); }
+        saveLocal(); renderAll();
+        let cloudMsg = '';
+        if(isCloudConfigured()){
+          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','CSV取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
+          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+        }
+        setImportMessageHTML('candidateCsvImportMessage', `応募者CSVを取り込みました。<br>新規追加：${added}件 ／ 上書き：${updated}件 ／ スキップ：${skipped}件${cloudMsg}`, 'success');
+        clearCandidateCsvSelection();
+      }catch(err){ setImportMessage('candidateCsvImportMessage', `応募者CSV取込エラー：${err.message}`, 'error'); }
+    }
+
+    // ===== 採用計画CSV =====
+    function handlePlanCsvFileSelect(event){
+      const f = event.target.files[0]; if(!f) return;
+      selectedPlanCsvFile = f;
+      const nameEl = $('planCsvFileName'); if(nameEl) nameEl.textContent = `選択中のファイル：${f.name}`;
+      const btn = $('btnExecutePlanCsvImport'); if(btn) btn.disabled = false;
+      setImportMessage('planCsvImportMessage', `ファイル「${f.name}」を選択しました。「取込実行」を押すと反映されます。`, 'info');
+    }
+
+    function clearPlanCsvSelection(){
+      selectedPlanCsvFile = null;
+      const inp = $('inputPlansCSV'); if(inp) inp.value = '';
+      const nameEl = $('planCsvFileName'); if(nameEl) nameEl.textContent = 'CSVファイルが選択されていません';
+      const btn = $('btnExecutePlanCsvImport'); if(btn) btn.disabled = true;
+      setImportMessage('planCsvImportMessage', '', '');
+    }
+
+    async function executePlanCsvImport(){
+      if(!selectedPlanCsvFile){ setImportMessage('planCsvImportMessage','CSVファイルが選択されていません。', 'error'); return; }
+      try{
+        const text = await readFileText(selectedPlanCsvFile);
+        const rows = parseCsv(text);
+        if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
+        const headers = rows[0].map(h => String(h || '').trim());
+        if(!headers.includes('職種')) throw new Error('必須列「職種」が不足しています。');
+        const objects = rowsToObjects(rows);
+        if(!objects.length) throw new Error('取込対象データがありません。');
+        let added = 0, updated = 0, skipped = 0;
+        const incoming = [];
+        const existingIds = new Set(plans.map(p => p.id));
+        objects.forEach(o => {
+          if(!o['職種']){ skipped++; return; }
+          const id = o['id'] || uid();
+          incoming.push(normalizePlan({
+            id, job: o['職種'] || '',
+            total: Number(o['今期目標人数'] || 0),
+            q1: Number(o['1Q目標'] || 0), q2: Number(o['2Q目標'] || 0),
+            q3: Number(o['3Q目標'] || 0), q4: Number(o['4Q目標'] || 0)
+          }));
+          if(o['id'] && existingIds.has(id)) updated++; else added++;
+        });
+        const mode = getRadioValue('planImportMode');
+        if(mode === 'replace'){ plans = [...incoming]; }
+        else { plans = mergeOrReplace(plans, incoming, mode); }
+        saveLocal(); renderAll();
+        let cloudMsg = '';
+        if(isCloudConfigured()){
+          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','CSV取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
+          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+        }
+        setImportMessageHTML('planCsvImportMessage', `採用計画CSVを取り込みました。<br>新規追加：${added}件 ／ 上書き：${updated}件 ／ スキップ：${skipped}件${cloudMsg}`, 'success');
+        clearPlanCsvSelection();
+      }catch(err){ setImportMessage('planCsvImportMessage', `採用計画CSV取込エラー：${err.message}`, 'error'); }
+    }
+
+    // ===== 媒体費用CSV =====
+    function handleMediaCostCsvFileSelect(event){
+      const f = event.target.files[0]; if(!f) return;
+      selectedMediaCostCsvFile = f;
+      const nameEl = $('mediaCostCsvFileName'); if(nameEl) nameEl.textContent = `選択中のファイル：${f.name}`;
+      const btn = $('btnExecuteMediaCostCsvImport'); if(btn) btn.disabled = false;
+      setImportMessage('mediaCostCsvImportMessage', `ファイル「${f.name}」を選択しました。「取込実行」を押すと反映されます。`, 'info');
+    }
+
+    function clearMediaCostCsvSelection(){
+      selectedMediaCostCsvFile = null;
+      const inp = $('inputMediaCSV2'); if(inp) inp.value = '';
+      const nameEl = $('mediaCostCsvFileName'); if(nameEl) nameEl.textContent = 'CSVファイルが選択されていません';
+      const btn = $('btnExecuteMediaCostCsvImport'); if(btn) btn.disabled = true;
+      setImportMessage('mediaCostCsvImportMessage', '', '');
+    }
+
+    async function executeMediaCostCsvImport(){
+      if(!selectedMediaCostCsvFile){ setImportMessage('mediaCostCsvImportMessage','CSVファイルが選択されていません。', 'error'); return; }
+      try{
+        const text = await readFileText(selectedMediaCostCsvFile);
+        const rows = parseCsv(text);
+        if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
+        const headers = rows[0].map(h => String(h || '').trim());
+        if(!headers.includes('媒体/紹介会社名')) throw new Error('必須列「媒体/紹介会社名」が不足しています。');
+        const objects = rowsToObjects(rows);
+        if(!objects.length) throw new Error('取込対象データがありません。');
+        let added = 0, updated = 0, skipped = 0;
+        const incoming = [];
+        const existingIds = new Set(mediaCosts.map(m => m.id));
+        objects.forEach(o => {
+          if(!o['媒体/紹介会社名']){ skipped++; return; }
+          let monthlyAllocations = [];
+          try{ monthlyAllocations = JSON.parse(o['手動月割りJSON'] || '[]'); }catch(e){ monthlyAllocations = []; }
+          const id = o['id'] || uid();
+          incoming.push(normalizeMediaCost({
+            id, feeType: o['費用タイプ'] || '', name: o['媒体/紹介会社名'] || '',
+            jobTitle: o['求人タイトル'] || '', targetJob: o['対象職種'] || '',
+            source: o['紐付き応募経路'] || '', startDate: o['掲載開始日'] || '', endDate: o['掲載終了日'] || '',
+            costMonth: o['計上月'] || '', billingMonth: o['請求月'] || '', allocationType: o['月次配分方法'] || '',
+            fixedListingCost: Number(o['掲載金額'] || 0), otherCost: Number(o['その他費用'] || 0),
+            successFeeType: o['成功報酬計算方法'] || '', successFeePerHire: Number(o['1名あたり成功報酬額'] || 0),
+            annualSalaryEstimate: Number(o['理論年収'] || 0), successFeeRate: Number(o['成功報酬率'] || 0),
+            feeTriggerStatus: o['成功報酬発生条件'] || '', manualBillableCount: Number(o['手動請求対象人数'] || 0),
+            monthlyAllocations, billingMemo: o['請求条件メモ'] || '', memo: o['メモ'] || '',
+            createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
+          }));
+          if(o['id'] && existingIds.has(id)) updated++; else added++;
+        });
+        const mode = (document.querySelector('input[name="mediaImportMode2"]:checked') || {}).value || 'merge';
+        if(mode === 'replace'){ mediaCosts = [...incoming]; }
+        else { mediaCosts = mergeOrReplace(mediaCosts, incoming, mode); }
+        saveLocal(); renderAll();
+        let cloudMsg = '';
+        if(isCloudConfigured()){
+          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','CSV取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
+          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+        }
+        setImportMessageHTML('mediaCostCsvImportMessage', `媒体費用CSVを取り込みました。<br>新規追加：${added}件 ／ 上書き：${updated}件 ／ スキップ：${skipped}件${cloudMsg}`, 'success');
+        clearMediaCostCsvSelection();
+      }catch(err){ setImportMessage('mediaCostCsvImportMessage', `媒体費用CSV取込エラー：${err.message}`, 'error'); }
+    }
+
+    // ===== JSONバックアップ =====
+    function handleJsonBackupFileSelect(event){
+      const f = event.target.files[0]; if(!f) return;
+      selectedJsonBackupFile = f;
+      const nameEl = $('jsonBackupFileName'); if(nameEl) nameEl.textContent = `選択中のファイル：${f.name}`;
+      const btn = $('btnExecuteJsonBackupImport'); if(btn) btn.disabled = false;
+      setImportMessage('jsonBackupImportMessage', `ファイル「${f.name}」を選択しました。「取込実行」を押すと反映されます。`, 'info');
+    }
+
+    function clearJsonBackupSelection(){
+      selectedJsonBackupFile = null;
+      const inp = $('inputBackupJSON'); if(inp) inp.value = '';
+      const nameEl = $('jsonBackupFileName'); if(nameEl) nameEl.textContent = 'JSONファイルが選択されていません';
+      const btn = $('btnExecuteJsonBackupImport'); if(btn) btn.disabled = true;
+      setImportMessage('jsonBackupImportMessage', '', '');
+    }
+
+    async function executeJsonBackupImport(){
+      if(!selectedJsonBackupFile){ setImportMessage('jsonBackupImportMessage','JSONファイルが選択されていません。', 'error'); return; }
+      if(!confirm('JSONバックアップを取り込むと、現在の応募者・採用計画・媒体費用データがバックアップ内容で上書きされます。実行しますか？')) return;
+      try{
+        const text = await readFileText(selectedJsonBackupFile);
+        let json;
+        try{ json = JSON.parse(text); }catch(e){ throw new Error('JSON形式が不正です。'); }
+        if(!json || (!Array.isArray(json.candidates) && !Array.isArray(json.plans) && !Array.isArray(json.mediaCosts))) throw new Error('JSON構造が不正です（candidates / plans / mediaCosts が見つかりません）。');
+        const newCandidates = (json.candidates || []).map(normalizeCandidate);
+        const newPlans = (json.plans || []).map(normalizePlan);
+        const newMediaCosts = (json.mediaCosts || []).map(normalizeMediaCost);
+        candidates = newCandidates; plans = newPlans; mediaCosts = newMediaCosts;
+        saveLocal(); renderAll();
+        let cloudMsg = '';
+        if(isCloudConfigured()){
+          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','JSON取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
+          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+        }
+        setImportMessageHTML('jsonBackupImportMessage', `JSONバックアップを復元しました。<br>応募者：${candidates.length}件 ／ 採用計画：${plans.length}件 ／ 媒体費用：${mediaCosts.length}件${cloudMsg}`, 'success');
+        clearJsonBackupSelection();
+      }catch(err){ setImportMessage('jsonBackupImportMessage', `JSONバックアップ取込エラー：${err.message}`, 'error'); }
+    }
+
+    async function readFileText(file){
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('ファイル読み込みに失敗しました'));
+        reader.readAsText(file, 'UTF-8');
+      });
+    }
+
+    function mergeOrReplace(existing, incoming, mode){
+      if(mode === 'replace') return [...incoming];
+      const map = new Map(existing.map(x => [x.id, x]));
+      incoming.forEach(x => map.set(x.id, x));
+      return Array.from(map.values());
+    }
+
+    async function importCandidatesCSV(file){
+      try{
+        const text = await readFileText(file);
+        const rows = parseCsv(text);
+        const objects = rowsToObjects(rows);
+        if(!objects.length) throw new Error('データ行が見つかりません');
+        const incoming = objects.map(o => normalizeCandidate({
+          id: o['id'] || uid(),
+          name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
+          job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
+          license: o['免許区分'] || '', area: o['希望勤務地'] || '',
+          interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
+          nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
+          resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
+          appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
+          createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
+        })).filter(c => c.name);
+        const mode = getRadioValue('candImportMode');
+        candidates = mergeOrReplace(candidates, incoming, mode);
+        await persist();
+        setDataMessage(`応募者CSVを取込みました（${incoming.length}件、モード：${mode === 'replace' ? '上書き' : '追加'}）`, 'success');
+      }catch(err){ setDataMessage(`応募者CSV取込エラー：${err.message}`, 'error'); }
+    }
+
+    async function importPlansCSV(file){
+      try{
+        const text = await readFileText(file);
+        const rows = parseCsv(text);
+        const objects = rowsToObjects(rows);
+        if(!objects.length) throw new Error('データ行が見つかりません');
+        const incoming = objects.map(o => normalizePlan({
+          id: o['id'] || uid(), job: o['職種'] || '',
+          total: Number(o['今期目標人数'] || 0),
+          q1: Number(o['1Q目標'] || 0), q2: Number(o['2Q目標'] || 0),
+          q3: Number(o['3Q目標'] || 0), q4: Number(o['4Q目標'] || 0)
+        })).filter(p => p.job);
+        const mode = getRadioValue('planImportMode');
+        plans = mergeOrReplace(plans, incoming, mode);
+        await persist();
+        setDataMessage(`採用計画CSVを取込みました（${incoming.length}件、モード：${mode === 'replace' ? '上書き' : '追加'}）`, 'success');
+      }catch(err){ setDataMessage(`採用計画CSV取込エラー：${err.message}`, 'error'); }
+    }
+
+    // ===== 求人媒体CSV取込 =====
+
+    let mediaCSVFile = null;
+
+    function normalizePhone(raw){
+      if(!raw) return '';
+      let s = String(raw).trim();
+      // 先頭のシングルクォート（Excel の数値化防止）を除去
+      s = s.replace(/^['"`]+/, '');
+      // 全角数字を半角に
+      s = s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+      // 全角ハイフン類を半角に
+      s = s.replace(/[‐－―ー−ｰ]/g, '-');
+      // 数字だけ抽出（ただし元の整形候補のため別途参照）
+      let digits = s.replace(/\D/g, '');
+      // 81 から始まる11〜12桁は +81 として扱う
+      if(/^81\d{9,10}$/.test(digits)) digits = '0' + digits.slice(2);
+      // +81 prefix 文字列も対応（先に +81 → 0）
+      if(!digits && /^\+?81/.test(s)){
+        s = s.replace(/^\+?81[\s-]?/, '0');
+        digits = s.replace(/\D/g, '');
+      }
+      // 携帯番号 11桁 (070/080/090)
+      if(/^0[789]0\d{8}$/.test(digits)){
+        return `${digits.slice(0,3)}-${digits.slice(3,7)}-${digits.slice(7)}`;
+      }
+      // 050 IP電話 11桁
+      if(/^050\d{8}$/.test(digits)){
+        return `${digits.slice(0,3)}-${digits.slice(3,7)}-${digits.slice(7)}`;
+      }
+      // 0120 フリー 10桁
+      if(/^0120\d{6}$/.test(digits)){
+        return `${digits.slice(0,4)}-${digits.slice(4,7)}-${digits.slice(7)}`;
+      }
+      // 一般固定電話 10桁
+      if(digits.length === 10){
+        return `${digits.slice(0,2)}-${digits.slice(2,6)}-${digits.slice(6)}`;
+      }
+      if(digits.length === 11){
+        return `${digits.slice(0,3)}-${digits.slice(3,7)}-${digits.slice(7)}`;
+      }
+      // 整形不能ならクォート除去のみ返す
+      return s.trim();
+    }
+
+    const MEDIA_STATUS_MAP = {
+      '新規応募':'応募受付', '未対応':'応募受付', '応募済':'応募受付', '応募':'応募受付',
+      '連絡済':'書類選考中',
+      '面接設定済':'一次面接', '面接予定':'一次面接',
+      '内定':'内定',
+      '採用':'内定承諾', '承諾':'内定承諾', '入社決定':'内定承諾',
+      '辞退':'辞退',
+      '不採用':'不採用', '見送り':'不採用'
+    };
+
+    function mapMediaStatus(raw){
+      const v = String(raw || '').trim();
+      if(!v) return '応募受付';
+      if(MEDIA_STATUS_MAP[v]) return MEDIA_STATUS_MAP[v];
+      // 部分一致でフォールバック
+      for(const k of Object.keys(MEDIA_STATUS_MAP)){
+        if(v.includes(k)) return MEDIA_STATUS_MAP[k];
+      }
+      return '応募受付';
+    }
+
+    function mapMediaRating(raw){
+      const v = String(raw || '').trim();
+      if(v === 'はい' || v === 'YES' || v === 'Yes' || v === 'yes') return 'B：前向きに検討';
+      if(v === 'いいえ' || v === 'NO' || v === 'No' || v === 'no') return 'C：懸念あり';
+      return '未評価';
+    }
+
+    function classifyMediaJob(rawJob){
+      const j = String(rawJob || '');
+      if(/運行管理/.test(j)) return { job: '運行管理者', original: j, fallback: false };
+      if(/(ドライバー|運転手|配送|中型|大型|4t|4ｔ)/.test(j)) return { job: '中型ドライバー', original: j, fallback: false };
+      return { job: '中型ドライバー', original: j, fallback: true };
+    }
+
+    function buildMediaMemo(row){
+      const lines = [];
+      lines.push('【求人媒体CSV取込情報】');
+      if(row['日付']) lines.push(`応募日：${row['日付']}`);
+      if(row['ステータス']) lines.push(`媒体ステータス：${row['ステータス']}`);
+      if(row['応募経路']) lines.push(`応募経路（媒体）：${row['応募経路']}`);
+      if(row['職種名']) lines.push(`求人タイトル：${row['職種名']}`);
+      if(row['勤務地']) lines.push(`勤務地：${row['勤務地']}`);
+      if(row['応募者の居住地']) lines.push(`応募者の居住地：${row['応募者の居住地']}`);
+      if(row['関連のある経験']) lines.push(`関連のある経験：${row['関連のある経験']}`);
+      if(row['学歴']) lines.push(`学歴：${row['学歴']}`);
+      if(row['採用の見込み']) lines.push(`採用の見込み：${row['採用の見込み']}`);
+
+      const qaLines = [];
+      for(let i = 1; i <= 15; i++){
+        const q = row[`質問${i}`];
+        const a = row[`質問${i}の回答`];
+        const ok = row[`質問${i}は適格`];
+        if(q || a){
+          qaLines.push(`Q${i}：${q || '-'}`);
+          qaLines.push(`A${i}：${a || '-'}`);
+          qaLines.push(`適格：${ok || '-'}`);
+          qaLines.push('');
+        }
+      }
+      if(qaLines.length){
+        lines.push('');
+        lines.push('【質問回答】');
+        lines.push(...qaLines);
+      }
+      lines.push('');
+      lines.push(`取込日時：${nowDateTime()}`);
+      return lines.join('\n').trim();
+    }
+
+    function detectMediaSource(row){
+      // 応募経路欄から判定。indeedドメインのメールが含まれていれば indeed 確定
+      const email = String(row['メールアドレス'] || '').toLowerCase();
+      if(email.includes('indeed')) return 'indeed';
+      const src = String(row['応募経路'] || '').toLowerCase();
+      const srcOriginal = String(row['応募経路'] || '').trim();
+      if(/indeed/.test(src) || /スポンサー/.test(srcOriginal)) return 'indeed';
+      if(/plex/i.test(srcOriginal)) return 'PLEX';
+      if(/xmile/i.test(srcOriginal) || /エックスマイル/.test(srcOriginal)) return 'XMile';
+      if(/リファラル/.test(srcOriginal)) return 'リファラル';
+      if(/紹介/.test(srcOriginal)) return '紹介';
+      return 'indeed';
+    }
+
+    function findDuplicateCandidate(incoming){
+      // 1. メール一致
+      if(incoming.email){
+        const m = candidates.find(c => c.email && c.email.toLowerCase() === incoming.email.toLowerCase());
+        if(m) return m;
+      }
+      // 2. 電話一致（整形後）
+      if(incoming.phone){
+        const np = normalizePhone(incoming.phone);
+        const m = candidates.find(c => c.phone && normalizePhone(c.phone) === np);
+        if(m) return m;
+      }
+      // 3. 名前+応募日
+      if(incoming.name && incoming._appliedDate){
+        const m = candidates.find(c => c.name === incoming.name && (c.createdAt || '').slice(0,10).replace(/\//g,'-') === incoming._appliedDate);
+        if(m) return m;
+      }
+      return null;
+    }
+
+    function buildIncomingFromMediaRow(row){
+      const name = String(row['名前'] || '').trim();
+      if(!name) return null;
+      const jobInfo = classifyMediaJob(row['職種名']);
+      const status = mapMediaStatus(row['ステータス']);
+      const rating = mapMediaRating(row['採用の見込み']);
+      const source = detectMediaSource(row);
+      const phone = normalizePhone(row['電話番号']);
+      const email = String(row['メールアドレス'] || '').trim();
+      const area = String(row['応募者の居住地'] || '').trim();
+      const appliedDate = String(row['日付'] || '').trim();
+      const memo = buildMediaMemo(row);
+      return {
+        name, phone, email,
+        job: jobInfo.job,
+        source,
+        workType: '未確認',
+        license: '未確認',
+        area,
+        interviewAt: '',
+        nextDate: '',
+        status, rating,
+        owner: '',
+        memo,
+        resumeName: '',
+        resumeUrl: '',
+        appliedAt: appliedDate,
+        _appliedDate: appliedDate,
+        _jobOriginal: jobInfo.original,
+        _jobFallback: jobInfo.fallback
+      };
+    }
+
+    function setMediaImportResult(html, type){
+      const el = $('mediaImportResult'); if(!el) return;
+      el.className = 'notice' + (type ? ' ' + type : '');
+      el.innerHTML = html;
+    }
+
+    function clearMediaImport(){
+      mediaCSVFile = null;
+      const input = $('inputMediaCSV'); if(input) input.value = '';
+      const name = $('mediaFileName'); if(name) name.textContent = '未選択';
+      setMediaImportResult('', '');
+    }
+
+    async function runMediaImport(){
+      if(!mediaCSVFile){ setMediaImportResult('CSVファイルを選択してください。', 'error'); return; }
+      try{
+        const text = await readFileText(mediaCSVFile);
+        const rows = parseCsv(text);
+        if(rows.length < 2) throw new Error('データ行が見つかりません。');
+        const headers = rows[0].map(h => String(h || '').trim());
+        if(!headers.includes('名前')) throw new Error('CSVに「名前」列が見つかりません。求人媒体CSVのフォーマットを確認してください。');
+        const objects = rows.slice(1).map(r => {
+          const obj = {};
+          headers.forEach((h, i) => { obj[h] = (r[i] || '').toString().trim(); });
+          return obj;
+        });
+
+        const mode = (document.querySelector('input[name="mediaImportMode"]:checked') || {}).value || 'merge';
+
+        if(mode === 'replace'){
+          if(!confirm(`既存の応募者${candidates.length}件を全削除してから取込みます。よろしいですか？`)) return;
+          candidates = [];
+        }
+
+        let total = 0, added = 0, updated = 0, skipped = 0, errored = 0, fallbackJobs = 0;
+
+        objects.forEach(row => {
+          total++;
+          try{
+            const incoming = buildIncomingFromMediaRow(row);
+            if(!incoming){ skipped++; return; }
+            if(incoming._jobFallback) fallbackJobs++;
+            const dup = findDuplicateCandidate(incoming);
+            if(dup){
+              const mergedMemo = (dup.memo && !dup.memo.includes('【求人媒体CSV取込情報】'))
+                ? (dup.memo + '\n\n' + incoming.memo)
+                : (dup.memo ? (dup.memo.replace(/【求人媒体CSV取込情報】[\s\S]*$/, '').trim() + (dup.memo.replace(/【求人媒体CSV取込情報】[\s\S]*$/, '').trim() ? '\n\n' : '') + incoming.memo) : incoming.memo);
+              const updatedRecord = normalizeCandidate({
+                ...dup,
+                name: incoming.name || dup.name,
+                phone: incoming.phone || dup.phone,
+                email: incoming.email || dup.email,
+                job: incoming.job || dup.job,
+                source: incoming.source || dup.source,
+                area: incoming.area || dup.area,
+                status: incoming.status || dup.status,
+                rating: (dup.rating && dup.rating !== '未評価') ? dup.rating : incoming.rating,
+                memo: mergedMemo,
+                updatedAt: nowDateTime()
+              });
+              candidates = candidates.map(c => c.id === dup.id ? updatedRecord : c);
+              updated++;
+            }else{
+              const createdAt = incoming._appliedDate ? `${incoming._appliedDate.replace(/-/g,'/')} 00:00:00` : nowDateTime();
+              candidates.unshift(normalizeCandidate({
+                ...incoming,
+                createdAt,
+                updatedAt: nowDateTime()
+              }));
+              added++;
+            }
+          }catch(rowErr){
+            console.error('行取込エラー', rowErr);
+            errored++;
+          }
+        });
+
+        await persist();
+
+        const lines = [];
+        lines.push(`<strong>取込完了</strong>`);
+        lines.push(`総行数：${total}件`);
+        lines.push(`新規追加：${added}件 ／ 上書き更新：${updated}件 ／ スキップ（名前なし等）：${skipped}件 ／ エラー：${errored}件`);
+        if(fallbackJobs > 0) lines.push(`<span style="color:#a16207;">※ 職種が判定不能で「中型ドライバー」に仮設定された応募者：${fallbackJobs}件（メモに元の求人タイトルが記録されています）</span>`);
+        if(isCloudConfigured()) lines.push('クラウドにも保存しました。');
+        setMediaImportResult(lines.join('<br>'), 'success');
+        clearMediaImport();
+        // 取込後は応募者一覧へ
+        switchTab('list');
+      }catch(err){
+        setMediaImportResult(`取込エラー：${err.message}`, 'error');
+      }
+    }
+
+    async function importJSONBackup(file){
+      try{
+        const text = await readFileText(file);
+        const json = JSON.parse(text);
+        if(!json || (!Array.isArray(json.candidates) && !Array.isArray(json.plans) && !Array.isArray(json.mediaCosts))) throw new Error('JSON構造が不正です（candidates / plans / mediaCosts が見つかりません）');
+        if(!confirm('JSONバックアップを取込むと、現在の応募者・採用計画・媒体費用が上書きされます。よろしいですか？')) return;
+        candidates = (json.candidates || []).map(normalizeCandidate);
+        plans = (json.plans || []).map(normalizePlan);
+        mediaCosts = (json.mediaCosts || []).map(normalizeMediaCost);
+        await persist();
+        setDataMessage(`JSONバックアップを取込みました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
+      }catch(err){ setDataMessage(`JSONバックアップ取込エラー：${err.message}`, 'error'); }
+    }
+
+    function setDataMessage(message, type){
+      const el = $('dataMessage'); if(!el) return;
+      el.textContent = message;
+      el.className = 'notice' + (type ? ' ' + type : '');
+    }
+
+    async function reseedSampleData(){
+      if(!confirm('現在のデータを破棄してサンプルデータを再投入しますか？')) return;
+      loadSampleData();
+      await persist();
+      setDataMessage('サンプルデータを再投入しました', 'success');
+    }
+
+    async function resetAllData(){
+      if(!confirm('全応募者データ・採用計画・媒体費用を削除しますか？この操作は戻せません。')) return;
+      candidates = []; plans = []; mediaCosts = [];
+      await persist();
+      setDataMessage('全データをリセットしました', 'success');
+    }
+
+    function loadApiSettingsToForm(){
+      const url = localStorage.getItem(STORAGE_API_URL) || '';
+      const key = localStorage.getItem(STORAGE_API_KEY) || '';
+      if($('apiUrl')) $('apiUrl').value = url;
+      if($('apiKey')) $('apiKey').value = key;
+    }
+
+    function saveApiSettings(){
+      const url = ($('apiUrl') && $('apiUrl').value || '').trim();
+      const key = ($('apiKey') && $('apiKey').value || '').trim();
+      if(url) localStorage.setItem(STORAGE_API_URL, url); else localStorage.removeItem(STORAGE_API_URL);
+      if(key) localStorage.setItem(STORAGE_API_KEY, key); else localStorage.removeItem(STORAGE_API_KEY);
+      setDataMessage('クラウド共有設定を保存しました。「接続確認」を押してテストしてください。', 'success');
+      renderSyncCard();
+      startAutoPolling();
+    }
+
+    async function testConnection(){
+      try{
+        setDataMessage('接続確認中です...', 'info');
+        const res = await callCloud('ping', {});
+        setSyncState('ok', res.message || '接続成功');
+        setDataMessage(`接続成功：${res.savedAt || nowDateTime()}`, 'success');
+      }catch(err){
+        setSyncState('ng', err.message);
+        setDataMessage(`接続エラー：${err.message}`, 'error');
+      }
+    }
+
+    async function cloudReload(silent = false){
+      try{
+        if(!silent) setDataMessage('クラウドから読込中です...', 'info');
+        const res = await callCloud('load', {});
+        const data = res.data || {};
+        candidates = (Array.isArray(data.candidates) ? data.candidates : []).map(normalizeCandidate);
+        plans = (Array.isArray(data.plans) ? data.plans : []).map(normalizePlan);
+        mediaCosts = (Array.isArray(data.mediaCosts) ? data.mediaCosts : []).map(normalizeMediaCost);
+        saveLocal();
+        renderAll();
+        setSyncState('ok', silent ? '自動更新成功' : '読込成功');
+        if(!silent) setDataMessage(`クラウドから再読込しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
+      }catch(err){
+        setSyncState('ng', err.message);
+        if(!silent) setDataMessage(`クラウド読込エラー：${err.message}`, 'error');
+      }
+    }
+
+    async function cloudPush(){
+      try{
+        setDataMessage('クラウドへ反映中です...', 'info');
+        await callCloud('save', { candidates, plans, mediaCosts });
+        setSyncState('ok', '反映成功');
+        setDataMessage(`クラウドへ反映しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
+      }catch(err){
+        setSyncState('ng', err.message);
+        setDataMessage(`クラウド反映エラー：${err.message}`, 'error');
+      }
+    }
+
+    function switchTab(tabId){
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+      document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === tabId));
+      const titles = {
+        dashboard: ['採用状況をひと目で把握','応募者・面接日時・選考ステータス・媒体別効果を確認できます。'],
+        list: ['応募者を探す・確認する','検索、絞り込み、詳細確認、編集ができます。'],
+        kanban: ['選考状況を管理する','ステータス別に応募者を見ながら、進捗を動かせます。'],
+        form: ['応募者を手動登録する','1名ずつ手入力で登録します。'],
+        plan: ['採用目標と進捗を管理する','職種別の目標人数と内定承諾数を比較します。'],
+        media: ['掲載費用管理','媒体・紹介会社ごとに費用タイプを分けて管理します。'],
+        report: ['月次レポート','月ごとの採用費用と応募/承諾/入社の単価を集計します。'],
+        settings: ['設定・データ操作','クラウド共有設定とCSV / JSONバックアップ操作']
+      };
+      if(titles[tabId]){
+        if($('pageTitle')) $('pageTitle').textContent = titles[tabId][0];
+        if($('pageLead')) $('pageLead').textContent = titles[tabId][1];
+      }
+    }
+
+    function bindEvents(){
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+      const onClick = (id, fn) => { const el = $(id); if(el) el.addEventListener('click', fn); };
+      onClick('btnQuickForm', () => switchTab('form'));
+      onClick('btnListForm', () => switchTab('form'));
+      onClick('btnQuickReload', cloudReload);
+      onClick('btnQuickCSV', exportCandidatesCSV);
+      onClick('btnQuickImport', () => {
+        switchTab('settings');
+        setTimeout(() => {
+          const sec = $('mediaImportSection');
+          if(sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      });
+      onClick('btnRunMediaImport', runMediaImport);
+      onClick('btnClearMediaImport', clearMediaImport);
+      onClick('btnResetCandidateForm', () => resetFormMode());
+      onClick('btnResetPlanForm', resetPlanForm);
+      onClick('btnCloseModal', closeModal);
+      onClick('btnSaveSettings', saveApiSettings);
+      onClick('btnTestConnection', testConnection);
+      onClick('btnCloudReload', () => cloudReload(false));
+      onClick('btnCloudPush', cloudPush);
+      const pollingToggle = $('pollingToggle');
+      if(pollingToggle){
+        pollingToggle.addEventListener('change', () => {
+          pollingEnabled = pollingToggle.checked;
+          if(pollingEnabled) startAutoPolling(); else stopAutoPolling();
+          renderSyncCard();
+          setDataMessage(pollingEnabled ? '自動更新をONにしました（30秒ごと）。' : '自動更新をOFFにしました。', 'info');
+        });
+      }
+      onClick('btnExportCandidatesCSV', exportCandidatesCSV);
+      onClick('btnExportPlansCSV', exportPlansCSV);
+      onClick('btnExportMediaCSV', exportMediaCSV);
+      onClick('btnExportJSON', exportJSONBackup);
+      const mediaCsv2 = $('inputMediaCSV2'); if(mediaCsv2) mediaCsv2.addEventListener('change', handleMediaCostCsvFileSelect);
+      onClick('btnLoadSample', reseedSampleData);
+      onClick('btnResetAll', resetAllData);
+
+      const candidateForm = $('candidateForm'); if(candidateForm) candidateForm.addEventListener('submit', handleCandidateSubmit);
+      const planForm = $('planForm'); if(planForm) planForm.addEventListener('submit', handlePlanSubmit);
+      const mediaForm = $('mediaForm'); if(mediaForm) mediaForm.addEventListener('submit', handleMediaSubmit);
+      onClick('btnResetMediaForm', resetMediaForm);
+      onClick('btnExportReportCSV', exportMonthlyReportCSV);
+      onClick('btnGoReport', () => switchTab('report'));
+      ['reportMonth','reportJob','reportSource','reportFeeType'].forEach(id => { const el = $(id); if(el) el.addEventListener('change', renderMonthlyReport); });
+
+      ['searchName','filterJob','filterStatus','filterSource'].forEach(id => { const el = $(id); if(el) el.addEventListener('input', renderTable); });
+
+      const mediaCsv = $('inputMediaCSV'); if(mediaCsv) mediaCsv.addEventListener('change', e => {
+        const f = e.target.files[0];
+        if(f){
+          mediaCSVFile = f;
+          const nameEl = $('mediaFileName'); if(nameEl) nameEl.textContent = f.name;
+          setMediaImportResult(`ファイルを選択しました：${escapeHTML(f.name)}（${(f.size/1024).toFixed(1)} KB）。「取込実行」を押してください。`, 'info');
+        }
+      });
+      // 2ステップ取込：ファイル選択のみ（実行は別ボタン）
+      const candCsv = $('inputCandidatesCSV'); if(candCsv) candCsv.addEventListener('change', handleCandidateCsvFileSelect);
+      const planCsv = $('inputPlansCSV'); if(planCsv) planCsv.addEventListener('change', handlePlanCsvFileSelect);
+      const backup = $('inputBackupJSON'); if(backup) backup.addEventListener('change', handleJsonBackupFileSelect);
+      onClick('btnExecuteCandidateCsvImport', executeCandidateCsvImport);
+      onClick('btnClearCandidateCsv', clearCandidateCsvSelection);
+      onClick('btnExecutePlanCsvImport', executePlanCsvImport);
+      onClick('btnClearPlanCsv', clearPlanCsvSelection);
+      onClick('btnExecuteMediaCostCsvImport', executeMediaCostCsvImport);
+      onClick('btnClearMediaCostCsv', clearMediaCostCsvSelection);
+      onClick('btnExecuteJsonBackupImport', executeJsonBackupImport);
+      onClick('btnClearJsonBackup', clearJsonBackupSelection);
+
+      document.addEventListener('click', e => {
+        const btn = e.target.closest('[data-action]'); if(!btn) return;
+        const action = btn.dataset.action; const id = btn.dataset.id;
+        if(action === 'detail') showDetail(id);
+        if(action === 'edit') editCandidate(id);
+        if(action === 'delete') deleteCandidate(id);
+        if(action === 'editPlan') editPlan(id);
+        if(action === 'deletePlan') deletePlan(id);
+        if(action === 'editMedia') editMedia(id);
+        if(action === 'deleteMedia') deleteMedia(id);
+      });
+      document.addEventListener('change', e => {
+        const el = e.target.closest('[data-action="status"]');
+        if(el) changeStatus(el.dataset.id, el.value);
+      });
+      document.addEventListener('click', e => {
+        if(e.target && e.target.id === 'btnEditFromModal'){ closeModal(); editCandidate(e.target.dataset.id); }
+      });
+    }
+
+    async function init(){
+      initSelects();
+      loadLocal();
+      bindEvents();
+      loadApiSettingsToForm();
+      resetFormMode();
+      resetPlanForm();
+      renderAll();
+      if(isCloudConfigured()){
+        try{ await cloudReload(); }catch(err){ /* error already handled */ }
+        startAutoPolling();
+      }
+      // タブ復帰時に即時再読込
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') autoPoll();
+      });
+      // ウィンドウフォーカス時にも
+      window.addEventListener('focus', autoPoll);
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
