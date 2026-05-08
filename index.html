@@ -51,6 +51,18 @@
     .resume-box{display:grid;gap:12px}.resume-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.resume-preview{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff;min-height:220px}.resume-preview iframe{width:100%;height:520px;border:0;display:block}
     .radio-row{display:flex;gap:14px;align-items:center;font-size:13px;font-weight:700;color:var(--muted);flex-wrap:wrap}.radio-row label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
     .sync-card{font-size:13px;line-height:1.8;color:var(--text)}.sync-card strong{color:var(--navy);font-size:16px}.sync-state{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-weight:900;font-size:12px;margin-bottom:10px}.sync-state.idle{background:#f1f5f9;color:#475569}.sync-state.ok{background:#dcfce7;color:#15803d}.sync-state.ng{background:#fee2e2;color:#b91c1c}
+    .toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:420px;pointer-events:none}
+    .toast{background:#fff;border-left:5px solid var(--blue);padding:14px 18px;border-radius:14px;box-shadow:0 12px 32px rgba(15,39,71,.20);font-size:13px;line-height:1.65;animation:toast-in .3s ease;white-space:pre-line;cursor:pointer;color:var(--text);pointer-events:auto}
+    .toast strong{color:var(--navy);display:block;margin-bottom:4px;font-size:14px}
+    .toast.success{border-left-color:var(--green)}.toast.success strong{color:#15803d}
+    .toast.error{border-left-color:var(--red)}.toast.error strong{color:#b91c1c}
+    .toast.warning{border-left-color:#d97706}.toast.warning strong{color:#a16207}
+    .toast.info{border-left-color:var(--blue)}
+    @keyframes toast-in{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(30px)}}
+    .toast.fade-out{animation:toast-out .3s ease forwards}
+    .import-result{margin-top:10px}
+    .import-result table{min-width:auto;width:100%}.import-result td{padding:6px 10px;border:0;font-size:12px}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -367,6 +379,8 @@
       </section>
     </main>
   </div>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <div class="modal-backdrop" id="modalBackdrop"><div class="modal"><div class="modal-header"><h3 id="modalTitle">応募者詳細</h3><button type="button" class="btn btn-ghost" id="btnCloseModal">閉じる</button></div><div id="modalBody"></div></div></div>
 
@@ -1484,6 +1498,93 @@
     let selectedMediaCostCsvFile = null;
     let selectedJsonBackupFile = null;
 
+    // ===== トースト通知 =====
+    function showToast(message, type = 'success', duration = 6000){
+      const container = document.getElementById('toastContainer');
+      if(!container) return;
+      const titles = { success: '✓ 取込成功', error: '✗ 取込失敗', warning: '⚠ 部分成功', info: 'ℹ お知らせ' };
+      const div = document.createElement('div');
+      div.className = `toast ${type}`;
+      div.innerHTML = `<strong>${escapeHTML(titles[type] || titles.info)}</strong>${escapeHTML(message)}`;
+      div.addEventListener('click', () => removeToast(div));
+      container.appendChild(div);
+      setTimeout(() => removeToast(div), duration);
+    }
+    function removeToast(div){
+      if(!div || !div.parentNode) return;
+      div.classList.add('fade-out');
+      setTimeout(() => { if(div.parentNode) div.parentNode.removeChild(div); }, 300);
+    }
+
+    // ===== 取込結果オブジェクト =====
+    function makeImportResult(){
+      return { totalRows:0, imported:0, added:0, updated:0, skipped:0, errors:0, beforeCount:0, afterCount:0, cloudSaved:false, cloudError:'' };
+    }
+
+    // ===== 取込結果表示 =====
+    function showImportResult(targetId, result, label){
+      const el = $(targetId); if(!el) return;
+      let type = 'success';
+      if(result.errors > 0 && result.imported === 0) type = 'error';
+      else if(result.cloudError) type = 'warning';
+      const cloudLine = result.cloudError
+        ? `<tr><td>クラウド保存：</td><td><span class="error">失敗（${escapeHTML(result.cloudError)}）</span></td></tr>`
+        : (result.cloudSaved ? `<tr><td>クラウド保存：</td><td><span class="success">完了</span></td></tr>` : `<tr><td>クラウド保存：</td><td>未設定（ローカルのみ）</td></tr>`);
+      el.className = 'notice ' + type + ' import-result';
+      el.innerHTML = `<strong>${escapeHTML(label)}を取り込みました</strong>
+<table><tbody>
+  <tr><td>読み込み行数：</td><td>${result.totalRows}件</td></tr>
+  <tr><td>新規追加：</td><td><strong>${result.added}件</strong></td></tr>
+  <tr><td>上書き：</td><td><strong>${result.updated}件</strong></td></tr>
+  <tr><td>スキップ：</td><td>${result.skipped}件</td></tr>
+  <tr><td>エラー：</td><td>${result.errors}件</td></tr>
+  <tr><td>取込前 → 取込後：</td><td>${result.beforeCount}件 → <strong>${result.afterCount}件</strong></td></tr>
+  <tr><td>localStorage保存：</td><td><span class="success">完了</span></td></tr>
+  <tr><td>画面再描画：</td><td><span class="success">完了</span></td></tr>
+  ${cloudLine}
+</tbody></table>`;
+    }
+
+    // ===== クラウド保存 + 通知の共通ヘルパー =====
+    async function afterImportSuccess(result, messageTargetId, label){
+      saveLocal();
+      renderAll();
+      let cloudSaved = false, cloudError = '';
+      if(isCloudConfigured()){
+        try{
+          await callCloud('save', { candidates, plans, mediaCosts });
+          setSyncState('ok', `${label} 取込`);
+          cloudSaved = true;
+        }catch(err){
+          setSyncState('ng', err.message);
+          cloudError = err.message || String(err);
+        }
+      }
+      result.cloudSaved = cloudSaved;
+      result.cloudError = cloudError;
+      console.log(`[IMPORT] ${label} result:`, result);
+      showImportResult(messageTargetId, result, label);
+      if(cloudError){
+        showToast(`${label}を取り込みました（${result.added}件追加 / ${result.updated}件上書き）。\nクラウド保存に失敗：${cloudError}`, 'warning');
+      }else if(result.errors > 0 && result.imported === 0){
+        showToast(`${label}の取込に失敗しました（${result.errors}件のエラー）。`, 'error');
+      }else{
+        showToast(`${label}を取り込みました。\n新規追加：${result.added}件 ／ 上書き：${result.updated}件\n${cloudSaved ? 'クラウド保存：完了' : 'ローカル保存のみ'}\n画面に反映しました。`, 'success');
+      }
+      return result;
+    }
+
+    // ===== 取込ボタンのローディング制御 =====
+    async function withImportButtonLoading(buttonId, originalText, fn){
+      const btn = $(buttonId);
+      if(btn){ btn.disabled = true; btn.textContent = '取込中...'; }
+      try{
+        return await fn();
+      }finally{
+        if(btn){ btn.textContent = originalText; btn.disabled = false; }
+      }
+    }
+
     function setImportMessage(elId, message, type){
       const el = $(elId); if(!el) return;
       if(!message){ el.textContent=''; el.className=''; return; }
@@ -1517,46 +1618,60 @@
     }
 
     async function executeCandidateCsvImport(){
-      if(!selectedCandidateCsvFile){ setImportMessage('candidateCsvImportMessage','CSVファイルが選択されていません。', 'error'); return; }
-      try{
-        const text = await readFileText(selectedCandidateCsvFile);
-        const rows = parseCsv(text);
-        if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
-        const headers = rows[0].map(h => String(h || '').trim());
-        if(!headers.includes('応募者名') && !headers.includes('id')) throw new Error('必須列「応募者名」が不足しています。');
-        const objects = rowsToObjects(rows);
-        if(!objects.length) throw new Error('取込対象データがありません。');
-        let added = 0, updated = 0, skipped = 0;
-        const incoming = [];
-        const existingIds = new Set(candidates.map(c => c.id));
-        objects.forEach(o => {
-          if(!o['応募者名']){ skipped++; return; }
-          const id = o['id'] || uid();
-          incoming.push(normalizeCandidate({
-            id,
-            name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
-            job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
-            license: o['免許区分'] || '', area: o['希望勤務地'] || '',
-            interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
-            nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
-            resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
-            appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
-            createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
-          }));
-          if(o['id'] && existingIds.has(id)) updated++; else added++;
-        });
-        const mode = getRadioValue('candImportMode');
-        if(mode === 'replace'){ candidates = [...incoming]; }
-        else { candidates = mergeOrReplace(candidates, incoming, mode); }
-        saveLocal(); renderAll();
-        let cloudMsg = '';
-        if(isCloudConfigured()){
-          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','CSV取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
-          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+      console.log('[CSV IMPORT] start candidate import');
+      if(!selectedCandidateCsvFile){
+        setImportMessage('candidateCsvImportMessage','CSVファイルが選択されていません。', 'error');
+        showToast('CSVファイルが選択されていません。', 'error');
+        console.error('[CSV IMPORT] no file selected');
+        return;
+      }
+      await withImportButtonLoading('btnExecuteCandidateCsvImport', '応募者CSV取込を実行', async () => {
+        const result = makeImportResult();
+        result.beforeCount = candidates.length;
+        try{
+          const text = await readFileText(selectedCandidateCsvFile);
+          const rows = parseCsv(text);
+          console.log('[CSV IMPORT] parsed rows:', rows.length);
+          if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
+          const headers = rows[0].map(h => String(h || '').trim());
+          if(!headers.includes('応募者名') && !headers.includes('id')) throw new Error('必須列「応募者名」が見つかりません。');
+          const objects = rowsToObjects(rows);
+          if(!objects.length) throw new Error('取込対象データがありません。');
+          result.totalRows = objects.length;
+          const incoming = [];
+          const existingIds = new Set(candidates.map(c => c.id));
+          objects.forEach(o => {
+            try{
+              if(!o['応募者名']){ result.skipped++; return; }
+              const id = o['id'] || uid();
+              incoming.push(normalizeCandidate({
+                id,
+                name: o['応募者名'] || '', phone: o['電話番号'] || '', email: o['メールアドレス'] || '',
+                job: o['希望職種'] || '', source: o['応募経路'] || '', workType: o['雇用形態'] || '',
+                license: o['免許区分'] || '', area: o['希望勤務地'] || '',
+                interviewAt: o['面接日時'] || '', status: o['選考ステータス'] || '', rating: o['評価'] || '',
+                nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
+                resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
+                appliedAt: o['応募日'] || '', offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
+                createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
+              }));
+              if(o['id'] && existingIds.has(id)) result.updated++; else result.added++;
+              result.imported++;
+            }catch(rowErr){ console.error('[CSV IMPORT] row error', rowErr); result.errors++; }
+          });
+          const mode = getRadioValue('candImportMode');
+          if(mode === 'replace') candidates = [...incoming];
+          else candidates = mergeOrReplace(candidates, incoming, mode);
+          result.afterCount = candidates.length;
+          await afterImportSuccess(result, 'candidateCsvImportMessage', '応募者CSV');
+          clearCandidateCsvSelection();
+        }catch(err){
+          console.error('[CSV IMPORT] failed:', err);
+          setImportMessage('candidateCsvImportMessage', `応募者CSV取込エラー：${err.message}`, 'error');
+          showToast(`応募者CSV取込エラー：${err.message}`, 'error');
+          const btn = $('btnExecuteCandidateCsvImport'); if(btn){ btn.disabled = !selectedCandidateCsvFile; btn.textContent = '応募者CSV取込を実行'; }
         }
-        setImportMessageHTML('candidateCsvImportMessage', `応募者CSVを取り込みました。<br>新規追加：${added}件 ／ 上書き：${updated}件 ／ スキップ：${skipped}件${cloudMsg}`, 'success');
-        clearCandidateCsvSelection();
-      }catch(err){ setImportMessage('candidateCsvImportMessage', `応募者CSV取込エラー：${err.message}`, 'error'); }
+      });
     }
 
     // ===== 採用計画CSV =====
@@ -1577,41 +1692,55 @@
     }
 
     async function executePlanCsvImport(){
-      if(!selectedPlanCsvFile){ setImportMessage('planCsvImportMessage','CSVファイルが選択されていません。', 'error'); return; }
-      try{
-        const text = await readFileText(selectedPlanCsvFile);
-        const rows = parseCsv(text);
-        if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
-        const headers = rows[0].map(h => String(h || '').trim());
-        if(!headers.includes('職種')) throw new Error('必須列「職種」が不足しています。');
-        const objects = rowsToObjects(rows);
-        if(!objects.length) throw new Error('取込対象データがありません。');
-        let added = 0, updated = 0, skipped = 0;
-        const incoming = [];
-        const existingIds = new Set(plans.map(p => p.id));
-        objects.forEach(o => {
-          if(!o['職種']){ skipped++; return; }
-          const id = o['id'] || uid();
-          incoming.push(normalizePlan({
-            id, job: o['職種'] || '',
-            total: Number(o['今期目標人数'] || 0),
-            q1: Number(o['1Q目標'] || 0), q2: Number(o['2Q目標'] || 0),
-            q3: Number(o['3Q目標'] || 0), q4: Number(o['4Q目標'] || 0)
-          }));
-          if(o['id'] && existingIds.has(id)) updated++; else added++;
-        });
-        const mode = getRadioValue('planImportMode');
-        if(mode === 'replace'){ plans = [...incoming]; }
-        else { plans = mergeOrReplace(plans, incoming, mode); }
-        saveLocal(); renderAll();
-        let cloudMsg = '';
-        if(isCloudConfigured()){
-          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','CSV取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
-          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+      console.log('[CSV IMPORT] start plan import');
+      if(!selectedPlanCsvFile){
+        setImportMessage('planCsvImportMessage','CSVファイルが選択されていません。', 'error');
+        showToast('CSVファイルが選択されていません。', 'error');
+        console.error('[CSV IMPORT] no file selected');
+        return;
+      }
+      await withImportButtonLoading('btnExecutePlanCsvImport', '採用計画CSV取込を実行', async () => {
+        const result = makeImportResult();
+        result.beforeCount = plans.length;
+        try{
+          const text = await readFileText(selectedPlanCsvFile);
+          const rows = parseCsv(text);
+          console.log('[CSV IMPORT] parsed rows:', rows.length);
+          if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
+          const headers = rows[0].map(h => String(h || '').trim());
+          if(!headers.includes('職種')) throw new Error('必須列「職種」が見つかりません。');
+          const objects = rowsToObjects(rows);
+          if(!objects.length) throw new Error('取込対象データがありません。');
+          result.totalRows = objects.length;
+          const incoming = [];
+          const existingIds = new Set(plans.map(p => p.id));
+          objects.forEach(o => {
+            try{
+              if(!o['職種']){ result.skipped++; return; }
+              const id = o['id'] || uid();
+              incoming.push(normalizePlan({
+                id, job: o['職種'] || '',
+                total: Number(o['今期目標人数'] || 0),
+                q1: Number(o['1Q目標'] || 0), q2: Number(o['2Q目標'] || 0),
+                q3: Number(o['3Q目標'] || 0), q4: Number(o['4Q目標'] || 0)
+              }));
+              if(o['id'] && existingIds.has(id)) result.updated++; else result.added++;
+              result.imported++;
+            }catch(rowErr){ console.error('[CSV IMPORT] row error', rowErr); result.errors++; }
+          });
+          const mode = getRadioValue('planImportMode');
+          if(mode === 'replace') plans = [...incoming];
+          else plans = mergeOrReplace(plans, incoming, mode);
+          result.afterCount = plans.length;
+          await afterImportSuccess(result, 'planCsvImportMessage', '採用計画CSV');
+          clearPlanCsvSelection();
+        }catch(err){
+          console.error('[CSV IMPORT] failed:', err);
+          setImportMessage('planCsvImportMessage', `採用計画CSV取込エラー：${err.message}`, 'error');
+          showToast(`採用計画CSV取込エラー：${err.message}`, 'error');
+          const btn = $('btnExecutePlanCsvImport'); if(btn){ btn.disabled = !selectedPlanCsvFile; btn.textContent = '採用計画CSV取込を実行'; }
         }
-        setImportMessageHTML('planCsvImportMessage', `採用計画CSVを取り込みました。<br>新規追加：${added}件 ／ 上書き：${updated}件 ／ スキップ：${skipped}件${cloudMsg}`, 'success');
-        clearPlanCsvSelection();
-      }catch(err){ setImportMessage('planCsvImportMessage', `採用計画CSV取込エラー：${err.message}`, 'error'); }
+      });
     }
 
     // ===== 媒体費用CSV =====
@@ -1632,20 +1761,32 @@
     }
 
     async function executeMediaCostCsvImport(){
-      if(!selectedMediaCostCsvFile){ setImportMessage('mediaCostCsvImportMessage','CSVファイルが選択されていません。', 'error'); return; }
+      console.log('[CSV IMPORT] start media cost import');
+      if(!selectedMediaCostCsvFile){
+        setImportMessage('mediaCostCsvImportMessage','CSVファイルが選択されていません。', 'error');
+        showToast('CSVファイルが選択されていません。', 'error');
+        console.error('[CSV IMPORT] no file selected');
+        return;
+      }
+      const _btn = $('btnExecuteMediaCostCsvImport');
+      if(_btn){ _btn.disabled = true; _btn.textContent = '取込中...'; }
+      const result = makeImportResult();
+      result.beforeCount = mediaCosts.length;
       try{
         const text = await readFileText(selectedMediaCostCsvFile);
         const rows = parseCsv(text);
+        console.log('[CSV IMPORT] parsed rows:', rows.length);
         if(rows.length < 2) throw new Error('CSVの読み込みに失敗しました（データ行が見つかりません）。');
         const headers = rows[0].map(h => String(h || '').trim());
-        if(!headers.includes('媒体/紹介会社名')) throw new Error('必須列「媒体/紹介会社名」が不足しています。');
+        if(!headers.includes('媒体/紹介会社名')) throw new Error('必須列「媒体/紹介会社名」が見つかりません。');
         const objects = rowsToObjects(rows);
         if(!objects.length) throw new Error('取込対象データがありません。');
-        let added = 0, updated = 0, skipped = 0;
+        result.totalRows = objects.length;
         const incoming = [];
         const existingIds = new Set(mediaCosts.map(m => m.id));
         objects.forEach(o => {
-          if(!o['媒体/紹介会社名']){ skipped++; return; }
+         try{
+          if(!o['媒体/紹介会社名']){ result.skipped++; return; }
           let monthlyAllocations = [];
           try{ monthlyAllocations = JSON.parse(o['手動月割りJSON'] || '[]'); }catch(e){ monthlyAllocations = []; }
           const id = o['id'] || uid();
@@ -1661,20 +1802,24 @@
             monthlyAllocations, billingMemo: o['請求条件メモ'] || '', memo: o['メモ'] || '',
             createdAt: o['登録日'] || nowDateTime(), updatedAt: o['更新日'] || nowDateTime()
           }));
-          if(o['id'] && existingIds.has(id)) updated++; else added++;
+          if(o['id'] && existingIds.has(id)) result.updated++; else result.added++;
+          result.imported++;
+         }catch(rowErr){ console.error('[CSV IMPORT] row error', rowErr); result.errors++; }
         });
         const mode = (document.querySelector('input[name="mediaImportMode2"]:checked') || {}).value || 'merge';
-        if(mode === 'replace'){ mediaCosts = [...incoming]; }
-        else { mediaCosts = mergeOrReplace(mediaCosts, incoming, mode); }
-        saveLocal(); renderAll();
-        let cloudMsg = '';
-        if(isCloudConfigured()){
-          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','CSV取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
-          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
-        }
-        setImportMessageHTML('mediaCostCsvImportMessage', `媒体費用CSVを取り込みました。<br>新規追加：${added}件 ／ 上書き：${updated}件 ／ スキップ：${skipped}件${cloudMsg}`, 'success');
+        if(mode === 'replace') mediaCosts = [...incoming];
+        else mediaCosts = mergeOrReplace(mediaCosts, incoming, mode);
+        result.afterCount = mediaCosts.length;
+        await afterImportSuccess(result, 'mediaCostCsvImportMessage', '媒体費用CSV');
         clearMediaCostCsvSelection();
-      }catch(err){ setImportMessage('mediaCostCsvImportMessage', `媒体費用CSV取込エラー：${err.message}`, 'error'); }
+      }catch(err){
+        console.error('[CSV IMPORT] failed:', err);
+        setImportMessage('mediaCostCsvImportMessage', `媒体費用CSV取込エラー：${err.message}`, 'error');
+        showToast(`媒体費用CSV取込エラー：${err.message}`, 'error');
+      }finally{
+        const btn = $('btnExecuteMediaCostCsvImport');
+        if(btn){ btn.disabled = !selectedMediaCostCsvFile; btn.textContent = '媒体費用CSV取込を実行'; }
+      }
     }
 
     // ===== JSONバックアップ =====
@@ -1695,8 +1840,20 @@
     }
 
     async function executeJsonBackupImport(){
-      if(!selectedJsonBackupFile){ setImportMessage('jsonBackupImportMessage','JSONファイルが選択されていません。', 'error'); return; }
-      if(!confirm('JSONバックアップを取り込むと、現在の応募者・採用計画・媒体費用データがバックアップ内容で上書きされます。実行しますか？')) return;
+      console.log('[JSON IMPORT] start backup import');
+      if(!selectedJsonBackupFile){
+        setImportMessage('jsonBackupImportMessage','JSONファイルが選択されていません。', 'error');
+        showToast('JSONファイルが選択されていません。', 'error');
+        console.error('[JSON IMPORT] no file selected');
+        return;
+      }
+      if(!confirm('JSONバックアップを取り込むと、現在の応募者・採用計画・媒体費用データがバックアップ内容で上書きされます。実行しますか？')){
+        console.log('[JSON IMPORT] cancelled by user');
+        return;
+      }
+      const _btn = $('btnExecuteJsonBackupImport');
+      if(_btn){ _btn.disabled = true; _btn.textContent = '取込中...'; }
+      const beforeCand = candidates.length, beforePlan = plans.length, beforeMedia = mediaCosts.length;
       try{
         const text = await readFileText(selectedJsonBackupFile);
         let json;
@@ -1706,15 +1863,43 @@
         const newPlans = (json.plans || []).map(normalizePlan);
         const newMediaCosts = (json.mediaCosts || []).map(normalizeMediaCost);
         candidates = newCandidates; plans = newPlans; mediaCosts = newMediaCosts;
+        console.log('[JSON IMPORT] restored:', { candidates: candidates.length, plans: plans.length, mediaCosts: mediaCosts.length });
         saveLocal(); renderAll();
-        let cloudMsg = '';
+        let cloudSaved = false, cloudError = '';
         if(isCloudConfigured()){
-          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','JSON取込'); cloudMsg = '<br>クラウドにも保存しました。'; }
-          catch(err){ setSyncState('ng', err.message); cloudMsg = `<br><span class="error">ローカル保存は完了しましたが、クラウド保存に失敗しました：${escapeHTML(err.message)}</span>`; }
+          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','JSON取込'); cloudSaved = true; }
+          catch(err){ setSyncState('ng', err.message); cloudError = err.message || String(err); }
         }
-        setImportMessageHTML('jsonBackupImportMessage', `JSONバックアップを復元しました。<br>応募者：${candidates.length}件 ／ 採用計画：${plans.length}件 ／ 媒体費用：${mediaCosts.length}件${cloudMsg}`, 'success');
+        const cloudLine = cloudError
+          ? `<tr><td>クラウド保存：</td><td><span class="error">失敗（${escapeHTML(cloudError)}）</span></td></tr>`
+          : (cloudSaved ? `<tr><td>クラウド保存：</td><td><span class="success">完了</span></td></tr>` : `<tr><td>クラウド保存：</td><td>未設定（ローカルのみ）</td></tr>`);
+        const el = $('jsonBackupImportMessage');
+        if(el){
+          el.className = 'notice ' + (cloudError ? 'warning' : 'success') + ' import-result';
+          el.innerHTML = `<strong>JSONバックアップを復元しました</strong>
+<table><tbody>
+  <tr><td>応募者：</td><td>${beforeCand}件 → <strong>${candidates.length}件</strong></td></tr>
+  <tr><td>採用計画：</td><td>${beforePlan}件 → <strong>${plans.length}件</strong></td></tr>
+  <tr><td>媒体費用：</td><td>${beforeMedia}件 → <strong>${mediaCosts.length}件</strong></td></tr>
+  <tr><td>localStorage保存：</td><td><span class="success">完了</span></td></tr>
+  <tr><td>画面再描画：</td><td><span class="success">完了</span></td></tr>
+  ${cloudLine}
+</tbody></table>`;
+        }
+        if(cloudError){
+          showToast(`JSONバックアップを復元しました。\n応募者：${candidates.length}件 ／ 採用計画：${plans.length}件 ／ 媒体費用：${mediaCosts.length}件\nクラウド保存に失敗：${cloudError}`, 'warning');
+        }else{
+          showToast(`JSONバックアップを復元しました。\n応募者：${candidates.length}件 ／ 採用計画：${plans.length}件 ／ 媒体費用：${mediaCosts.length}件\n${cloudSaved ? 'クラウド保存：完了' : 'ローカル保存のみ'}\n画面に反映しました。`, 'success');
+        }
         clearJsonBackupSelection();
-      }catch(err){ setImportMessage('jsonBackupImportMessage', `JSONバックアップ取込エラー：${err.message}`, 'error'); }
+      }catch(err){
+        console.error('[JSON IMPORT] failed:', err);
+        setImportMessage('jsonBackupImportMessage', `JSONバックアップ取込エラー：${err.message}`, 'error');
+        showToast(`JSONバックアップ取込エラー：${err.message}`, 'error');
+      }finally{
+        const btn = $('btnExecuteJsonBackupImport');
+        if(btn){ btn.disabled = !selectedJsonBackupFile; btn.textContent = 'JSONバックアップ取込を実行'; }
+      }
     }
 
     async function readFileText(file){
@@ -2044,11 +2229,15 @@
         if(fallbackJobs > 0) lines.push(`<span style="color:#a16207;">※ 職種が判定不能で「中型ドライバー」に仮設定された応募者：${fallbackJobs}件（メモに元の求人タイトルが記録されています）</span>`);
         if(isCloudConfigured()) lines.push('クラウドにも保存しました。');
         setMediaImportResult(lines.join('<br>'), 'success');
+        showToast(`求人媒体CSVを取り込みました。\n総${total}件中、新規${added}件・上書き${updated}件・スキップ${skipped}件\n${isCloudConfigured() ? 'クラウド保存：完了' : 'ローカル保存のみ'}\n画面に反映しました。`, 'success');
+        console.log('[MEDIA CSV IMPORT] result:', { total, added, updated, skipped, errored, fallbackJobs });
         clearMediaImport();
         // 取込後は応募者一覧へ
         switchTab('list');
       }catch(err){
+        console.error('[MEDIA CSV IMPORT] failed:', err);
         setMediaImportResult(`取込エラー：${err.message}`, 'error');
+        showToast(`求人媒体CSV取込エラー：${err.message}`, 'error');
       }
     }
 
