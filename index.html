@@ -423,7 +423,7 @@
       };
     }
 
-    const jobs = ['中型ドライバー', '運行管理者'];
+    const jobs = ['中型ドライバー', '運行管理者', '事務スタッフ'];
     const sources = ['indeed', 'PLEX', 'XMile', 'リファラル', '紹介'];
     const statuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退','不採用','保留'];
     const kanbanStatuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退・不採用'];
@@ -2176,6 +2176,7 @@
     function classifyMediaJob(rawJob){
       const j = String(rawJob || '');
       if(/運行管理/.test(j)) return { job: '運行管理者', original: j, fallback: false };
+      if(/(事務|受付|バックオフィス|経理|総務|人事|営業事務|一般事務)/.test(j)) return { job: '事務スタッフ', original: j, fallback: false };
       if(/(ドライバー|運転手|配送|中型|大型|4t|4ｔ)/.test(j)) return { job: '中型ドライバー', original: j, fallback: false };
       return { job: '中型ドライバー', original: j, fallback: true };
     }
