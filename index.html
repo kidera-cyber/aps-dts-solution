@@ -368,15 +368,15 @@
           </div>
 
           <div class="form-section">
-            <h4>媒体費用データ（CSV / 請求書PDF 両対応）</h4>
-            <p class="hint" style="margin-bottom:10px;">CSVは従来通り一括登録。PDFは請求書1枚から明細行を抽出して媒体×職種×雇用形態ごとに分解登録します。PDFはプレビューで修正してから確定できます。</p>
+            <h4>採用費用データ（CSV / 請求書PDF 両対応）</h4>
+            <p class="hint" style="margin-bottom:10px;">求人広告費（Indeed等）と人材紹介手数料（PLEX等）を1画面で管理します。PDFは請求元を自動判定して明細を抽出し、プレビューで修正してから確定できます。</p>
             <div class="action-row" style="margin-bottom:10px;">
-              <button class="btn btn-primary" id="btnExportMediaCSV">媒体費用データを出力</button>
+              <button class="btn btn-primary" id="btnExportMediaCSV">採用費用データを出力</button>
               <label class="btn btn-soft btn-file">CSV・PDFを選択<input type="file" id="inputMediaCSV2" accept=".csv,.pdf,text/csv,application/pdf" /></label>
               <span id="mediaCostCsvFileName" style="color:var(--muted);font-size:13px;font-weight:700;">CSV / PDFファイルが選択されていません</span>
             </div>
             <div class="action-row" style="margin-bottom:10px;">
-              <button class="btn btn-primary" id="btnExecuteMediaCostCsvImport" disabled>媒体費用データを取込</button>
+              <button class="btn btn-primary" id="btnExecuteMediaCostCsvImport" disabled>採用費用データを取込</button>
               <button class="btn btn-ghost" id="btnClearMediaCostCsv">選択をクリア</button>
             </div>
             <div class="radio-row">取込モード：
@@ -461,15 +461,21 @@
         allocationType: allocationTypes.includes(m.allocationType) ? m.allocationType : '単月計上',
         monthlyAllocations: Array.isArray(m.monthlyAllocations) ? m.monthlyAllocations : [],
         // ===== 請求書PDF由来の追加フィールド =====
+        costType: ['media','recruitment_fee','other'].includes(m.costType) ? m.costType : 'media',
         yearMonth: m.yearMonth || '',
+        vendor: m.vendor || '',
         media: m.media || m.name || '',
+        applicantName: m.applicantName || '',
+        candidateId: m.candidateId || '',
         job: m.job || '',
         employmentType: m.employmentType || '',
         amount: Number(m.amount || 0),
         area: m.area || '',
         invoiceDate: m.invoiceDate || '',
         dueDate: m.dueDate || '',
+        transactionDate: m.transactionDate || '',
         postedDate: m.postedDate || '',
+        invoiceNumber: m.invoiceNumber || '',
         description: m.description || '',
         rawNote: m.rawNote || '',
         invoiceSubtotal: Number(m.invoiceSubtotal || 0),
@@ -1424,25 +1430,29 @@
         return true;
       });
       let listingTotal = 0, successTotal = 0, otherTotal = 0;
+      let adCost = 0, feeCost = 0; // 求人広告費 / 人材紹介手数料
       mediaInScope.forEach(m => {
         const c = getMediaMonthlyCost(m, ym);
         listingTotal += c.listing; successTotal += c.successFee; otherTotal += c.other;
+        const rowTotal = c.listing + c.successFee + c.other;
+        if(m.costType === 'recruitment_fee') feeCost += rowTotal;
+        else adCost += rowTotal;
       });
       const totalCost = listingTotal + successTotal + otherTotal;
       const stats = getMonthlyApplicantStats(ym, jobFilter, sourceFilter);
 
       const groups = [
-        ['月次総費用', yen(totalCost), ym],
-        ['月次掲載費用', yen(listingTotal), ''],
-        ['月次成功報酬', yen(successTotal), ''],
+        ['月次総採用費', yen(totalCost), ym],
+        ['求人広告費', yen(adCost), 'Indeed等'],
+        ['人材紹介手数料', yen(feeCost), 'PLEX等'],
         ['月次応募数', stats.applied, ''],
-        ['月次面接数', stats.interview, ''],
-        ['月次内定数', stats.offered, ''],
         ['月次内定承諾数', stats.accepted, ''],
         ['月次入社決定数', stats.joined, ''],
-        ['月次応募単価', cpa(totalCost, stats.applied), ''],
-        ['月次内定承諾単価', cpa(totalCost, stats.accepted), ''],
-        ['月次入社決定単価', cpa(totalCost, stats.joined), '']
+        ['広告CPA(応募)', cpa(adCost, stats.applied), '広告費÷応募'],
+        ['広告CPA(承諾)', cpa(adCost, stats.accepted), '広告費÷承諾'],
+        ['総採用CPA(承諾)', cpa(totalCost, stats.accepted), '(広告+紹介)÷承諾'],
+        ['総採用CPA(入社)', cpa(totalCost, stats.joined), '(広告+紹介)÷入社'],
+        ['月次面接数', stats.interview, '']
       ];
       target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
 
@@ -2237,8 +2247,226 @@
       return text;
     }
 
-    // 請求書テキストから構造化データを抽出
+    // ===== 応募者名の正規化 & 照合 =====
+    function normalizeName(s){
+      return String(s || '').replace(/[\s　]+/g, ' ').trim().replace(/\s+/g, ' ');
+    }
+    function findCandidateByName(name){
+      const target = normalizeName(name);
+      if(!target) return null;
+      const matched = candidates.filter(c => normalizeName(c.name) === target);
+      if(matched.length === 1) return matched[0];
+      return null; // 複数一致は自動確定しない（曖昧回避）
+    }
+
+    // ===== 請求書テキスト正規化・金額パース =====
+    function normalizeInvoiceText(text){
+      return String(text || '')
+        .normalize('NFKC')
+        .replace(/ /g, ' ')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+    }
+
+    function parseMoney(value){
+      if (value == null || value === '') return null;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+      const normalized = String(value).normalize('NFKC').replace(/[¥￥円,\s]/g, '');
+      const num = Number(normalized);
+      return Number.isFinite(num) ? num : null;
+    }
+
+    // ===== 請求元判定・ディスパッチ =====
+    function detectInvoiceVendor(text){
+      const T = normalizeInvoiceText(text);
+      if(/株式会社\s*プレックス|プレックス|PLEX/i.test(T)) return 'PLEX';
+      if(/INV-?\d+/i.test(T) && !/indeed\s*チャージ/i.test(T)) return 'PLEX';
+      if(/HRドメイン|HR\s?domain/i.test(T)) return 'HRDomain';
+      if(/indeed\s*チャージ|チャージ\s*[・･]\s*運用/i.test(T)) return 'HRDomain';
+      return 'Generic';
+    }
+
+    // 請求書テキストから構造化データを抽出（ディスパッチャ）
     function parseInvoiceText(text, fileName){
+      const vendor = detectInvoiceVendor(text);
+      if(vendor === 'PLEX') return parsePlexInvoice(text, fileName);
+      // Generic は既存のHRドメイン型ロジックで解析
+      return parseHRDomainInvoice(text, fileName);
+    }
+
+    // ===== PLEX（人材紹介手数料）専用パーサ（座標非依存・多段フォールバック） =====
+    function parsePlexInvoice(text, fileName){
+      const T = normalizeInvoiceText(text);
+      const debug = { vendor: 'PLEX', fileName };
+
+      // --- 請求書番号 ---
+      const invNumMatch = T.match(/INV-?\d{5,}/i);
+      const invoiceNumber = invNumMatch ? invNumMatch[0].toUpperCase().replace(/^INV-?/, 'INV-') : '';
+      debug.invoiceNumber = invoiceNumber;
+
+      // --- 全日付候補（インデックス付き） ---
+      const dateMatches = [];
+      const dateRe = /(20\d{2})[\-\/\.年](\d{1,2})[\-\/\.月](\d{1,2})日?/g;
+      let dm;
+      while((dm = dateRe.exec(T)) !== null){
+        dateMatches.push({
+          iso: `${dm[1]}-${String(dm[2]).padStart(2,'0')}-${String(dm[3]).padStart(2,'0')}`,
+          index: dm.index,
+          raw: dm[0]
+        });
+      }
+      debug.dateMatches = dateMatches.map(d => `${d.iso}@${d.index}`);
+
+      // --- ラベル近傍日付検索 ---
+      function findDateNearLabel(labels, maxDist = 200){
+        for(const label of labels){
+          const labelIdx = T.indexOf(label);
+          if(labelIdx < 0) continue;
+          let best = null, bestDist = Infinity;
+          dateMatches.forEach(d => {
+            const dist = Math.abs(d.index - labelIdx);
+            if(dist < bestDist && dist < maxDist){ bestDist = dist; best = d.iso; }
+          });
+          if(best) return best;
+        }
+        return '';
+      }
+
+      let invoiceDate = findDateNearLabel(['請求日','ご請求日']);
+      let dueDate = findDateNearLabel(['入金期日','お支払期日','支払期日','振込期日']);
+      let transactionDate = findDateNearLabel(['取引日','納品日','サービス提供日']);
+
+      // フォールバック：ラベルで取れない場合、INV番号の位置から推定
+      if(invoiceNumber){
+        const invIdx = T.indexOf(invoiceNumber);
+        const beforeInv = dateMatches.filter(d => d.index < invIdx).sort((a,b) => b.index - a.index);
+        const afterInv = dateMatches.filter(d => d.index > invIdx).sort((a,b) => a.index - b.index);
+        // INV直前2つの日付：display順で「入金期日→請求日→INV」の想定
+        if(!invoiceDate && beforeInv.length >= 1) invoiceDate = beforeInv[0].iso;
+        if(!dueDate && beforeInv.length >= 2) dueDate = beforeInv[1].iso;
+        // 日付論理検証：dueDate < invoiceDate なら入れ替え
+        if(invoiceDate && dueDate && new Date(dueDate.replace(/-/g,'/')) < new Date(invoiceDate.replace(/-/g,'/'))){
+          const tmp = dueDate; dueDate = invoiceDate; invoiceDate = tmp;
+        }
+        // 取引日：INV後で最初の日付
+        if(!transactionDate && afterInv.length > 0) transactionDate = afterInv[0].iso;
+      }
+
+      debug.invoiceDate = invoiceDate;
+      debug.dueDate = dueDate;
+      debug.transactionDate = transactionDate;
+
+      // --- 応募者名抽出 ---
+      const nameMatch = T.match(/人材紹介手数料\s*[（(]\s*([^）)]+?)\s*様?\s*[）)]/);
+      const applicantName = nameMatch ? normalizeName(nameMatch[1].replace(/様\s*$/, '').trim()) : '';
+      debug.applicantName = applicantName;
+
+      // --- 金額抽出（ラベル近傍） ---
+      function pickMoneyNear(labels, maxDist = 150){
+        for(const label of labels){
+          const idx = T.indexOf(label);
+          if(idx < 0) continue;
+          // ラベル後方を優先
+          const after = T.slice(idx + label.length, idx + label.length + maxDist);
+          const mAfter = after.match(/([\d,]{3,})\s*円?/);
+          if(mAfter){ const v = parseMoney(mAfter[1]); if(v && v >= 100) return v; }
+          // ラベル前方も探す
+          const before = T.slice(Math.max(0, idx - maxDist), idx);
+          const mBeforeAll = before.match(/([\d,]{3,})\s*円?/g);
+          if(mBeforeAll && mBeforeAll.length){
+            const v = parseMoney(mBeforeAll[mBeforeAll.length - 1]);
+            if(v && v >= 100) return v;
+          }
+        }
+        return null;
+      }
+
+      let subtotal = pickMoneyNear(['小計']);
+      let tax = pickMoneyNear(['消費税','税額','内消費税']);
+      let total = pickMoneyNear(['請求総額','ご請求額','ご請求金額','合計金額']);
+
+      // --- 明細金額抽出：応募者名の後ろにある連続金額 ---
+      let amount = 0, unitPrice = 0;
+      if(applicantName){
+        const nameIdx = T.indexOf(applicantName);
+        if(nameIdx >= 0){
+          const after = T.slice(nameIdx, nameIdx + 400);
+          const moneys = [];
+          const moneyRe = /([\d,]{3,})/g;
+          let mm;
+          while((mm = moneyRe.exec(after)) !== null){
+            const v = parseMoney(mm[1]);
+            if(v && v >= 1000) moneys.push(v);
+          }
+          debug.detailMoneys = moneys;
+          // 数量「1 人」の後に単価・明細金額が並ぶ想定
+          if(moneys.length >= 2){
+            unitPrice = moneys[0]; amount = moneys[1];
+          }else if(moneys.length === 1){
+            unitPrice = moneys[0]; amount = moneys[0];
+          }
+        }
+      }
+      // 最終フォールバック：小計/総額から逆算
+      if(!amount){
+        if(subtotal) amount = subtotal;
+        else if(total && tax) amount = total - tax;
+        else if(total) amount = Math.round(total / 1.1);
+      }
+      if(!unitPrice) unitPrice = amount;
+      if(!subtotal) subtotal = amount;
+      if(!tax && total && subtotal) tax = total - subtotal;
+      if(!total) total = subtotal + (tax || 0);
+
+      debug.subtotal = subtotal;
+      debug.tax = tax;
+      debug.total = total;
+      debug.amount = amount;
+
+      console.log('[PDF PARSE] PLEX result:', debug);
+
+      // --- 明細構築 ---
+      const items = [];
+      if(applicantName && amount > 0){
+        items.push({
+          applicantName,
+          unitPrice,
+          quantity: 1,
+          amount,
+          description: `人材紹介手数料（${applicantName}様）`,
+          transactionDate
+        });
+      }
+
+      // 整合性チェック
+      if(subtotal && tax && total && (subtotal + tax !== total)){
+        console.warn('[PDF PARSE] PLEX: 小計+税≠総額', { subtotal, tax, total });
+      }
+
+      const yearMonth = invoiceDate ? invoiceDate.slice(0,7) : (transactionDate ? transactionDate.slice(0,7) : '');
+      const seed = `PLEX|${invoiceNumber}|${invoiceDate}|${total}|${fileName}`;
+      const invoiceId = 'inv_' + btoa(unescape(encodeURIComponent(seed))).replace(/[^A-Za-z0-9]/g,'').slice(0,16);
+
+      return {
+        vendor: '株式会社プレックス',
+        media: 'PLEX',
+        costType: 'recruitment_fee',
+        invoiceDate, dueDate, transactionDate, invoiceNumber,
+        subtotal: subtotal || 0,
+        tax: tax || 0,
+        total: total || 0,
+        yearMonth,
+        invoiceId,
+        sourceFileName: fileName,
+        items,
+        rawTextLength: T.length,
+        _debug: debug
+      };
+    }
+
+    // ===== HRドメイン（求人広告費）専用パーサ（旧 parseInvoiceText） =====
+    function parseHRDomainInvoice(text, fileName){
       const invoiceDate = parseJpDate((text.match(/ご請求日[：:\s]*(\d{4}年\d{1,2}月\d{1,2}日)/) || [,''])[1]);
       const dueDate = parseJpDate((text.match(/お支払期日[：:\s]*(\d{4}年\d{1,2}月\d{1,2}日)/) || [,''])[1]);
       const subtotal = parseYen((text.match(/小計[\s\S]{0,20}?([\d,]+)/) || [,''])[1]);
@@ -2295,10 +2523,12 @@
       const invoiceId = 'inv_' + btoa(unescape(encodeURIComponent(invoiceIdSeed))).replace(/[^A-Za-z0-9]/g,'').slice(0,16);
 
       return {
+        vendor: 'HRドメイン株式会社',
+        media: 'Indeed',
+        costType: 'media',
         invoiceDate, dueDate, subtotal, tax, total,
         yearMonth,
         invoiceId,
-        media: 'Indeed', // 現状はIndeed想定。将来他媒体対応時に判定を追加
         sourceFileName: fileName,
         items,
         rawTextLength: text.length
@@ -2402,19 +2632,32 @@
       try{
         setImportMessage('mediaCostCsvImportMessage','PDFを解析中...', 'info');
         const text = await extractPdfText(file);
+        console.log('[PDF PARSE] raw text length:', text.length);
+        console.log('[PDF PARSE] preview:', text.slice(0, 500));
         const parsed = parseInvoiceText(text, file.name);
-        if(!parsed.invoiceDate || parsed.items.length === 0){
+        console.log('[PDF PARSE] parsed:', parsed);
+        // 失敗条件：明細0件 かつ 合計金額も取れない場合のみ失敗
+        if(parsed.items.length === 0 && !parsed.total && !parsed.subtotal){
           const missing = [];
           if(!parsed.invoiceDate) missing.push('請求日');
           if(parsed.items.length === 0) missing.push('明細金額');
-          throw new Error(`請求書の解析に失敗しました。以下が確認できませんでした：${missing.join(' / ')}。別のPDFを選択するか、CSV取込をご利用ください。`);
+          if(!parsed.total && !parsed.subtotal) missing.push('請求金額');
+          throw new Error(`請求書の解析に失敗しました。以下が確認できませんでした：${missing.join(' / ')}。ブラウザConsole（F12）に詳細ログが出ています。`);
         }
         // 明細合計と小計の整合性チェック
         const itemsTotal = parsed.items.reduce((a,i) => a + i.amount, 0);
         const mismatch = parsed.subtotal && itemsTotal !== parsed.subtotal;
         parsedInvoiceCache = parsed;
         openInvoicePreview(parsed, mismatch, itemsTotal);
-        setImportMessage('mediaCostCsvImportMessage','PDF解析完了。プレビュー画面で内容確認後に登録してください。', 'success');
+        const warnMissing = [];
+        if(!parsed.invoiceDate) warnMissing.push('請求日');
+        if(parsed.items.length === 0) warnMissing.push('明細');
+        setImportMessage('mediaCostCsvImportMessage',
+          warnMissing.length
+            ? `PDF解析：${warnMissing.join('・')}が未検出。プレビューで手動修正できます。`
+            : 'PDF解析完了。プレビュー画面で内容確認後に登録してください。',
+          warnMissing.length ? 'info' : 'success'
+        );
       }catch(err){
         console.error('[PDF IMPORT] failed:', err);
         setImportMessage('mediaCostCsvImportMessage', `PDF取込エラー：${err.message}`, 'error');
@@ -2426,38 +2669,72 @@
 
     function openInvoicePreview(parsed, mismatch, itemsTotal){
       const body = $('invoicePreviewBody'); if(!body) return;
+      const isFee = parsed.costType === 'recruitment_fee';
+      const typeLabel = isFee ? '人材紹介手数料' : (parsed.costType === 'media' ? '求人広告費' : 'その他');
       const jobOptions = jobs.map(j => `<option value="${escapeHTML(j)}">${escapeHTML(j)}</option>`).join('');
       const empOptions = ['','正社員','アルバイト','パート','契約社員','派遣'].map(e => `<option value="${escapeHTML(e)}">${escapeHTML(e || '(未設定)')}</option>`).join('');
       const mediaOptions = ['Indeed','PLEX','XMile','リファラル','紹介'].map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
-      const rowsHtml = parsed.items.map((it, i) => {
-        const parts = splitJobEmployment(it.biko);
-        const guessJob = normalizeJobLabel(parts.job || it.biko);
-        const guessEmp = parts.employmentType || '';
-        return `<tr>
-          <td>${i+1}</td>
-          <td><select data-idx="${i}" data-key="media" class="preview-input">${mediaOptions.replace(`value="Indeed"`, `value="Indeed" selected`)}</select></td>
-          <td><select data-idx="${i}" data-key="job" class="preview-input">${jobOptions.replace(`value="${escapeHTML(guessJob)}"`, `value="${escapeHTML(guessJob)}" selected`)}</select></td>
-          <td><select data-idx="${i}" data-key="employmentType" class="preview-input">${empOptions.replace(`value="${escapeHTML(guessEmp)}"`, `value="${escapeHTML(guessEmp)}" selected`)}</select></td>
-          <td><input data-idx="${i}" data-key="amount" class="preview-input" type="number" value="${it.amount}" style="width:110px;text-align:right;" /></td>
-          <td><input data-idx="${i}" data-key="area" class="preview-input" value="${escapeHTML(it.area || '')}" style="width:100px;" /></td>
-          <td><input data-idx="${i}" data-key="postedDate" class="preview-input" type="date" value="${escapeHTML(it.postedDate || '')}" /></td>
-          <td style="font-size:11px;color:var(--muted);">${escapeHTML(it.biko)}</td>
-          <td><input type="checkbox" data-idx="${i}" class="preview-skip" /></td>
-        </tr>`;
-      }).join('');
+
+      let rowsHtml = '';
+      if(isFee){
+        rowsHtml = parsed.items.map((it, i) => {
+          const cand = findCandidateByName(it.applicantName);
+          const matchLabel = cand
+            ? `<span class="badge badge-green">照合：${escapeHTML(cand.name)}</span>`
+            : `<span class="badge badge-yellow">照合：未確認</span>`;
+          const guessJob = cand ? cand.job : '中型ドライバー';
+          const guessEmp = (cand && cand.workType && cand.workType !== '未確認') ? cand.workType : '';
+          const guessMedia = cand && cand.source ? normalizeMediaName(cand.source) : 'PLEX';
+          return `<tr>
+            <td>${i+1}</td>
+            <td><input data-idx="${i}" data-key="applicantName" class="preview-input" value="${escapeHTML(it.applicantName || '')}" style="width:130px;" /></td>
+            <td>${matchLabel}<input type="hidden" data-idx="${i}" data-key="candidateId" class="preview-input" value="${escapeHTML(cand ? cand.id : '')}" /></td>
+            <td><select data-idx="${i}" data-key="media" class="preview-input">${mediaOptions.replace(`value="${escapeHTML(guessMedia)}"`, `value="${escapeHTML(guessMedia)}" selected`)}</select></td>
+            <td><select data-idx="${i}" data-key="job" class="preview-input">${jobOptions.replace(`value="${escapeHTML(guessJob)}"`, `value="${escapeHTML(guessJob)}" selected`)}</select></td>
+            <td><select data-idx="${i}" data-key="employmentType" class="preview-input">${empOptions.replace(`value="${escapeHTML(guessEmp)}"`, `value="${escapeHTML(guessEmp)}" selected`)}</select></td>
+            <td><input data-idx="${i}" data-key="amount" class="preview-input" type="number" value="${it.amount}" style="width:120px;text-align:right;" /></td>
+            <td><input type="checkbox" data-idx="${i}" class="preview-skip" /></td>
+          </tr>`;
+        }).join('');
+      }else{
+        rowsHtml = parsed.items.map((it, i) => {
+          const parts = splitJobEmployment(it.biko);
+          const guessJob = normalizeJobLabel(parts.job || it.biko);
+          const guessEmp = parts.employmentType || '';
+          return `<tr>
+            <td>${i+1}</td>
+            <td><select data-idx="${i}" data-key="media" class="preview-input">${mediaOptions.replace(`value="Indeed"`, `value="Indeed" selected`)}</select></td>
+            <td><select data-idx="${i}" data-key="job" class="preview-input">${jobOptions.replace(`value="${escapeHTML(guessJob)}"`, `value="${escapeHTML(guessJob)}" selected`)}</select></td>
+            <td><select data-idx="${i}" data-key="employmentType" class="preview-input">${empOptions.replace(`value="${escapeHTML(guessEmp)}"`, `value="${escapeHTML(guessEmp)}" selected`)}</select></td>
+            <td><input data-idx="${i}" data-key="amount" class="preview-input" type="number" value="${it.amount}" style="width:110px;text-align:right;" /></td>
+            <td><input data-idx="${i}" data-key="area" class="preview-input" value="${escapeHTML(it.area || '')}" style="width:100px;" /></td>
+            <td><input data-idx="${i}" data-key="postedDate" class="preview-input" type="date" value="${escapeHTML(it.postedDate || '')}" /></td>
+            <td style="font-size:11px;color:var(--muted);">${escapeHTML(it.biko)}</td>
+            <td><input type="checkbox" data-idx="${i}" class="preview-skip" /></td>
+          </tr>`;
+        }).join('');
+      }
+
       const warnHtml = mismatch
         ? `<div class="notice error" style="margin-top:12px;">⚠ 請求書の明細合計（${itemsTotal.toLocaleString()}円）と小計（${parsed.subtotal.toLocaleString()}円）が一致しません。内容を確認してください。</div>`
         : '';
+
+      const headerCells = isFee
+        ? `<tr><th>#</th><th>対象者</th><th>照合</th><th>媒体/紹介会社</th><th>職種</th><th>雇用形態</th><th style="text-align:right;">金額(税抜)</th><th>除外</th></tr>`
+        : `<tr><th>#</th><th>媒体</th><th>職種</th><th>雇用形態</th><th style="text-align:right;">金額(税抜)</th><th>エリア</th><th>掲載日</th><th>元備考</th><th>除外</th></tr>`;
+
       body.innerHTML = `
+        <div style="margin-bottom:12px;"><span class="badge ${isFee ? 'badge-purple' : 'badge-blue'}">費用種別：${escapeHTML(typeLabel)}</span></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;">
-          <div class="detail-item"><small>請求月</small><div>${escapeHTML(parsed.yearMonth || '-')}</div></div>
-          <div class="detail-item"><small>媒体</small><div>${escapeHTML(parsed.media)}</div></div>
+          <div class="detail-item"><small>請求元</small><div>${escapeHTML(parsed.vendor || '-')}</div></div>
+          <div class="detail-item"><small>${isFee ? '紹介会社（正規化）' : '媒体'}</small><div>${escapeHTML(parsed.media || '-')}</div></div>
+          <div class="detail-item"><small>対象月</small><div>${escapeHTML(parsed.yearMonth || '-')}</div></div>
+          <div class="detail-item"><small>請求書番号</small><div>${escapeHTML(parsed.invoiceNumber || '-')}</div></div>
           <div class="detail-item"><small>請求日</small><div>${escapeHTML(parsed.invoiceDate || '-')}</div></div>
-          <div class="detail-item"><small>支払期日</small><div>${escapeHTML(parsed.dueDate || '-')}</div></div>
+          <div class="detail-item"><small>入金/支払期日</small><div>${escapeHTML(parsed.dueDate || '-')}</div></div>
+          ${isFee ? `<div class="detail-item"><small>取引日</small><div>${escapeHTML(parsed.transactionDate || '-')}</div></div>` : ''}
         </div>
-        <div class="table-wrap"><table><thead><tr>
-          <th>#</th><th>媒体</th><th>職種</th><th>雇用形態</th><th style="text-align:right;">金額(税抜)</th><th>エリア</th><th>掲載日</th><th>元備考</th><th>除外</th>
-        </tr></thead><tbody>${rowsHtml}</tbody></table></div>
+        <div class="table-wrap"><table><thead>${headerCells}</thead><tbody>${rowsHtml}</tbody></table></div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;">
           <div class="detail-item"><small>税抜合計</small><div><strong>¥${parsed.subtotal.toLocaleString()}</strong></div></div>
           <div class="detail-item"><small>消費税</small><div>¥${parsed.tax.toLocaleString()}</div></div>
@@ -2490,6 +2767,8 @@
         else if(key === 'media') editedItems[idx].__media = el.value;
         else if(key === 'job') editedItems[idx].__job = el.value;
         else if(key === 'employmentType') editedItems[idx].__emp = el.value;
+        else if(key === 'applicantName') editedItems[idx].applicantName = el.value;
+        else if(key === 'candidateId') editedItems[idx].candidateId = el.value;
         else editedItems[idx][key] = el.value;
       });
       // 除外チェック
@@ -2501,30 +2780,44 @@
         return;
       }
 
+      const isFee = parsed.costType === 'recruitment_fee';
       // mediaCosts オブジェクト生成（プレビュー編集値を反映）
       const newRecords = finalItems.map((it, idx) => {
         const media = normalizeMediaName(it.__media || parsed.media);
-        const job = it.__job || normalizeJobLabel(splitJobEmployment(it.biko).job);
-        const emp = it.__emp !== undefined ? it.__emp : splitJobEmployment(it.biko).employmentType;
-        const yearMonth = parsed.yearMonth || (it.postedDate ? it.postedDate.slice(0,7) : '');
+        const job = it.__job || (isFee ? '' : normalizeJobLabel(splitJobEmployment(it.biko || '').job));
+        const emp = it.__emp !== undefined ? it.__emp : (isFee ? '' : splitJobEmployment(it.biko || '').employmentType);
+        const yearMonth = parsed.yearMonth || (it.postedDate ? it.postedDate.slice(0,7) : (parsed.transactionDate ? parsed.transactionDate.slice(0,7) : ''));
+        const applicantName = it.applicantName || '';
+        const cand = isFee ? findCandidateByName(applicantName) : null;
+        const feeType = isFee ? '成功報酬型' : '掲載課金型';
         return normalizeMediaCost({
           id: `${parsed.invoiceId}_${idx}`,
-          feeType: '掲載課金型',
+          feeType,
           name: media,
-          jobTitle: it.biko,
+          jobTitle: isFee ? (applicantName ? `${applicantName}（紹介手数料）` : '人材紹介手数料') : (it.biko || ''),
           targetJob: job,
           source: media.toLowerCase(),
-          startDate: it.postedDate,
+          startDate: it.postedDate || parsed.transactionDate || '',
           costMonth: yearMonth,
           billingMonth: parsed.invoiceDate ? parsed.invoiceDate.slice(0,7) : yearMonth,
           allocationType: '単月計上',
-          fixedListingCost: it.amount,
-          memo: `PDF取込：${parsed.sourceFileName}｜備考：${it.biko}`,
-          billingMemo: `請求日：${parsed.invoiceDate} ／ 支払期日：${parsed.dueDate}`,
-          yearMonth, media, job, employmentType: emp,
+          fixedListingCost: isFee ? 0 : it.amount,
+          successFeePerHire: isFee ? it.amount : 0,
+          successFeeType: isFee ? '固定金額' : '固定金額',
+          feeTriggerStatus: isFee ? '内定承諾' : '内定承諾',
+          manualBillableCount: isFee ? 1 : 0,
+          memo: isFee ? `PDF取込：${parsed.sourceFileName}｜対象：${applicantName || '-'}` : `PDF取込：${parsed.sourceFileName}｜備考：${it.biko || ''}`,
+          billingMemo: `請求元：${parsed.vendor || ''} ／ 請求日：${parsed.invoiceDate} ／ 期日：${parsed.dueDate}${parsed.invoiceNumber ? ' ／ 請求書番号：' + parsed.invoiceNumber : ''}`,
+          costType: parsed.costType || (isFee ? 'recruitment_fee' : 'media'),
+          yearMonth, vendor: parsed.vendor || '', media, applicantName,
+          candidateId: (it.candidateId || (cand ? cand.id : '')),
+          job, employmentType: emp,
           amount: it.amount, area: it.area || '',
-          invoiceDate: parsed.invoiceDate, dueDate: parsed.dueDate, postedDate: it.postedDate,
-          description: it.productName || '', rawNote: it.biko,
+          invoiceDate: parsed.invoiceDate, dueDate: parsed.dueDate,
+          transactionDate: parsed.transactionDate || '',
+          postedDate: it.postedDate || '',
+          invoiceNumber: parsed.invoiceNumber || '',
+          description: it.description || it.productName || '', rawNote: it.biko || it.description || '',
           invoiceSubtotal: parsed.subtotal, invoiceTax: parsed.tax, invoiceTotal: parsed.total,
           sourceType: 'pdf', sourceFileName: parsed.sourceFileName, invoiceId: parsed.invoiceId
         });
