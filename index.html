@@ -368,19 +368,20 @@
           </div>
 
           <div class="form-section">
-            <h4>媒体費用データ</h4>
+            <h4>媒体費用データ（CSV / 請求書PDF 両対応）</h4>
+            <p class="hint" style="margin-bottom:10px;">CSVは従来通り一括登録。PDFは請求書1枚から明細行を抽出して媒体×職種×雇用形態ごとに分解登録します。PDFはプレビューで修正してから確定できます。</p>
             <div class="action-row" style="margin-bottom:10px;">
-              <button class="btn btn-primary" id="btnExportMediaCSV">媒体費用CSVを出力</button>
-              <label class="btn btn-soft btn-file">媒体費用CSVを選択<input type="file" id="inputMediaCSV2" accept=".csv,text/csv" /></label>
-              <span id="mediaCostCsvFileName" style="color:var(--muted);font-size:13px;font-weight:700;">CSVファイルが選択されていません</span>
+              <button class="btn btn-primary" id="btnExportMediaCSV">媒体費用データを出力</button>
+              <label class="btn btn-soft btn-file">CSV・PDFを選択<input type="file" id="inputMediaCSV2" accept=".csv,.pdf,text/csv,application/pdf" /></label>
+              <span id="mediaCostCsvFileName" style="color:var(--muted);font-size:13px;font-weight:700;">CSV / PDFファイルが選択されていません</span>
             </div>
             <div class="action-row" style="margin-bottom:10px;">
-              <button class="btn btn-primary" id="btnExecuteMediaCostCsvImport" disabled>媒体費用CSV取込を実行</button>
+              <button class="btn btn-primary" id="btnExecuteMediaCostCsvImport" disabled>媒体費用データを取込</button>
               <button class="btn btn-ghost" id="btnClearMediaCostCsv">選択をクリア</button>
             </div>
             <div class="radio-row">取込モード：
-              <label><input type="radio" name="mediaImportMode2" value="merge" checked /> 残して追加（IDが同じ場合は上書き）</label>
-              <label><input type="radio" name="mediaImportMode2" value="replace" /> 削除して上書き</label>
+              <label><input type="radio" name="mediaImportMode2" value="merge" checked /> 既存データに追加</label>
+              <label><input type="radio" name="mediaImportMode2" value="replace_ym" /> 同じ請求月・媒体のデータを置き換える</label>
             </div>
             <div id="mediaCostCsvImportMessage" style="margin-top:10px;"></div>
           </div>
@@ -416,6 +417,16 @@
 
   <div class="modal-backdrop" id="modalBackdrop"><div class="modal"><div class="modal-header"><h3 id="modalTitle">応募者詳細</h3><button type="button" class="btn btn-ghost" id="btnCloseModal">閉じる</button></div><div id="modalBody"></div></div></div>
 
+  <div class="modal-backdrop" id="invoicePreviewBackdrop"><div class="modal" style="max-width:1000px;"><div class="modal-header"><h3>請求書PDF プレビュー</h3><button type="button" class="btn btn-ghost" id="btnCloseInvoicePreview">閉じる</button></div><div id="invoicePreviewBody"></div></div></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    });
+  </script>
   <script>
     const STORAGE_CANDIDATES = 'apsLocal.candidates.v2';
     const STORAGE_PLANS = 'apsLocal.plans.v2';
@@ -449,6 +460,24 @@
         billingMonth: m.billingMonth || '',
         allocationType: allocationTypes.includes(m.allocationType) ? m.allocationType : '単月計上',
         monthlyAllocations: Array.isArray(m.monthlyAllocations) ? m.monthlyAllocations : [],
+        // ===== 請求書PDF由来の追加フィールド =====
+        yearMonth: m.yearMonth || '',
+        media: m.media || m.name || '',
+        job: m.job || '',
+        employmentType: m.employmentType || '',
+        amount: Number(m.amount || 0),
+        area: m.area || '',
+        invoiceDate: m.invoiceDate || '',
+        dueDate: m.dueDate || '',
+        postedDate: m.postedDate || '',
+        description: m.description || '',
+        rawNote: m.rawNote || '',
+        invoiceSubtotal: Number(m.invoiceSubtotal || 0),
+        invoiceTax: Number(m.invoiceTax || 0),
+        invoiceTotal: Number(m.invoiceTotal || 0),
+        sourceType: m.sourceType || 'manual',
+        sourceFileName: m.sourceFileName || '',
+        invoiceId: m.invoiceId || '',
         createdAt: m.createdAt || nowDateTime(),
         updatedAt: m.updatedAt || nowDateTime()
       };
@@ -1538,8 +1567,8 @@
       setDataMessage(`応募者CSVを出力しました（${candidates.length}件）`, 'success');
     }
 
-    const MEDIA_HEADERS = ['id','費用タイプ','媒体/紹介会社名','求人タイトル','対象職種','紐付き応募経路','掲載開始日','掲載終了日','計上月','請求月','月次配分方法','掲載金額','その他費用','成功報酬計算方法','1名あたり成功報酬額','理論年収','成功報酬率','成功報酬発生条件','手動請求対象人数','手動月割りJSON','請求条件メモ','メモ','登録日','更新日'];
-    const MEDIA_KEYS = ['id','feeType','name','jobTitle','targetJob','source','startDate','endDate','costMonth','billingMonth','allocationType','fixedListingCost','otherCost','successFeeType','successFeePerHire','annualSalaryEstimate','successFeeRate','feeTriggerStatus','manualBillableCount','monthlyAllocations','billingMemo','memo','createdAt','updatedAt'];
+    const MEDIA_HEADERS = ['id','費用タイプ','媒体/紹介会社名','求人タイトル','対象職種','紐付き応募経路','掲載開始日','掲載終了日','計上月','請求月','月次配分方法','掲載金額','その他費用','成功報酬計算方法','1名あたり成功報酬額','理論年収','成功報酬率','成功報酬発生条件','手動請求対象人数','手動月割りJSON','請求条件メモ','メモ','対象月YM','媒体正規化名','職種','雇用形態','金額(税抜明細)','エリア','請求日','支払期日','掲載日','商品名','元備考','請求書小計','消費税','請求総額','取込元','元ファイル名','請求書ID','登録日','更新日'];
+    const MEDIA_KEYS = ['id','feeType','name','jobTitle','targetJob','source','startDate','endDate','costMonth','billingMonth','allocationType','fixedListingCost','otherCost','successFeeType','successFeePerHire','annualSalaryEstimate','successFeeRate','feeTriggerStatus','manualBillableCount','monthlyAllocations','billingMemo','memo','yearMonth','media','job','employmentType','amount','area','invoiceDate','dueDate','postedDate','description','rawNote','invoiceSubtotal','invoiceTax','invoiceTotal','sourceType','sourceFileName','invoiceId','createdAt','updatedAt'];
 
     function exportMediaCSV(){
       const rows = [MEDIA_HEADERS, ...mediaCosts.map(m => MEDIA_KEYS.map(k => k === 'monthlyAllocations' ? JSON.stringify(m[k] || []) : (m[k] ?? '')))];
@@ -2131,21 +2160,408 @@
       });
     }
 
-    // ===== 媒体費用CSV =====
+    // ===== 請求書PDF解析 =====
+    function normalizeMediaName(text){
+      const s = String(text || '').toLowerCase();
+      if(/indeed|インディード/.test(s)) return 'Indeed';
+      if(/plex|プレックス/.test(s)) return 'PLEX';
+      if(/xmile|エックスマイル|クロスマイル/.test(s)) return 'XMile';
+      if(/リファラル|referral/.test(s)) return 'リファラル';
+      if(/紹介|agent|エージェント/.test(s)) return '紹介';
+      return String(text || '').trim();
+    }
+
+    function splitJobEmployment(biko){
+      const raw = String(biko || '').trim();
+      if(!raw) return { job: '', employmentType: '' };
+      // 区切り文字：_ ＿ ‗ 全角/半角スペース ／・
+      const parts = raw.split(/[_＿‗\s　／\/・]+/).filter(Boolean);
+      if(parts.length === 0) return { job: '', employmentType: '' };
+      if(parts.length === 1) return { job: parts[0], employmentType: '' };
+      // 最後が雇用形態っぽい語なら分離、そうでなければ全体を job
+      const last = parts[parts.length - 1];
+      if(/^(正社員|アルバイト|パート|契約社員|派遣|業務委託)$/.test(last)){
+        return { job: parts.slice(0, -1).join(' '), employmentType: last };
+      }
+      return { job: raw.replace(/[_＿‗]/g, ' '), employmentType: '' };
+    }
+
+    function normalizeJobLabel(rawJob){
+      const s = String(rawJob || '');
+      if(/運行管理/.test(s)) return '運行管理者';
+      if(/事務|受付|バックオフィス|経理|総務|人事/.test(s)) return '事務スタッフ';
+      if(/ドライバー|運転手|配送|中型/.test(s)) return '中型ドライバー';
+      return s || '中型ドライバー';
+    }
+
+    function parseYen(s){
+      const m = String(s || '').replace(/[¥￥,、\s]/g, '').match(/\d+/);
+      return m ? Number(m[0]) : 0;
+    }
+
+    function parseJpDate(s){
+      const m = String(s || '').match(/(\d{4})[年\/\-.](\d{1,2})[月\/\-.](\d{1,2})/);
+      if(!m) return '';
+      return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+    }
+
+    function parseMmDdOfYear(s, yearHint){
+      const m = String(s || '').match(/(\d{1,2})[\/\-.](\d{1,2})/);
+      if(!m || !yearHint) return '';
+      return `${yearHint}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+    }
+
+    // pdf.js でPDFテキスト抽出
+    async function extractPdfText(file){
+      if(!window.pdfjsLib) throw new Error('PDF読取ライブラリが読み込まれていません。ネット接続を確認して再読込してください。');
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+      let text = '';
+      for(let i = 1; i <= pdf.numPages; i++){
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        // 位置情報を保持しつつ行に整形（Y座標でグルーピング）
+        const rows = new Map();
+        content.items.forEach(it => {
+          const y = Math.round(it.transform[5]);
+          if(!rows.has(y)) rows.set(y, []);
+          rows.get(y).push({ x: it.transform[4], str: it.str });
+        });
+        const sortedY = Array.from(rows.keys()).sort((a,b) => b - a);
+        sortedY.forEach(y => {
+          const items = rows.get(y).sort((a,b) => a.x - b.x);
+          text += items.map(x => x.str).join(' ') + '\n';
+        });
+        text += '\n';
+      }
+      return text;
+    }
+
+    // 請求書テキストから構造化データを抽出
+    function parseInvoiceText(text, fileName){
+      const invoiceDate = parseJpDate((text.match(/ご請求日[：:\s]*(\d{4}年\d{1,2}月\d{1,2}日)/) || [,''])[1]);
+      const dueDate = parseJpDate((text.match(/お支払期日[：:\s]*(\d{4}年\d{1,2}月\d{1,2}日)/) || [,''])[1]);
+      const subtotal = parseYen((text.match(/小計[\s\S]{0,20}?([\d,]+)/) || [,''])[1]);
+      const tax = parseYen((text.match(/消費税[^\d]*([\d,]+)/) || [,''])[1]);
+      const total = parseYen((text.match(/合計[\s\S]{0,40}?([\d,]+)/) || (text.match(/ご請求額[\s\S]{0,20}?¥?([\d,]+)/)) || [,''])[1]);
+      // 年月推定
+      const y = invoiceDate ? invoiceDate.slice(0,4) : (String(new Date().getFullYear()));
+      const monthNum = invoiceDate ? invoiceDate.slice(5,7) : '';
+      const yearMonth = invoiceDate ? invoiceDate.slice(0,7) : '';
+
+      // 明細抽出：各行から「商品名 エリア 掲載日 金額 備考」を試みる
+      // 想定パターン："indeed チャージ・運用 千葉 3/23 100,000 運行管理者"
+      const items = [];
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const lineRegex = /^(indeed|Indeed|INDEED|plex|PLEX|xmile|XMile|リファラル|紹介)[^\d]*?([一-龥ぁ-んァ-ンー〜A-Za-z]+)\s+(\d{1,2}[\/\-.]\d{1,2})\s+([\d,]+)\s+([^\s]+.*)$/;
+      const lineRegex2 = /(indeed|Indeed|INDEED)[\s　]*[^\n]*?[\s　]+([一-龥]+)[\s　]+(\d{1,2}[\/\-.]\d{1,2})[\s　]+([\d,]+)[\s　]+([^\n]+)/g;
+      lines.forEach(line => {
+        // 小計/消費税/合計行はスキップ
+        if(/^(小計|消費税|合計|ご請求額)/.test(line)) return;
+        const m = line.match(lineRegex);
+        if(m){
+          const productName = 'indeed チャージ・運用';
+          const area = m[2];
+          const postedRaw = m[3];
+          const amount = parseYen(m[4]);
+          const biko = m[5].trim();
+          const posted = parseMmDdOfYear(postedRaw, y);
+          if(amount > 0){
+            items.push({ productName, area, postedDate: posted, amount, biko });
+          }
+        }
+      });
+
+      // 別解析：全文から連続パターンを拾う（複数行にまたがる場合の保険）
+      if(items.length === 0){
+        const flat = text.replace(/\n/g, ' ');
+        let m;
+        while((m = lineRegex2.exec(flat)) !== null){
+          const amount = parseYen(m[4]);
+          if(amount > 0){
+            items.push({
+              productName: 'indeed チャージ・運用',
+              area: m[2],
+              postedDate: parseMmDdOfYear(m[3], y),
+              amount,
+              biko: m[5].trim().replace(/(小計|消費税|合計).*$/, '').trim()
+            });
+          }
+        }
+      }
+
+      // invoiceId生成（決定的ハッシュ風）
+      const invoiceIdSeed = `${invoiceDate}|${total}|${fileName}`;
+      const invoiceId = 'inv_' + btoa(unescape(encodeURIComponent(invoiceIdSeed))).replace(/[^A-Za-z0-9]/g,'').slice(0,16);
+
+      return {
+        invoiceDate, dueDate, subtotal, tax, total,
+        yearMonth,
+        invoiceId,
+        media: 'Indeed', // 現状はIndeed想定。将来他媒体対応時に判定を追加
+        sourceFileName: fileName,
+        items,
+        rawTextLength: text.length
+      };
+    }
+
+    // 解析結果 → mediaCosts 用オブジェクト配列に変換
+    function invoiceToMediaCosts(parsed, editedItems){
+      const items = editedItems || parsed.items;
+      return items.map((it, idx) => {
+        const parts = splitJobEmployment(it.biko);
+        const job = normalizeJobLabel(parts.job || it.biko);
+        const emp = parts.employmentType || '';
+        const media = normalizeMediaName(parsed.media || it.productName);
+        const yearMonth = parsed.yearMonth || (it.postedDate ? it.postedDate.slice(0,7) : '');
+        return normalizeMediaCost({
+          id: `${parsed.invoiceId}_${idx}`,
+          feeType: '掲載課金型',
+          name: media,
+          jobTitle: it.biko,
+          targetJob: job,
+          source: media.toLowerCase(),
+          startDate: it.postedDate,
+          endDate: '',
+          costMonth: yearMonth,
+          billingMonth: parsed.invoiceDate ? parsed.invoiceDate.slice(0,7) : yearMonth,
+          allocationType: '単月計上',
+          fixedListingCost: it.amount,
+          otherCost: 0,
+          memo: `PDF取込：${parsed.sourceFileName}｜備考：${it.biko}`,
+          billingMemo: `請求日：${parsed.invoiceDate} ／ 支払期日：${parsed.dueDate}`,
+          // 新フィールド
+          yearMonth,
+          media,
+          job,
+          employmentType: emp,
+          amount: it.amount,
+          area: it.area || '',
+          invoiceDate: parsed.invoiceDate,
+          dueDate: parsed.dueDate,
+          postedDate: it.postedDate,
+          description: it.productName || '',
+          rawNote: it.biko,
+          invoiceSubtotal: parsed.subtotal,
+          invoiceTax: parsed.tax,
+          invoiceTotal: parsed.total,
+          sourceType: 'pdf',
+          sourceFileName: parsed.sourceFileName,
+          invoiceId: parsed.invoiceId
+        });
+      });
+    }
+
+    // ===== 媒体費用CSV / PDF =====
+    let selectedMediaFileType = ''; // 'csv' | 'pdf'
+    let parsedInvoiceCache = null;   // PDF解析結果キャッシュ
+
+    function isPdfFile(f){ return /\.pdf$/i.test(f.name) || f.type === 'application/pdf'; }
+    function isCsvFile(f){ return /\.csv$/i.test(f.name) || f.type === 'text/csv'; }
+
     function handleMediaCostCsvFileSelect(event){
       const f = event.target.files[0]; if(!f) return;
       selectedMediaCostCsvFile = f;
-      const nameEl = $('mediaCostCsvFileName'); if(nameEl) nameEl.textContent = `選択中のファイル：${f.name}`;
-      const btn = $('btnExecuteMediaCostCsvImport'); if(btn) btn.disabled = false;
-      setImportMessage('mediaCostCsvImportMessage', `ファイル「${f.name}」を選択しました。「取込実行」を押すと反映されます。`, 'info');
+      selectedMediaFileType = isPdfFile(f) ? 'pdf' : (isCsvFile(f) ? 'csv' : '');
+      const nameEl = $('mediaCostCsvFileName');
+      if(nameEl) nameEl.textContent = `選択中：${f.name}（${selectedMediaFileType === 'pdf' ? 'PDF' : selectedMediaFileType === 'csv' ? 'CSV' : '不明形式'}）`;
+      const btn = $('btnExecuteMediaCostCsvImport'); if(btn){ btn.disabled = !selectedMediaFileType; btn.textContent = selectedMediaFileType === 'pdf' ? 'PDFを解析してプレビュー' : '媒体費用データを取込'; }
+      setImportMessage('mediaCostCsvImportMessage', `ファイル「${f.name}」を選択しました。${selectedMediaFileType === 'pdf' ? '「PDFを解析してプレビュー」を押すと明細を確認できます。' : '「取込実行」を押すと反映されます。'}`, 'info');
     }
 
     function clearMediaCostCsvSelection(){
       selectedMediaCostCsvFile = null;
+      selectedMediaFileType = '';
+      parsedInvoiceCache = null;
       const inp = $('inputMediaCSV2'); if(inp) inp.value = '';
-      const nameEl = $('mediaCostCsvFileName'); if(nameEl) nameEl.textContent = 'CSVファイルが選択されていません';
-      const btn = $('btnExecuteMediaCostCsvImport'); if(btn) btn.disabled = true;
+      const nameEl = $('mediaCostCsvFileName'); if(nameEl) nameEl.textContent = 'CSV / PDFファイルが選択されていません';
+      const btn = $('btnExecuteMediaCostCsvImport'); if(btn){ btn.disabled = true; btn.textContent = '媒体費用データを取込'; }
       setImportMessage('mediaCostCsvImportMessage', '', '');
+    }
+
+    // 統合エントリ：CSV/PDFをルーティング
+    async function executeMediaImportDispatch(){
+      if(!selectedMediaCostCsvFile){
+        setImportMessage('mediaCostCsvImportMessage','ファイルが選択されていません。', 'error');
+        showToast('ファイルが選択されていません。', 'error');
+        return;
+      }
+      if(selectedMediaFileType === 'pdf'){
+        await previewInvoicePdf(selectedMediaCostCsvFile);
+      }else if(selectedMediaFileType === 'csv'){
+        await executeMediaCostCsvImport();
+      }else{
+        setImportMessage('mediaCostCsvImportMessage','対応していないファイル形式です（CSV / PDFのみ）', 'error');
+        showToast('対応していないファイル形式です', 'error');
+      }
+    }
+
+    async function previewInvoicePdf(file){
+      const btn = $('btnExecuteMediaCostCsvImport');
+      if(btn){ btn.disabled = true; btn.textContent = 'PDF解析中...'; }
+      try{
+        setImportMessage('mediaCostCsvImportMessage','PDFを解析中...', 'info');
+        const text = await extractPdfText(file);
+        const parsed = parseInvoiceText(text, file.name);
+        if(!parsed.invoiceDate || parsed.items.length === 0){
+          const missing = [];
+          if(!parsed.invoiceDate) missing.push('請求日');
+          if(parsed.items.length === 0) missing.push('明細金額');
+          throw new Error(`請求書の解析に失敗しました。以下が確認できませんでした：${missing.join(' / ')}。別のPDFを選択するか、CSV取込をご利用ください。`);
+        }
+        // 明細合計と小計の整合性チェック
+        const itemsTotal = parsed.items.reduce((a,i) => a + i.amount, 0);
+        const mismatch = parsed.subtotal && itemsTotal !== parsed.subtotal;
+        parsedInvoiceCache = parsed;
+        openInvoicePreview(parsed, mismatch, itemsTotal);
+        setImportMessage('mediaCostCsvImportMessage','PDF解析完了。プレビュー画面で内容確認後に登録してください。', 'success');
+      }catch(err){
+        console.error('[PDF IMPORT] failed:', err);
+        setImportMessage('mediaCostCsvImportMessage', `PDF取込エラー：${err.message}`, 'error');
+        showToast(`PDF取込エラー：${err.message}`, 'error');
+      }finally{
+        if(btn){ btn.disabled = false; btn.textContent = 'PDFを解析してプレビュー'; }
+      }
+    }
+
+    function openInvoicePreview(parsed, mismatch, itemsTotal){
+      const body = $('invoicePreviewBody'); if(!body) return;
+      const jobOptions = jobs.map(j => `<option value="${escapeHTML(j)}">${escapeHTML(j)}</option>`).join('');
+      const empOptions = ['','正社員','アルバイト','パート','契約社員','派遣'].map(e => `<option value="${escapeHTML(e)}">${escapeHTML(e || '(未設定)')}</option>`).join('');
+      const mediaOptions = ['Indeed','PLEX','XMile','リファラル','紹介'].map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
+      const rowsHtml = parsed.items.map((it, i) => {
+        const parts = splitJobEmployment(it.biko);
+        const guessJob = normalizeJobLabel(parts.job || it.biko);
+        const guessEmp = parts.employmentType || '';
+        return `<tr>
+          <td>${i+1}</td>
+          <td><select data-idx="${i}" data-key="media" class="preview-input">${mediaOptions.replace(`value="Indeed"`, `value="Indeed" selected`)}</select></td>
+          <td><select data-idx="${i}" data-key="job" class="preview-input">${jobOptions.replace(`value="${escapeHTML(guessJob)}"`, `value="${escapeHTML(guessJob)}" selected`)}</select></td>
+          <td><select data-idx="${i}" data-key="employmentType" class="preview-input">${empOptions.replace(`value="${escapeHTML(guessEmp)}"`, `value="${escapeHTML(guessEmp)}" selected`)}</select></td>
+          <td><input data-idx="${i}" data-key="amount" class="preview-input" type="number" value="${it.amount}" style="width:110px;text-align:right;" /></td>
+          <td><input data-idx="${i}" data-key="area" class="preview-input" value="${escapeHTML(it.area || '')}" style="width:100px;" /></td>
+          <td><input data-idx="${i}" data-key="postedDate" class="preview-input" type="date" value="${escapeHTML(it.postedDate || '')}" /></td>
+          <td style="font-size:11px;color:var(--muted);">${escapeHTML(it.biko)}</td>
+          <td><input type="checkbox" data-idx="${i}" class="preview-skip" /></td>
+        </tr>`;
+      }).join('');
+      const warnHtml = mismatch
+        ? `<div class="notice error" style="margin-top:12px;">⚠ 請求書の明細合計（${itemsTotal.toLocaleString()}円）と小計（${parsed.subtotal.toLocaleString()}円）が一致しません。内容を確認してください。</div>`
+        : '';
+      body.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;">
+          <div class="detail-item"><small>請求月</small><div>${escapeHTML(parsed.yearMonth || '-')}</div></div>
+          <div class="detail-item"><small>媒体</small><div>${escapeHTML(parsed.media)}</div></div>
+          <div class="detail-item"><small>請求日</small><div>${escapeHTML(parsed.invoiceDate || '-')}</div></div>
+          <div class="detail-item"><small>支払期日</small><div>${escapeHTML(parsed.dueDate || '-')}</div></div>
+        </div>
+        <div class="table-wrap"><table><thead><tr>
+          <th>#</th><th>媒体</th><th>職種</th><th>雇用形態</th><th style="text-align:right;">金額(税抜)</th><th>エリア</th><th>掲載日</th><th>元備考</th><th>除外</th>
+        </tr></thead><tbody>${rowsHtml}</tbody></table></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;">
+          <div class="detail-item"><small>税抜合計</small><div><strong>¥${parsed.subtotal.toLocaleString()}</strong></div></div>
+          <div class="detail-item"><small>消費税</small><div>¥${parsed.tax.toLocaleString()}</div></div>
+          <div class="detail-item"><small>税込合計</small><div><strong>¥${parsed.total.toLocaleString()}</strong></div></div>
+        </div>
+        ${warnHtml}
+        <div class="action-row" style="margin-top:16px;justify-content:flex-end;">
+          <button type="button" class="btn btn-ghost" id="btnCancelInvoiceImport">キャンセル</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmInvoiceImport">${parsed.items.length}件を取り込む</button>
+        </div>
+      `;
+      $('invoicePreviewBackdrop').classList.add('active');
+      document.getElementById('btnCancelInvoiceImport').addEventListener('click', closeInvoicePreview);
+      document.getElementById('btnConfirmInvoiceImport').addEventListener('click', confirmInvoiceImport);
+    }
+
+    function closeInvoicePreview(){
+      $('invoicePreviewBackdrop').classList.remove('active');
+    }
+
+    async function confirmInvoiceImport(){
+      if(!parsedInvoiceCache) return;
+      const parsed = parsedInvoiceCache;
+      // プレビューの編集内容を反映
+      const editedItems = parsed.items.map((it, i) => ({ ...it }));
+      document.querySelectorAll('.preview-input').forEach(el => {
+        const idx = Number(el.dataset.idx); const key = el.dataset.key;
+        if(!editedItems[idx]) return;
+        if(key === 'amount') editedItems[idx].amount = Number(el.value || 0);
+        else if(key === 'media') editedItems[idx].__media = el.value;
+        else if(key === 'job') editedItems[idx].__job = el.value;
+        else if(key === 'employmentType') editedItems[idx].__emp = el.value;
+        else editedItems[idx][key] = el.value;
+      });
+      // 除外チェック
+      const skipSet = new Set();
+      document.querySelectorAll('.preview-skip').forEach(el => { if(el.checked) skipSet.add(Number(el.dataset.idx)); });
+      const finalItems = editedItems.filter((_, i) => !skipSet.has(i));
+      if(finalItems.length === 0){
+        showToast('登録対象がありません（全て除外されています）', 'error');
+        return;
+      }
+
+      // mediaCosts オブジェクト生成（プレビュー編集値を反映）
+      const newRecords = finalItems.map((it, idx) => {
+        const media = normalizeMediaName(it.__media || parsed.media);
+        const job = it.__job || normalizeJobLabel(splitJobEmployment(it.biko).job);
+        const emp = it.__emp !== undefined ? it.__emp : splitJobEmployment(it.biko).employmentType;
+        const yearMonth = parsed.yearMonth || (it.postedDate ? it.postedDate.slice(0,7) : '');
+        return normalizeMediaCost({
+          id: `${parsed.invoiceId}_${idx}`,
+          feeType: '掲載課金型',
+          name: media,
+          jobTitle: it.biko,
+          targetJob: job,
+          source: media.toLowerCase(),
+          startDate: it.postedDate,
+          costMonth: yearMonth,
+          billingMonth: parsed.invoiceDate ? parsed.invoiceDate.slice(0,7) : yearMonth,
+          allocationType: '単月計上',
+          fixedListingCost: it.amount,
+          memo: `PDF取込：${parsed.sourceFileName}｜備考：${it.biko}`,
+          billingMemo: `請求日：${parsed.invoiceDate} ／ 支払期日：${parsed.dueDate}`,
+          yearMonth, media, job, employmentType: emp,
+          amount: it.amount, area: it.area || '',
+          invoiceDate: parsed.invoiceDate, dueDate: parsed.dueDate, postedDate: it.postedDate,
+          description: it.productName || '', rawNote: it.biko,
+          invoiceSubtotal: parsed.subtotal, invoiceTax: parsed.tax, invoiceTotal: parsed.total,
+          sourceType: 'pdf', sourceFileName: parsed.sourceFileName, invoiceId: parsed.invoiceId
+        });
+      });
+
+      // 取込モード：置換 or 追加
+      const mode = (document.querySelector('input[name="mediaImportMode2"]:checked') || {}).value || 'merge';
+      const before = mediaCosts.length;
+      let removed = 0;
+      if(mode === 'replace_ym'){
+        // 同じ請求月×媒体を削除
+        const targetYm = parsed.yearMonth;
+        const targetMedia = normalizeMediaName(parsed.media);
+        const filtered = mediaCosts.filter(m => !(m.yearMonth === targetYm && normalizeMediaName(m.media || m.name) === targetMedia));
+        removed = mediaCosts.length - filtered.length;
+        mediaCosts = filtered;
+      }
+      // 重複防止：invoiceIdが同じ既存はスキップ
+      const existingInvoiceIds = new Set(mediaCosts.map(m => m.invoiceId).filter(Boolean));
+      const alreadyImported = existingInvoiceIds.has(parsed.invoiceId);
+      if(alreadyImported){
+        // 既存明細を全て入れ替え
+        mediaCosts = mediaCosts.filter(m => m.invoiceId !== parsed.invoiceId);
+      }
+      mediaCosts = [...newRecords, ...mediaCosts];
+
+      const result = makeImportResult();
+      result.beforeCount = before;
+      result.afterCount = mediaCosts.length;
+      result.totalRows = parsed.items.length;
+      result.added = alreadyImported ? 0 : newRecords.length;
+      result.updated = alreadyImported ? newRecords.length : 0;
+      result.skipped = parsed.items.length - finalItems.length + removed;
+
+      closeInvoicePreview();
+      await afterImportSuccess(result, 'mediaCostCsvImportMessage', `請求書PDF「${parsed.sourceFileName}」`);
+      clearMediaCostCsvSelection();
     }
 
     async function executeMediaCostCsvImport(){
@@ -2833,7 +3249,8 @@
       onClick('btnClearCandidateCsv', clearCandidateCsvSelection);
       onClick('btnExecutePlanCsvImport', executePlanCsvImport);
       onClick('btnClearPlanCsv', clearPlanCsvSelection);
-      onClick('btnExecuteMediaCostCsvImport', executeMediaCostCsvImport);
+      onClick('btnExecuteMediaCostCsvImport', executeMediaImportDispatch);
+      onClick('btnCloseInvoicePreview', closeInvoicePreview);
       onClick('btnClearMediaCostCsv', clearMediaCostCsvSelection);
       onClick('btnExecuteJsonBackupImport', executeJsonBackupImport);
       onClick('btnClearJsonBackup', clearJsonBackupSelection);
