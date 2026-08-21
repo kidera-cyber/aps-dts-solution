@@ -63,6 +63,22 @@
     .toast.fade-out{animation:toast-out .3s ease forwards}
     .import-result{margin-top:10px}
     .import-result table{min-width:auto;width:100%}.import-result td{padding:6px 10px;border:0;font-size:12px}
+    .resume-drop{border:2px dashed #93c5fd;background:linear-gradient(135deg,#eff6ff,#f8fafc);padding:20px;border-radius:16px;text-align:center;transition:.15s ease;cursor:pointer;position:relative}
+    .resume-drop:hover{background:linear-gradient(135deg,#dbeafe,#eff6ff);border-color:#60a5fa}
+    .resume-drop.dragover{background:#dbeafe;border-color:var(--blue);border-style:solid}
+    .resume-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .resume-drop-icon{font-size:32px;color:var(--blue);margin-bottom:8px}
+    .resume-drop-text{font-weight:900;color:var(--navy);font-size:14px;margin-bottom:4px}
+    .resume-drop-sub{color:var(--muted);font-size:12px}
+    .resume-current{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+    .resume-current-name{font-weight:900;color:var(--navy);font-size:13px}
+    .resume-current-meta{color:var(--muted);font-size:11px;margin-top:2px}
+    .resume-selected{background:#dcfce7;border:1px solid #bbf7d0;color:#15803d;border-radius:14px;padding:10px 14px;margin-top:10px;font-size:13px;font-weight:900;display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .resume-selected small{font-weight:400}
+    .resume-status{margin-top:8px;font-size:12px;font-weight:900}
+    details.legacy-url{margin-top:14px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+    details.legacy-url summary{cursor:pointer;font-size:12px;color:var(--muted);font-weight:800}
+    details.legacy-url[open] summary{margin-bottom:10px}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -153,10 +169,25 @@
               <label class="field">入社決定日<input id="joinedAt" type="date" /></label>
             </div>
             <label class="field" style="margin-top:14px;">メモ<textarea id="memo" placeholder="面接メモ、懸念点、次回アクションなど"></textarea></label></div>
-            <div class="form-section"><h4>履歴書・職務経歴書</h4><div class="form-grid">
-              <label class="field">履歴書ファイル名<input id="resumeName" placeholder="例）山田太郎_履歴書.pdf" /></label>
-              <label class="field" style="grid-column:span 3;">履歴書URL（共有リンクを貼り付け）<input id="resumeUrl" type="url" placeholder="https://drive.google.com/file/d/.../view など" /></label>
-            </div><p class="hint">※ ファイル本体ではなく共有リンクのみ保存します。Google Drive形式は詳細画面でプレビュー表示できます。</p></div>
+            <div class="form-section"><h4>履歴書・職務経歴書</h4>
+              <p class="hint" style="margin-bottom:10px;">PDF / Word / 画像ファイル（10MB以下）を選択すると、保存時にGoogle Driveへ自動アップロードします。</p>
+              <div class="resume-drop" id="resumeDropZone">
+                <div class="resume-drop-icon">📎</div>
+                <div class="resume-drop-text">PDFをドラッグ＆ドロップ または クリックしてファイルを選択</div>
+                <div class="resume-drop-sub">対応：PDF / Word / JPEG / PNG（10MB以下）</div>
+                <input type="file" id="resumeFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png" />
+              </div>
+              <div id="resumeSelectedBox" style="display:none;"></div>
+              <div id="resumeCurrentBox" style="display:none;"></div>
+              <p id="resumeStatus" class="resume-status"></p>
+              <details class="legacy-url">
+                <summary>共有URLを直接登録する場合はこちら（従来方式）</summary>
+                <div class="form-grid" style="margin-top:8px;">
+                  <label class="field">履歴書ファイル名<input id="resumeName" placeholder="例）山田太郎_履歴書.pdf" /></label>
+                  <label class="field" style="grid-column:span 3;">履歴書URL（共有リンクを貼り付け）<input id="resumeUrl" type="url" placeholder="https://drive.google.com/file/d/.../view など" /></label>
+                </div>
+              </details>
+            </div>
             <div class="action-row"><button type="submit" class="btn btn-primary">保存する</button><button type="button" class="btn btn-ghost" id="btnResetCandidateForm">新規登録に戻す</button></div>
             <p id="formMessage" style="font-weight:900;"></p>
           </form>
@@ -441,6 +472,11 @@
     const POLLING_INTERVAL_MS = 30000;
     let pollingTimer = null;
     let pollingEnabled = true;
+    // 未保存の変更あり → 自動再読込で上書きされないよう防御
+    let dirtyLocal = false;
+    let lastSaveAt = 0;
+    function markDirty(){ dirtyLocal = true; }
+    function markClean(){ dirtyLocal = false; lastSaveAt = Date.now(); }
 
     function isFormInUse(){
       const cid = document.getElementById('candidateId');
@@ -461,6 +497,10 @@
       if(!isCloudConfigured()) return;
       if(!pollingEnabled) return;
       if(isFormInUse()) return;
+      // 未保存の変更がある間は自動再読込しない（データ消失防止）
+      if(dirtyLocal){ console.warn('[AUTO POLL] スキップ：未保存のローカル変更があります'); return; }
+      // 直近3秒以内に保存した直後は Apps Script の書き込み完了待ち
+      if(Date.now() - lastSaveAt < 3000) return;
       try{ await cloudReload(true); }catch(err){ /* syncCard で表示済み */ }
     }
 
@@ -532,7 +572,8 @@
         return;
       }
       if(syncState.mode === 'ng'){
-        el.innerHTML = `<div class="sync-state ng">共有モード：接続エラー</div><div class="error">エラー内容：${escapeHTML(syncState.message || '不明')}</div><div style="margin-top:8px;font-size:12px;">${pollingLabel}</div><div style="margin-top:4px;color:var(--muted);font-size:12px;">設定タブで「接続確認」を実行してください。</div>`;
+        const dirtyWarn = dirtyLocal ? `<div class="error" style="margin-top:6px;">⚠ ローカルに未同期の変更があります（自動更新は停止中）。設定→「現在データをクラウドへ反映」で再送してください。</div>` : '';
+        el.innerHTML = `<div class="sync-state ng">共有モード：接続エラー</div><div class="error">エラー内容：${escapeHTML(syncState.message || '不明')}</div>${dirtyWarn}<div style="margin-top:8px;font-size:12px;">${pollingLabel}</div><div style="margin-top:4px;color:var(--muted);font-size:12px;">設定タブで「接続確認」を実行してください。</div>`;
         return;
       }
       el.innerHTML = `<div class="sync-state idle">共有モード：待機中</div><div>クラウド設定済み。「クラウドから再読込」または「接続確認」を実行してください。</div><div style="margin-top:8px;font-size:12px;">${pollingLabel}</div>`;
@@ -556,15 +597,23 @@
     async function persist(showCloudMessage = false){
       saveLocal();
       renderAll();
+      markDirty();
       if(isCloudConfigured()){
         try{
-          await callCloud('save', { candidates, plans, mediaCosts });
-          setSyncState('ok', '保存しました');
-          if(showCloudMessage) setDataMessage('クラウドへ保存しました', 'success');
+          const res = await callCloud('save', { candidates, plans, mediaCosts });
+          const cleaned = (res && typeof res.cleanedDuplicates === 'number') ? res.cleanedDuplicates : 0;
+          setSyncState('ok', cleaned > 0 ? `保存しました（重複${cleaned}行を整理）` : '保存しました');
+          if(showCloudMessage) setDataMessage(`クラウドへ保存しました${cleaned > 0 ? `（重複${cleaned}行を整理）` : ''}`, 'success');
+          markClean();
         }catch(err){
+          console.error('[CLOUD SAVE] failed:', err);
           setSyncState('ng', err.message);
           if(showCloudMessage) setDataMessage(`クラウド保存エラー：${err.message}`, 'error');
+          showToast(`クラウド保存に失敗しました：${err.message}\nローカルには保存されています。自動更新は停止し、次回手動保存まで上書きされません。`, 'warning');
+          // dirty のまま：自動ポーリングを停止してデータ保護
         }
+      }else{
+        markClean();
       }
     }
 
@@ -587,6 +636,8 @@
         memo: c.memo || '',
         resumeName: c.resumeName || '',
         resumeUrl: c.resumeUrl || '',
+        resumeFileId: c.resumeFileId || '',
+        resumeUploadedAt: c.resumeUploadedAt || '',
         appliedAt: c.appliedAt || '',
         offerAt: c.offerAt || '',
         acceptedAt: c.acceptedAt || '',
@@ -726,17 +777,47 @@
       }).join('') : '<div class="empty">採用計画が未登録です</div>';
     }
 
+    // 応募日時のパース：'YYYY-MM-DD' も 'YYYY/MM/DD HH:mm:ss' もOK。空欄・不正は NaN
+    function parseAppliedTs(c){
+      const raw = String(c.appliedAt || '').trim();
+      if(!raw) return NaN;
+      const normalized = raw.replace(/-/g, '/');
+      const t = new Date(normalized).getTime();
+      return isNaN(t) ? NaN : t;
+    }
+    function parseCreatedTs(c){
+      const raw = String(c.createdAt || '').trim();
+      if(!raw) return 0;
+      const normalized = raw.replace(/-/g, '/');
+      const t = new Date(normalized).getTime();
+      return isNaN(t) ? 0 : t;
+    }
+    // 応募日時 降順（新しい順） / 空欄は末尾へ / 同日は登録日時降順で安定ソート
+    function sortByAppliedDesc(list){
+      return [...list].sort((a, b) => {
+        const ta = parseAppliedTs(a);
+        const tb = parseAppliedTs(b);
+        const aHas = !isNaN(ta), bHas = !isNaN(tb);
+        if(aHas && !bHas) return -1;
+        if(!aHas && bHas) return 1;
+        if(!aHas && !bHas) return parseCreatedTs(b) - parseCreatedTs(a);
+        if(tb !== ta) return tb - ta;
+        return parseCreatedTs(b) - parseCreatedTs(a);
+      });
+    }
+
     function getFilteredCandidates(){
       const name = $('searchName') ? $('searchName').value.trim().toLowerCase() : '';
       const job = $('filterJob') ? $('filterJob').value : '';
       const status = $('filterStatus') ? $('filterStatus').value : '';
       const source = $('filterSource') ? $('filterSource').value : '';
-      return candidates.filter(c =>
+      const filtered = candidates.filter(c =>
         (!name || String(c.name || '').toLowerCase().includes(name)) &&
         (!job || c.job === job) &&
         (!status || c.status === status) &&
         (!source || c.source === source)
       );
+      return sortByAppliedDesc(filtered);
     }
 
     function renderTable(){
@@ -956,8 +1037,10 @@
         nextDate: $('nextDate') ? $('nextDate').value : '',
         owner: $('owner') ? $('owner').value.trim() : '',
         memo: $('memo') ? $('memo').value.trim() : '',
-        resumeName: $('resumeName') ? $('resumeName').value.trim() : '',
-        resumeUrl: $('resumeUrl') ? $('resumeUrl').value.trim() : '',
+        resumeName: ($('resumeName') && $('resumeName').value.trim()) || (existing && existing.resumeName) || '',
+        resumeUrl: ($('resumeUrl') && $('resumeUrl').value.trim()) || (existing && existing.resumeUrl) || '',
+        resumeFileId: (existing && existing.resumeFileId) || '',
+        resumeUploadedAt: (existing && existing.resumeUploadedAt) || '',
         appliedAt: $('appliedAt') ? $('appliedAt').value : '',
         offerAt: $('offerAt') ? $('offerAt').value : '',
         acceptedAt: $('acceptedAt') ? $('acceptedAt').value : '',
@@ -974,6 +1057,26 @@
         if($('formMessage')){ $('formMessage').textContent = '応募者名・希望職種・選考ステータスは必須です。'; $('formMessage').className = 'error'; }
         return;
       }
+      // 履歴書アップロード（あれば）
+      if(pendingResumeFile){
+        const statusEl = $('resumeStatus');
+        if(statusEl){ statusEl.className = 'resume-status'; statusEl.textContent = 'Google Driveへアップロード中...'; }
+        try{
+          const uploaded = await uploadResumeToCloud(pendingResumeFile, data.name);
+          data.resumeName = uploaded.fileName || pendingResumeFile.name;
+          data.resumeUrl = uploaded.url || '';
+          data.resumeFileId = uploaded.fileId || '';
+          data.resumeUploadedAt = uploaded.uploadedAt || nowDateTime();
+          if(statusEl){ statusEl.className = 'resume-status success'; statusEl.textContent = `Google Driveへ保存済み：${data.resumeName}`; }
+          showToast(`履歴書をGoogle Driveへ保存しました：${data.resumeName}`, 'success');
+        }catch(err){
+          console.error('[RESUME UPLOAD] failed:', err);
+          if(statusEl){ statusEl.className = 'resume-status error'; statusEl.textContent = `Google Driveへの保存に失敗しました：${err.message}`; }
+          showToast(`Google Driveへの保存に失敗しました：${err.message}\n応募者情報は保存されません。`, 'error');
+          if($('formMessage')){ $('formMessage').textContent = `履歴書アップロードに失敗したため応募者情報は保存していません：${err.message}`; $('formMessage').className = 'error'; }
+          return; // データ破壊防止のため保存中止
+        }
+      }
       const exists = candidates.some(c => c.id === data.id);
       if(exists){
         candidates = candidates.map(c => c.id === data.id ? { ...c, ...data } : c);
@@ -983,15 +1086,21 @@
         if($('formMessage')) $('formMessage').textContent = '応募者を登録しました。';
       }
       if($('formMessage')) $('formMessage').className = 'success';
+      pendingResumeFile = null;
+      const inp = $('resumeFileInput'); if(inp) inp.value = '';
       await persist();
       if(!exists) resetFormMode(false);
+      updateResumeUI();
     }
 
     function editCandidate(id){
       const c = candidates.find(x => x.id === id); if(!c) return;
       if($('candidateId')) $('candidateId').value = c.id;
       ['name','phone','email','source','job','workType','license','area','status','rating','interviewAt','nextDate','owner','memo','resumeName','resumeUrl','appliedAt','offerAt','acceptedAt','joinedAt'].forEach(k => { if($(k)) $(k).value = c[k] || ''; });
+      pendingResumeFile = null;
+      const inp = $('resumeFileInput'); if(inp) inp.value = '';
       if($('formTitle')) $('formTitle').textContent = '応募者編集';
+      updateResumeUI();
       switchTab('form'); window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1002,6 +1111,10 @@
       if($('status')) $('status').value = '応募受付';
       if($('rating')) $('rating').value = '未評価';
       if(clearMessage && $('formMessage')) $('formMessage').textContent = '';
+      pendingResumeFile = null;
+      const inp = $('resumeFileInput'); if(inp) inp.value = '';
+      const statusEl = $('resumeStatus'); if(statusEl){ statusEl.textContent = ''; statusEl.className = 'resume-status'; }
+      updateResumeUI();
     }
 
     async function deleteCandidate(id){
@@ -1028,15 +1141,15 @@
     }
 
     function resumeBlockHTML(c){
-      if(!c.resumeUrl) return '<div class="empty">履歴書URLは未登録です（編集画面で入力できます）</div>';
+      if(!c.resumeUrl) return '<div class="empty">履歴書は未登録です（編集画面でアップロードできます）</div>';
       const previewUrl = toDrivePreviewUrl(c.resumeUrl);
       const isDrive = c.resumeUrl.includes('drive.google.com');
       return `<div class="resume-box">
         <div class="resume-actions">
-          <a class="btn btn-soft" href="${escapeHTML(c.resumeUrl)}" target="_blank" rel="noopener">別タブで開く</a>
-          <span style="color:var(--muted);font-size:12px;">${escapeHTML(c.resumeName || '-')}</span>
+          <a class="btn btn-primary" href="${escapeHTML(c.resumeUrl)}" target="_blank" rel="noopener">📄 履歴書を見る</a>
+          <span style="color:var(--muted);font-size:12px;">${escapeHTML(c.resumeName || '-')}${c.resumeUploadedAt ? ` ／ ${escapeHTML(c.resumeUploadedAt)}` : ''}</span>
         </div>
-        ${isDrive ? `<div class="resume-preview"><iframe src="${escapeHTML(previewUrl)}" title="履歴書プレビュー"></iframe></div>` : '<div class="empty" style="font-size:12px;">この共有形式は画面内プレビューに非対応です。「別タブで開く」を使ってください。</div>'}
+        ${isDrive ? `<div class="resume-preview"><iframe src="${escapeHTML(previewUrl)}" title="履歴書プレビュー"></iframe></div>` : '<div class="empty" style="font-size:12px;">この共有形式は画面内プレビューに非対応です。「履歴書を見る」で別タブから確認してください。</div>'}
       </div>`;
     }
 
@@ -1519,6 +1632,137 @@
     let selectedMediaCostCsvFile = null;
     let selectedJsonBackupFile = null;
 
+    // ===== 履歴書アップロード：状態変数 =====
+    let pendingResumeFile = null; // アップロード待ちのFileオブジェクト
+    const RESUME_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+    const RESUME_ALLOWED_EXT = ['.pdf','.doc','.docx','.jpg','.jpeg','.png'];
+    const RESUME_ALLOWED_MIME = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/jpeg','image/png'];
+
+    function extOf(name){ const m = String(name || '').toLowerCase().match(/\.[^.]+$/); return m ? m[0] : ''; }
+
+    function validateResumeFile(file){
+      if(!file) return { ok: false, error: 'ファイルが選択されていません' };
+      const ext = extOf(file.name);
+      if(!RESUME_ALLOWED_EXT.includes(ext)){
+        return { ok: false, error: `ファイル形式が対応していません（${ext}）。PDF / Word / JPEG / PNG のみアップロード可能です。` };
+      }
+      if(file.type && !RESUME_ALLOWED_MIME.includes(file.type)){
+        // MIMEが空/違うが拡張子が許可済みなら通す（.docx等でMIMEが空になる端末があるため）
+      }
+      if(file.size > RESUME_MAX_BYTES){
+        return { ok: false, error: `ファイルサイズが大きすぎます（${(file.size/1024/1024).toFixed(1)}MB）。10MB以下のファイルを選択してください。` };
+      }
+      if(file.size === 0){
+        return { ok: false, error: 'ファイルが空です' };
+      }
+      return { ok: true };
+    }
+
+    function updateResumeUI(){
+      const currentBox = $('resumeCurrentBox');
+      const selectedBox = $('resumeSelectedBox');
+      const statusEl = $('resumeStatus');
+      const existingId = $('candidateId') ? $('candidateId').value : '';
+      const existing = existingId ? candidates.find(c => c.id === existingId) : null;
+      if(statusEl) statusEl.textContent = '';
+
+      // 選択中ファイル表示
+      if(pendingResumeFile){
+        selectedBox.style.display = 'flex';
+        selectedBox.className = 'resume-selected';
+        selectedBox.innerHTML = `<div>✓ 選択中：<strong>${escapeHTML(pendingResumeFile.name)}</strong><br><small>${(pendingResumeFile.size/1024/1024).toFixed(2)}MB ／ 保存ボタンでGoogle Driveへアップロードします</small></div>
+          <button type="button" class="btn btn-ghost btn-small" id="btnClearPendingResume">選択解除</button>`;
+        const clearBtn = document.getElementById('btnClearPendingResume');
+        if(clearBtn) clearBtn.addEventListener('click', () => { pendingResumeFile = null; const inp = $('resumeFileInput'); if(inp) inp.value = ''; updateResumeUI(); });
+      }else{
+        selectedBox.style.display = 'none';
+      }
+
+      // 既存ファイル表示
+      const existingUrl = (existing && existing.resumeUrl) || '';
+      const existingName = (existing && existing.resumeName) || '';
+      const existingUploaded = (existing && existing.resumeUploadedAt) || '';
+      if(existingUrl){
+        currentBox.style.display = 'flex';
+        currentBox.className = 'resume-current';
+        currentBox.innerHTML = `<div>
+          <div class="resume-current-name">現在：${escapeHTML(existingName || '(ファイル名なし)')}</div>
+          ${existingUploaded ? `<div class="resume-current-meta">アップロード日：${escapeHTML(existingUploaded)}</div>` : ''}
+        </div>
+        <div class="action-row">
+          <a class="btn btn-soft btn-small" href="${escapeHTML(existingUrl)}" target="_blank" rel="noopener">開く</a>
+          <button type="button" class="btn btn-ghost btn-small" onclick="document.getElementById('resumeFileInput').click()">差し替える</button>
+        </div>`;
+      }else{
+        currentBox.style.display = 'none';
+      }
+    }
+
+    function bindResumeUpload(){
+      const input = $('resumeFileInput');
+      const drop = $('resumeDropZone');
+      if(!input || !drop) return;
+      input.addEventListener('change', e => {
+        const f = e.target.files && e.target.files[0];
+        if(!f) return;
+        const check = validateResumeFile(f);
+        if(!check.ok){
+          const statusEl = $('resumeStatus');
+          if(statusEl){ statusEl.className = 'resume-status error'; statusEl.textContent = check.error; }
+          showToast(check.error, 'error');
+          input.value = '';
+          return;
+        }
+        pendingResumeFile = f;
+        updateResumeUI();
+      });
+      ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('dragover'); }));
+      ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('dragover'); }));
+      drop.addEventListener('drop', e => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if(!f) return;
+        const check = validateResumeFile(f);
+        if(!check.ok){
+          const statusEl = $('resumeStatus');
+          if(statusEl){ statusEl.className = 'resume-status error'; statusEl.textContent = check.error; }
+          showToast(check.error, 'error');
+          return;
+        }
+        pendingResumeFile = f;
+        input.value = '';
+        updateResumeUI();
+      });
+    }
+
+    function fileToBase64(file){
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const s = String(reader.result || '');
+          const idx = s.indexOf('base64,');
+          resolve(idx >= 0 ? s.slice(idx + 7) : s);
+        };
+        reader.onerror = () => reject(new Error('ファイル読み込みに失敗しました'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function uploadResumeToCloud(file, applicantName){
+      if(!isCloudConfigured()) throw new Error('クラウド共有設定が未設定です。設定タブでWebアプリURLとAPI Keyを保存してください。');
+      const check = validateResumeFile(file);
+      if(!check.ok) throw new Error(check.error);
+      const base64 = await fileToBase64(file);
+      const res = await callCloud('uploadResume', {
+        applicantName: applicantName || '',
+        originalName: file.name,
+        mimeType: file.type || '',
+        size: file.size,
+        dataBase64: base64
+      });
+      if(!res || !res.resume) throw new Error('Apps Scriptからアップロード応答が不正です');
+      return res.resume; // { fileName, url, fileId, uploadedAt }
+    }
+
     // ===== トースト通知 =====
     function showToast(message, type = 'success', duration = 6000){
       const container = document.getElementById('toastContainer');
@@ -1570,16 +1814,21 @@
     async function afterImportSuccess(result, messageTargetId, label){
       saveLocal();
       renderAll();
+      markDirty(); // 保存試行前に「未同期」マーク
       let cloudSaved = false, cloudError = '';
       if(isCloudConfigured()){
         try{
           await callCloud('save', { candidates, plans, mediaCosts });
           setSyncState('ok', `${label} 取込`);
           cloudSaved = true;
+          markClean();
         }catch(err){
           setSyncState('ng', err.message);
           cloudError = err.message || String(err);
+          // dirty のまま：次の自動ポーリングは実行されない（データ保護）
         }
+      }else{
+        markClean(); // クラウド未設定なら常にクリーン扱い
       }
       result.cloudSaved = cloudSaved;
       result.cloudError = cloudError;
@@ -2435,16 +2684,37 @@
     async function testConnection(){
       try{
         setDataMessage('接続確認中です...', 'info');
-        const res = await callCloud('ping', {});
-        setSyncState('ok', res.message || '接続成功');
-        setDataMessage(`接続成功：${res.savedAt || nowDateTime()}`, 'success');
+        // まずping、次にdiagnose（旧Apps Scriptにも後方互換）
+        const ping = await callCloud('ping', {});
+        let diagHtml = `<strong>接続成功</strong>（${escapeHTML(ping.savedAt || nowDateTime())}）`;
+        try{
+          const diag = await callCloud('diagnose', {});
+          if(diag && Array.isArray(diag.checks)){
+            diagHtml += '<br><br><strong>詳細診断：</strong><ul style="margin:6px 0 0 20px;padding:0;">';
+            diag.checks.forEach(c => {
+              diagHtml += `<li>${c.ok ? '✅' : '❌'} ${escapeHTML(c.name)}：${escapeHTML(c.detail || '')}</li>`;
+            });
+            diagHtml += '</ul>';
+            if(diag.ok === false) diagHtml += `<br><span class="error">診断NG：${escapeHTML(diag.error || '')}</span>`;
+          }
+        }catch(diagErr){
+          diagHtml += `<br><br><span style="color:var(--muted);font-size:12px;">※ 詳細診断は未対応の旧Apps Scriptです。安定版コードへの差し替えを推奨します。</span>`;
+        }
+        setSyncState('ok', ping.message || '接続成功');
+        const el = $('dataMessage'); if(el){ el.className = 'notice success'; el.innerHTML = diagHtml; }
+        showToast('接続確認に成功しました', 'success');
       }catch(err){
         setSyncState('ng', err.message);
         setDataMessage(`接続エラー：${err.message}`, 'error');
+        showToast(`接続エラー：${err.message}`, 'error');
       }
     }
 
     async function cloudReload(silent = false){
+      // 未保存ローカル変更がある場合は手動再読込でも警告
+      if(dirtyLocal && !silent){
+        if(!confirm('ローカルに未同期の変更があります。クラウドから再読込するとローカル変更が失われます。実行しますか？')) return;
+      }
       try{
         if(!silent) setDataMessage('クラウドから読込中です...', 'info');
         const res = await callCloud('load', {});
@@ -2454,6 +2724,7 @@
         mediaCosts = (Array.isArray(data.mediaCosts) ? data.mediaCosts : []).map(normalizeMediaCost);
         saveLocal();
         renderAll();
+        markClean();
         setSyncState('ok', silent ? '自動更新成功' : '読込成功');
         if(!silent) setDataMessage(`クラウドから再読込しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
       }catch(err){
@@ -2468,9 +2739,12 @@
         await callCloud('save', { candidates, plans, mediaCosts });
         setSyncState('ok', '反映成功');
         setDataMessage(`クラウドへ反映しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
+        markClean();
+        showToast('クラウドへ現在のデータを反映しました', 'success');
       }catch(err){
         setSyncState('ng', err.message);
         setDataMessage(`クラウド反映エラー：${err.message}`, 'error');
+        showToast(`クラウド反映エラー：${err.message}`, 'error');
       }
     }
 
@@ -2588,6 +2862,7 @@
       initSelects();
       loadLocal();
       bindEvents();
+      bindResumeUpload();
       loadApiSettingsToForm();
       resetFormMode();
       resetPlanForm();
