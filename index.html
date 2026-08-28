@@ -79,6 +79,55 @@
     details.legacy-url{margin-top:14px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
     details.legacy-url summary{cursor:pointer;font-size:12px;color:var(--muted);font-weight:800}
     details.legacy-url[open] summary{margin-bottom:10px}
+    .funnel-row{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;padding:14px;background:#f8fbff;border-radius:16px;border:1px solid var(--line)}
+    .funnel-step{flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center;position:relative}
+    .funnel-step .fs-label{font-size:11px;color:var(--muted);font-weight:900;letter-spacing:.08em}
+    .funnel-step .fs-value{font-size:28px;font-weight:950;color:var(--navy);margin:4px 0;letter-spacing:-.03em}
+    .funnel-step .fs-unit{font-size:11px;color:var(--muted)}
+    .funnel-conv{display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:80px;font-size:11px;color:var(--muted);font-weight:900}
+    .funnel-conv .fc-rate{font-size:16px;color:var(--blue);font-weight:950;letter-spacing:-.02em}
+    .funnel-conv.warn .fc-rate{color:var(--amber)}.funnel-conv.bad .fc-rate{color:var(--red)}
+    .headline-card{background:linear-gradient(135deg,#eaf2ff,#f8fbff);border:1px solid #bfdbfe;border-radius:20px;padding:20px;margin-bottom:8px}
+    .headline-card h4{margin:0 0 10px;color:var(--navy);font-size:18px}
+    .headline-metrics{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px}
+    .headline-metric{display:flex;flex-direction:column;gap:2px}
+    .headline-metric .hm-label{font-size:11px;color:var(--muted);font-weight:900}
+    .headline-metric .hm-value{font-size:28px;font-weight:950;color:var(--navy);letter-spacing:-.03em}
+    .headline-metric .hm-conv{font-size:12px;color:var(--blue);font-weight:900}
+    .headline-eval{font-size:13px;line-height:1.7;color:var(--text);background:rgba(255,255,255,.7);padding:12px 14px;border-radius:12px;border:1px solid #e0ecff}
+    .keypoint-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+    .keypoint-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;position:relative}
+    .keypoint-num{position:absolute;top:10px;right:14px;font-size:32px;font-weight:950;color:#e0ecff;letter-spacing:-.03em}
+    .keypoint-card strong{color:var(--navy);display:block;margin-bottom:6px;font-size:14px}
+    .keypoint-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
+    .kpi-cell .kpi-mom{font-size:11px;font-weight:900;margin-top:4px}
+    .kpi-cell .kpi-mom.up{color:#15803d}.kpi-cell .kpi-mom.down{color:#b91c1c}.kpi-cell .kpi-mom.flat{color:var(--muted)}
+    .kpi-cell .kpi-status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:900;margin-top:6px}
+    .status-good{background:#dcfce7;color:#15803d}
+    .status-warn{background:#fef9c3;color:#a16207}
+    .status-bad{background:#fee2e2;color:#b91c1c}
+    .status-idle{background:#f1f5f9;color:#475569}
+    .action-item{background:#fff;border-left:5px solid var(--blue);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+    .action-item.pri-high{border-left-color:var(--red)}
+    .action-item.pri-mid{border-left-color:var(--amber)}
+    .action-item.pri-low{border-left-color:var(--blue)}
+    .action-item .a-pri{font-size:10px;font-weight:900;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#475569;margin-right:8px}
+    .action-item.pri-high .a-pri{background:#fee2e2;color:#b91c1c}
+    .action-item.pri-mid .a-pri{background:#fef9c3;color:#a16207}
+    .action-item strong{color:var(--navy);font-size:14px}
+    .action-item p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+    .mini-report-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+    .mini-report-card h5{margin:0 0 10px;color:var(--navy);font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+    .mini-report-card h5 .mrc-total{font-size:11px;color:var(--muted);font-weight:700}
+    .mini-report-card .mrc-row{display:grid;grid-template-columns:60px 1fr 40px;gap:8px;align-items:center;font-size:12px;padding:3px 0}
+    .mini-report-card .mrc-row strong{color:var(--navy);font-weight:900}
+    .mini-report-card .mrc-bar{height:6px;border-radius:999px;background:#eaf0f7;overflow:hidden}
+    .mini-report-card .mrc-bar>span{display:block;height:100%;background:var(--blue);border-radius:999px}
+    .cost-block{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+    .cost-item{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px}
+    .cost-item .c-label{font-size:11px;color:var(--muted);font-weight:900}
+    .cost-item .c-value{font-size:20px;font-weight:950;color:var(--navy);margin-top:4px;letter-spacing:-.02em}
+    .cost-item .c-sub{font-size:11px;color:var(--muted);margin-top:2px}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -119,6 +168,8 @@
           <div class="card side"><div class="card-head"><div><h3>応募経路別 効果</h3><p class="hint">indeed / PLEX / XMile / リファラル / 紹介</p></div></div><div id="sourceBars"></div></div>
           <div class="card wide"><div class="card-head"><div><h3>採用計画の進捗</h3><p class="hint">内定承諾数を目標と比較します</p></div></div><div id="planSummary"></div></div>
           <div class="card side"><div class="card-head"><div><h3>共有ステータス</h3><p class="hint">クラウド共有モードの接続状態</p></div></div><div id="syncCard" class="sync-card"></div></div>
+          <div class="card wide"><div class="card-head"><div><h3>雇用形態別 応募状況</h3><p class="hint">正社員・アルバイト・未確認の応募人数を表示します</p></div></div><div id="employmentBars"></div></div>
+          <div class="card side"><div class="card-head"><div><h3>職種 × 雇用形態</h3><p class="hint">職種ごとの正社員／アルバイト内訳</p></div></div><div id="employmentByJob"></div></div>
           <div class="card full"><div class="card-head"><div><h3>今月の採用費用</h3><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く</button></div><div class="grid" id="thisMonthCards"></div></div>
         </div>
       </section>
@@ -267,26 +318,75 @@
 
       <section id="report" class="panel">
         <div class="card">
-          <div class="card-head"><div><h3>月次レポート</h3><p class="hint">月ごとの採用費用と応募/面接/承諾/入社の単価を集計します</p></div><button class="btn btn-soft" id="btnExportReportCSV">月次レポートCSV出力</button></div>
+          <div class="card-head"><div><h3>月次レポート</h3><p class="hint">今月どうだった？ → 何が問題？ → 来月何をする？ が30秒で分かる意思決定ダッシュボード</p></div><button class="btn btn-soft" id="btnExportReportCSV">CSV出力</button></div>
           <div class="filters" style="margin-bottom:16px;">
             <label class="field">対象年月<input id="reportMonth" type="month" /></label>
             <label class="field">対象職種<select id="reportJob"></select></label>
             <label class="field">媒体/紹介会社<select id="reportSource"></select></label>
             <label class="field">費用タイプ<select id="reportFeeType"></select></label>
           </div>
-          <div class="grid" id="reportSummary"></div>
-          <div class="card-head" style="margin-top:18px;"><h3>媒体別月次表</h3></div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>対象月</th><th>媒体/紹介会社</th><th>費用タイプ</th><th>職種</th><th>掲載費用</th><th>成功報酬</th><th>その他</th><th>総費用</th><th>応募</th><th>面接</th><th>内定</th><th>承諾</th><th>入社</th><th>応募単価</th><th>面接単価</th><th>承諾単価</th><th>入社単価</th></tr></thead>
-            <tbody id="reportMediaTable"></tbody>
-          </table></div>
-          <div class="card-head" style="margin-top:18px;"><h3>月別推移（過去6か月）</h3></div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>月</th><th>総費用</th><th>応募</th><th>面接</th><th>内定</th><th>承諾</th><th>入社</th><th>応募単価</th><th>承諾単価</th><th>入社単価</th></tr></thead>
-            <tbody id="reportTrendTable"></tbody>
-          </table></div>
-          <div class="card-head" style="margin-top:18px;"><h3>推移グラフ（簡易）</h3></div>
-          <div id="reportChart" style="display:grid;gap:14px;"></div>
+
+          <!-- 01 今月の採用サマリー -->
+          <div id="reportHeadline"></div>
+
+          <!-- 02 今月の重要ポイント3つ -->
+          <div id="reportKeyPoints" style="margin-top:16px;"></div>
+
+          <!-- 03 KPIサマリー -->
+          <div class="card-head" style="margin-top:22px;"><h3>KPIサマリー</h3></div>
+          <div class="grid" id="reportKPI"></div>
+
+          <!-- 04 採用ファネル -->
+          <div class="card-head" style="margin-top:22px;"><h3>採用ファネル（応募 → 入社）</h3></div>
+          <div id="reportFunnel"></div>
+
+          <!-- 05 ボトルネック -->
+          <div id="reportBottleneck" style="margin-top:16px;"></div>
+
+          <!-- 06 次月アクション -->
+          <div class="card-head" style="margin-top:22px;"><h3>次月アクション（自動生成）</h3></div>
+          <div id="reportActions"></div>
+
+          <!-- 07 職種別成果 -->
+          <div class="card-head" style="margin-top:22px;"><h3>職種別 採用成果</h3></div>
+          <div id="reportByJob" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;"></div>
+
+          <!-- 08 雇用形態別成果 -->
+          <div class="card-head" style="margin-top:22px;"><h3>雇用形態別 採用成果</h3></div>
+          <div id="reportByEmp" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;"></div>
+
+          <!-- 09 媒体別成果 -->
+          <div class="card-head" style="margin-top:22px;"><h3>媒体別 採用成果</h3></div>
+          <div id="reportByMedia" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;"></div>
+
+          <!-- 10 採用コスト -->
+          <div class="card-head" style="margin-top:22px;"><h3>採用コスト内訳</h3></div>
+          <div id="reportCosts"></div>
+
+          <!-- 11 採用計画 vs 実績 -->
+          <div class="card-head" style="margin-top:22px;"><h3>採用計画 vs 実績</h3></div>
+          <div id="reportVsPlan"></div>
+
+          <!-- 12 過去6か月推移 -->
+          <div class="card-head" style="margin-top:22px;"><h3>過去6か月推移</h3></div>
+          <div id="reportTrend" style="display:grid;gap:14px;"></div>
+
+          <!-- 13 詳細データ（アコーディオン） -->
+          <details style="margin-top:22px;">
+            <summary style="cursor:pointer;padding:12px 16px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;font-weight:900;color:var(--navy);">詳細データを見る（媒体別明細・月次表）</summary>
+            <div style="margin-top:12px;">
+              <div class="card-head"><h3>媒体別月次明細（集約済み）</h3></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>対象月</th><th>媒体/紹介会社</th><th>費用タイプ</th><th>職種</th><th>掲載費用</th><th>成功報酬</th><th>その他</th><th>総費用</th></tr></thead>
+                <tbody id="reportMediaTable"></tbody>
+              </table></div>
+              <div class="card-head" style="margin-top:14px;"><h3>月別推移表（数値）</h3></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>月</th><th>総費用</th><th>広告費</th><th>紹介費</th><th>応募</th><th>面接</th><th>内定</th><th>承諾</th><th>入社</th><th>応募CPA</th><th>採用CPA</th></tr></thead>
+                <tbody id="reportTrendTable"></tbody>
+              </table></div>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -775,17 +875,56 @@
       return 'badge-gray';
     }
 
+    // ===== 職種カテゴリ集計 =====
+    function normalizeJobCategory(value){
+      const v = String(value || '').trim().normalize('NFKC');
+      if(!v) return 'その他';
+      if(v.includes('大型')) return '大型';
+      if(v.includes('中型')) return '中型';
+      if(/事務|受付|バックオフィス|経理|総務|人事/.test(v)) return '事務';
+      return 'その他';
+    }
+
+    function getApplicantJobSummary(list){
+      const src = list || candidates;
+      const result = { total: src.length, medium: 0, large: 0, office: 0, other: 0 };
+      src.forEach(c => {
+        const cat = normalizeJobCategory(c.job);
+        if(cat === '中型') result.medium++;
+        else if(cat === '大型') result.large++;
+        else if(cat === '事務') result.office++;
+        else result.other++;
+      });
+      return result;
+    }
+
     function renderMetrics(){
       const target = $('metricGrid'); if(!target) return;
+      const s = getApplicantJobSummary();
+      const maxCount = Math.max(1, s.medium, s.large, s.office);
+      const miniBar = (label, count, color) => {
+        const pct = Math.max(0, (count / maxCount) * 100);
+        return `<div style="display:grid;grid-template-columns:36px 1fr 34px;align-items:center;gap:6px;font-size:11px;line-height:1.3;margin-top:3px;">
+          <span style="color:var(--muted);font-weight:900;">${escapeHTML(label)}</span>
+          <span style="height:6px;border-radius:999px;background:#eaf0f7;overflow:hidden;display:block;"><span style="display:block;height:100%;width:${pct}%;background:${color};border-radius:999px;"></span></span>
+          <span style="text-align:right;font-weight:900;color:var(--navy);">${count}</span>
+        </div>`;
+      };
+      const jobBreakdownHtml = `
+        ${miniBar('中型', s.medium, '#2563eb')}
+        ${miniBar('大型', s.large, '#22d3ee')}
+        ${miniBar('事務', s.office, '#7c3aed')}
+        ${s.other > 0 ? miniBar('他', s.other, '#94a3b8') : ''}
+      `;
       const groups = [
-        ['総応募者数', candidates.length, '登録済み'],
-        ['面接予定', candidates.filter(c => c.interviewAt).length, '日時設定済み'],
-        ['選考中', candidates.filter(c => !['内定承諾','辞退','不採用'].includes(c.status)).length, '対応対象'],
-        ['内定承諾', candidates.filter(c => c.status === '内定承諾').length, '採用確定'],
-        ['履歴書あり', candidates.filter(c => c.resumeUrl).length, 'URL登録済み'],
-        ['未評価', candidates.filter(c => c.rating === '未評価').length, '評価待ち']
+        { label: '総応募者数', value: s.total, sub: '登録済み', extra: jobBreakdownHtml },
+        { label: '面接予定', value: candidates.filter(c => c.interviewAt).length, sub: '日時設定済み' },
+        { label: '選考中', value: candidates.filter(c => !['内定承諾','辞退','不採用'].includes(c.status)).length, sub: '対応対象' },
+        { label: '内定承諾', value: candidates.filter(c => c.status === '内定承諾').length, sub: '採用確定' },
+        { label: '履歴書あり', value: candidates.filter(c => c.resumeUrl).length, sub: 'URL登録済み' },
+        { label: '未評価', value: candidates.filter(c => c.rating === '未評価').length, sub: '評価待ち' }
       ];
-      target.innerHTML = groups.map(([label, value, sub]) => `<div class="card metric"><div class="label">${escapeHTML(label)}</div><div class="value">${escapeHTML(value)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+      target.innerHTML = groups.map(g => `<div class="card metric"><div class="label">${escapeHTML(g.label)}</div><div class="value">${escapeHTML(g.value)}</div><div class="sub">${escapeHTML(g.sub)}</div>${g.extra ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #edf2f7;">${g.extra}</div>` : ''}</div>`).join('');
     }
 
     function renderBars(targetId, items){
@@ -798,6 +937,103 @@
     }
 
     function renderJobBars(){ renderBars('jobBars', jobs.map(job => ({ label: job, count: candidates.filter(c => c.job === job).length }))); }
+
+    // ===== 雇用形態集計 =====
+    function normalizeEmploymentType(value){
+      const v = String(value || '').trim().normalize('NFKC');
+      if(!v || v === '未確認') return '未確認';
+      if(/正社員|正職員|フルタイム|regular/i.test(v)) return '正社員';
+      if(/アルバイト|バイト|パート|part[\s-]?time/i.test(v)) return 'アルバイト';
+      if(/契約社員|派遣|業務委託/i.test(v)) return v.match(/契約社員|派遣|業務委託/)[0];
+      if(v.includes('社員')) return '正社員';
+      return '未確認';
+    }
+
+    function getEmploymentTypeSummary(list){
+      const src = list || candidates;
+      const buckets = { '正社員': 0, 'アルバイト': 0, '未確認': 0 };
+      const extras = {};
+      src.forEach(c => {
+        const t = normalizeEmploymentType(c.workType);
+        if(buckets[t] !== undefined) buckets[t]++;
+        else extras[t] = (extras[t] || 0) + 1;
+      });
+      return { ...buckets, ...extras, total: src.length };
+    }
+
+    function getEmploymentTypeByJob(list){
+      const src = list || candidates;
+      const result = {};
+      jobs.forEach(j => { result[j] = { '正社員': 0, 'アルバイト': 0, '未確認': 0, total: 0 }; });
+      src.forEach(c => {
+        const j = jobs.includes(c.job) ? c.job : '中型ドライバー';
+        const t = normalizeEmploymentType(c.workType);
+        if(!result[j]) result[j] = { '正社員': 0, 'アルバイト': 0, '未確認': 0, total: 0 };
+        if(result[j][t] !== undefined) result[j][t]++;
+        result[j].total++;
+      });
+      return result;
+    }
+
+    function renderEmploymentBars(){
+      const target = $('employmentBars'); if(!target) return;
+      const s = getEmploymentTypeSummary();
+      const total = s.total;
+      if(total === 0){ target.innerHTML = '<div class="empty">応募者データがありません</div>'; return; }
+      const rows = [
+        ['正社員', s['正社員'], '#2563eb'],
+        ['アルバイト', s['アルバイト'], '#22d3ee'],
+        ['未確認', s['未確認'], '#94a3b8']
+      ];
+      // 積み上げ横棒（構成比）
+      let cumulative = 0;
+      const stackedHtml = `<div style="display:flex;height:22px;border-radius:11px;overflow:hidden;background:#eaf0f7;margin-bottom:14px;">` + rows.map(([label, count, color]) => {
+        const pct = total > 0 ? (count / total * 100) : 0;
+        cumulative += pct;
+        return count > 0 ? `<div title="${label}：${count}名（${pct.toFixed(1)}%）" style="width:${pct}%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:900;">${pct >= 10 ? label : ''}</div>` : '';
+      }).join('') + `</div>`;
+      // 個別バー
+      const barsHtml = rows.map(([label, count, color]) => {
+        const pct = total > 0 ? (count / total * 100) : 0;
+        return `<div style="display:grid;grid-template-columns:100px 1fr 140px;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #edf2f7;">
+          <strong style="color:var(--navy);">${escapeHTML(label)}</strong>
+          <div style="height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden;"><div style="height:100%;width:${Math.max(2, pct)}%;border-radius:999px;background:${color};"></div></div>
+          <span style="text-align:right;font-weight:900;color:var(--navy);">${count}名 <small style="color:var(--muted);font-weight:700;">（${pct.toFixed(1)}%）</small></span>
+        </div>`;
+      }).join('');
+      target.innerHTML = stackedHtml + barsHtml + `<div style="margin-top:8px;text-align:right;color:var(--muted);font-size:12px;">合計 <strong style="color:var(--navy);font-size:14px;">${total}名</strong></div>`;
+    }
+
+    function renderEmploymentByJob(){
+      const target = $('employmentByJob'); if(!target) return;
+      const data = getEmploymentTypeByJob();
+      const hasAny = Object.values(data).some(v => v.total > 0);
+      if(!hasAny){ target.innerHTML = '<div class="empty">応募者データがありません</div>'; return; }
+      const globalMax = Math.max(1, ...Object.values(data).map(v => v.total));
+      target.innerHTML = jobs.map(job => {
+        const d = data[job];
+        if(!d) return '';
+        const regularPct = d.total > 0 ? (d['正社員'] / globalMax * 100) : 0;
+        const partPct = d.total > 0 ? (d['アルバイト'] / globalMax * 100) : 0;
+        const unknownPct = d.total > 0 ? (d['未確認'] / globalMax * 100) : 0;
+        return `<div style="padding:10px 0;border-bottom:1px solid #edf2f7;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <strong style="color:var(--navy);font-size:13px;">${escapeHTML(job)}</strong>
+            <span style="color:var(--muted);font-size:11px;">計 ${d.total}名</span>
+          </div>
+          <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#eaf0f7;">
+            <div style="width:${regularPct}%;background:#2563eb;" title="正社員 ${d['正社員']}名"></div>
+            <div style="width:${partPct}%;background:#22d3ee;" title="アルバイト ${d['アルバイト']}名"></div>
+            <div style="width:${unknownPct}%;background:#94a3b8;" title="未確認 ${d['未確認']}名"></div>
+          </div>
+          <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:4px;">
+            <span><span style="display:inline-block;width:8px;height:8px;background:#2563eb;border-radius:2px;margin-right:3px;"></span>正社員 ${d['正社員']}</span>
+            <span><span style="display:inline-block;width:8px;height:8px;background:#22d3ee;border-radius:2px;margin-right:3px;"></span>アルバイト ${d['アルバイト']}</span>
+            ${d['未確認'] > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;background:#94a3b8;border-radius:2px;margin-right:3px;"></span>未確認 ${d['未確認']}</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
     function renderSourceBars(){ renderBars('sourceBars', sources.map(source => ({ label: source, count: candidates.filter(c => c.source === source).length }))); }
 
     function countAcceptedByJob(){ return candidates.filter(c => c.status === '内定承諾').reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {}); }
@@ -1045,7 +1281,7 @@
     }
 
     function renderAll(){
-      renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard(); renderTable(); renderKanban(); renderPlanTable();
+      renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard(); renderTable(); renderKanban(); renderPlanTable(); renderEmploymentBars(); renderEmploymentByJob();
       refreshReportSourceSelect();
       renderMediaSummary(); renderMediaTable(); renderMediaCompareTable();
       renderMonthlyReport();
@@ -1414,92 +1650,403 @@
       return { listing, successFee, other, total: listing + successFee + other };
     }
 
+    // ===== 月次レポート：意思決定ダッシュボード =====
+    function computeMonthCosts(mediaList, ym){
+      let listing = 0, success = 0, other = 0, ad = 0, fee = 0;
+      mediaList.forEach(m => {
+        const c = getMediaMonthlyCost(m, ym);
+        listing += c.listing; success += c.successFee; other += c.other;
+        const rowTotal = c.listing + c.successFee + c.other;
+        if(m.costType === 'recruitment_fee') fee += rowTotal;
+        else ad += rowTotal;
+      });
+      return { listing, success, other, ad, fee, total: listing + success + other };
+    }
+
+    function prevMonth(ym){
+      const [y, m] = ym.split('-').map(Number);
+      const d = new Date(y, m - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+
+    function momDelta(cur, prev){
+      const diff = cur - prev;
+      const pct = prev > 0 ? Math.round((diff / prev) * 100) : (cur > 0 ? 100 : 0);
+      const dir = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
+      const arrow = diff > 0 ? '↑' : (diff < 0 ? '↓' : '→');
+      return { diff, pct, dir, arrow, prev };
+    }
+
+    function conv(a, b){ return b > 0 ? Math.round((a / b) * 1000) / 10 : null; }
+    function convLabel(c){ return c === null ? '-' : `${c}%`; }
+
+    function isMonthInProgress(ym){
+      const now = new Date();
+      const nowYm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      return ym === nowYm;
+    }
+
     function renderMonthlyReport(){
-      const target = $('reportSummary'); if(!target) return;
       let ym = $('reportMonth') && $('reportMonth').value || '';
       if(!ym){ ym = todayYM(); if($('reportMonth')) $('reportMonth').value = ym; }
       const jobFilter = $('reportJob') && $('reportJob').value || '';
       const sourceFilter = $('reportSource') && $('reportSource').value || '';
       const feeTypeFilter = $('reportFeeType') && $('reportFeeType').value || '';
 
-      // 費用集計
       const mediaInScope = mediaCosts.filter(m => {
         if(jobFilter && m.targetJob && m.targetJob !== jobFilter) return false;
         if(sourceFilter && m.source && m.source !== sourceFilter && m.name !== sourceFilter) return false;
         if(feeTypeFilter && m.feeType !== feeTypeFilter) return false;
         return true;
       });
-      let listingTotal = 0, successTotal = 0, otherTotal = 0;
-      let adCost = 0, feeCost = 0; // 求人広告費 / 人材紹介手数料
-      mediaInScope.forEach(m => {
-        const c = getMediaMonthlyCost(m, ym);
-        listingTotal += c.listing; successTotal += c.successFee; otherTotal += c.other;
-        const rowTotal = c.listing + c.successFee + c.other;
-        if(m.costType === 'recruitment_fee') feeCost += rowTotal;
-        else adCost += rowTotal;
-      });
-      const totalCost = listingTotal + successTotal + otherTotal;
+
+      const cost = computeMonthCosts(mediaInScope, ym);
       const stats = getMonthlyApplicantStats(ym, jobFilter, sourceFilter);
 
-      const groups = [
-        ['月次総採用費', yen(totalCost), ym],
-        ['求人広告費', yen(adCost), 'Indeed等'],
-        ['人材紹介手数料', yen(feeCost), 'PLEX等'],
-        ['月次応募数', stats.applied, ''],
-        ['月次内定承諾数', stats.accepted, ''],
-        ['月次入社決定数', stats.joined, ''],
-        ['広告CPA(応募)', cpa(adCost, stats.applied), '広告費÷応募'],
-        ['広告CPA(承諾)', cpa(adCost, stats.accepted), '広告費÷承諾'],
-        ['総採用CPA(承諾)', cpa(totalCost, stats.accepted), '(広告+紹介)÷承諾'],
-        ['総採用CPA(入社)', cpa(totalCost, stats.joined), '(広告+紹介)÷入社'],
-        ['月次面接数', stats.interview, '']
-      ];
-      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+      // 転換率
+      const c_app_int = conv(stats.interview, stats.applied);
+      const c_int_off = conv(stats.offered, stats.interview);
+      const c_off_acc = conv(stats.accepted, stats.offered);
+      const c_acc_join = conv(stats.joined, stats.accepted);
+      const c_app_join = conv(stats.joined, stats.applied);
 
-      // 媒体別月次表
-      const mTbody = $('reportMediaTable');
-      if(mTbody){
-        if(!mediaInScope.length){ mTbody.innerHTML = '<tr><td colspan="17"><div class="empty">対象データがありません</div></td></tr>'; }
-        else{
-          mTbody.innerHTML = mediaInScope.map(m => {
-            const c = getMediaMonthlyCost(m, ym);
-            const ms = getMonthlyApplicantStats(ym, jobFilter, m.source || m.name);
-            return `<tr><td>${escapeHTML(ym)}</td><td><strong>${escapeHTML(m.name)}</strong></td><td>${escapeHTML(m.feeType)}</td><td>${escapeHTML(m.targetJob || '-')}</td><td>${yen(c.listing)}</td><td>${yen(c.successFee)}</td><td>${yen(c.other)}</td><td><strong>${yen(c.total)}</strong></td><td>${ms.applied}</td><td>${ms.interview}</td><td>${ms.offered}</td><td>${ms.accepted}</td><td>${ms.joined}</td><td>${cpa(c.total, ms.applied)}</td><td>${cpa(c.total, ms.interview)}</td><td>${cpa(c.total, ms.accepted)}</td><td>${cpa(c.total, ms.joined)}</td></tr>`;
+      // 前月
+      const pym = prevMonth(ym);
+      const prevStats = getMonthlyApplicantStats(pym, jobFilter, sourceFilter);
+      const prevCost = computeMonthCosts(mediaInScope, pym);
+
+      const asOf = isMonthInProgress(ym) ? `${new Date().toLocaleDateString('ja-JP')}時点（月途中）` : `${ym} 確定`;
+
+      // 01 ヘッドライン
+      const headline = $('reportHeadline');
+      if(headline){
+        // 評価文自動生成
+        const evalParts = [];
+        if(stats.applied === 0){
+          evalParts.push('今月はまだ応募が計上されていません。対象月の応募日が正しく登録されているか確認してください。');
+        }else{
+          evalParts.push(`応募は${stats.applied}名確保できています。`);
+          if(c_app_int !== null){
+            if(c_app_int < 20) evalParts.push(`ただし面接移行率は${c_app_int}%と低く、応募→面接の詰まりが課題です。`);
+            else if(c_app_int < 40) evalParts.push(`面接移行率は${c_app_int}%です。改善余地があります。`);
+            else evalParts.push(`面接移行率は${c_app_int}%で健全です。`);
+          }
+          if(stats.joined === 0 && stats.accepted === 0){
+            evalParts.push(`まだ内定・入社に至っておらず、選考後半の改善が必要です。`);
+          }else if(stats.joined > 0){
+            evalParts.push(`入社${stats.joined}名確定済み。`);
+          }
+        }
+        headline.innerHTML = `<div class="headline-card">
+          <h4>今月の採用サマリー（${escapeHTML(ym)}｜${escapeHTML(asOf)}）</h4>
+          <div class="headline-metrics">
+            <div class="headline-metric"><span class="hm-label">応募</span><span class="hm-value">${stats.applied}</span></div>
+            <div class="headline-metric"><span class="hm-label">面接</span><span class="hm-value">${stats.interview}</span><span class="hm-conv">応募→面接 ${convLabel(c_app_int)}</span></div>
+            <div class="headline-metric"><span class="hm-label">内定</span><span class="hm-value">${stats.offered}</span><span class="hm-conv">面接→内定 ${convLabel(c_int_off)}</span></div>
+            <div class="headline-metric"><span class="hm-label">承諾</span><span class="hm-value">${stats.accepted}</span></div>
+            <div class="headline-metric"><span class="hm-label">入社</span><span class="hm-value">${stats.joined}</span><span class="hm-conv">応募→入社 ${convLabel(c_app_join)}</span></div>
+          </div>
+          <div class="headline-eval">${escapeHTML(evalParts.join(''))}</div>
+        </div>`;
+      }
+
+      // 02 今月の重要ポイント3つ
+      const keypoints = [];
+      keypoints.push({ label: '応募の状況', text: stats.applied === 0 ? '応募未計上（応募日が登録されていない可能性）' : `応募${stats.applied}名を確保。前月${prevStats.applied}名 → ${momDelta(stats.applied, prevStats.applied).arrow}${Math.abs(stats.applied - prevStats.applied)}名` });
+      // ボトルネック検出
+      const stages = [
+        { name: '応募→面接', rate: c_app_int },
+        { name: '面接→内定', rate: c_int_off },
+        { name: '内定→承諾', rate: c_off_acc },
+        { name: '承諾→入社', rate: c_acc_join }
+      ].filter(s => s.rate !== null);
+      const bottleneck = stages.length ? stages.reduce((min, s) => s.rate < min.rate ? s : min, stages[0]) : null;
+      keypoints.push({ label: 'ボトルネック', text: bottleneck ? `${bottleneck.name}が最も低く ${bottleneck.rate}%。ここが最優先の改善ポイント。` : '選考データが不足しており判定できません。' });
+      keypoints.push({ label: '費用', text: cost.total === 0 ? '費用未登録（請求書を取り込むか手動登録してください）' : `総採用費 ${yen(cost.total)}（広告${yen(cost.ad)} + 紹介${yen(cost.fee)}）` });
+      const kpEl = $('reportKeyPoints');
+      if(kpEl){
+        kpEl.innerHTML = `<div class="keypoint-list">${keypoints.map((k, i) => `<div class="keypoint-card"><span class="keypoint-num">0${i+1}</span><strong>${escapeHTML(k.label)}</strong><p>${escapeHTML(k.text)}</p></div>`).join('')}</div>`;
+      }
+
+      // 03 KPIサマリー（前月比 + 評価）
+      const kpiEl = $('reportKPI');
+      if(kpiEl){
+        const kpiRows = [
+          { label: '応募数', cur: stats.applied, prev: prevStats.applied, kind: 'count', good: v => v >= 20 },
+          { label: '面接数', cur: stats.interview, prev: prevStats.interview, kind: 'count', good: v => v >= 5 },
+          { label: '内定数', cur: stats.offered, prev: prevStats.offered, kind: 'count' },
+          { label: '入社数', cur: stats.joined, prev: prevStats.joined, kind: 'count' },
+          { label: '総採用費', cur: cost.total, prev: prevCost.total, kind: 'yen', inverseGood: true },
+          { label: '総採用CPA(入社)', cur: (stats.joined > 0 ? Math.round(cost.total / stats.joined) : null), prev: (prevStats.joined > 0 ? Math.round(prevCost.total / prevStats.joined) : null), kind: 'yen', inverseGood: true }
+        ];
+        kpiEl.innerHTML = kpiRows.map(r => {
+          const val = r.kind === 'yen' ? (r.cur == null ? '-' : yen(r.cur)) : String(r.cur);
+          const mom = (r.prev != null && r.cur != null) ? momDelta(r.cur, r.prev) : null;
+          const momHtml = mom ? `<div class="kpi-mom ${mom.dir === 'flat' ? 'flat' : (r.inverseGood ? (mom.dir === 'up' ? 'down' : 'up') : mom.dir)}">${mom.arrow} 前月比 ${mom.diff > 0 ? '+' : ''}${r.kind === 'yen' ? yen(mom.diff) : mom.diff}（${mom.pct > 0 ? '+' : ''}${mom.pct}%）</div>` : `<div class="kpi-mom flat">前月データなし</div>`;
+          let status = 'status-idle', statusText = 'データ不足';
+          if(r.cur != null){
+            if(r.good && r.good(r.cur)){ status = 'status-good'; statusText = '良好'; }
+            else if(mom && ((r.inverseGood && mom.dir === 'down') || (!r.inverseGood && mom.dir === 'up'))){ status = 'status-good'; statusText = '改善傾向'; }
+            else if(mom && ((r.inverseGood && mom.dir === 'up') || (!r.inverseGood && mom.dir === 'down'))){ status = 'status-warn'; statusText = '要注意'; }
+            else if(r.cur === 0 && r.kind !== 'yen'){ status = 'status-bad'; statusText = '未達'; }
+          }
+          return `<div class="card metric kpi-cell"><div class="label">${escapeHTML(r.label)}</div><div class="value">${escapeHTML(val)}</div>${momHtml}<span class="kpi-status ${status}">${escapeHTML(statusText)}</span></div>`;
+        }).join('');
+      }
+
+      // 04 採用ファネル
+      const funnelEl = $('reportFunnel');
+      if(funnelEl){
+        const steps = [
+          { label: '応募', val: stats.applied },
+          { conv: c_app_int },
+          { label: '面接', val: stats.interview },
+          { conv: c_int_off },
+          { label: '内定', val: stats.offered },
+          { conv: c_off_acc },
+          { label: '承諾', val: stats.accepted },
+          { conv: c_acc_join },
+          { label: '入社', val: stats.joined }
+        ];
+        funnelEl.innerHTML = `<div class="funnel-row">${steps.map(s => {
+          if(s.conv !== undefined){
+            const cls = s.conv === null ? '' : (s.conv < 20 ? 'bad' : (s.conv < 40 ? 'warn' : ''));
+            return `<div class="funnel-conv ${cls}"><span>↓</span><span class="fc-rate">${convLabel(s.conv)}</span></div>`;
+          }
+          return `<div class="funnel-step"><div class="fs-label">${escapeHTML(s.label)}</div><div class="fs-value">${s.val}</div><div class="fs-unit">名</div></div>`;
+        }).join('')}</div>`;
+      }
+
+      // 05 ボトルネック
+      const bnEl = $('reportBottleneck');
+      if(bnEl){
+        if(bottleneck){
+          const level = bottleneck.rate < 20 ? '緊急' : (bottleneck.rate < 40 ? '要改善' : '軽微');
+          const color = bottleneck.rate < 20 ? 'error' : (bottleneck.rate < 40 ? '' : 'success');
+          bnEl.innerHTML = `<div class="notice ${color}"><strong>🎯 今月のボトルネック：${escapeHTML(bottleneck.name)}（${bottleneck.rate}%）</strong><br>優先度：<strong>${level}</strong>。この工程の転換率改善が来月の最重要テーマです。</div>`;
+        }else{
+          bnEl.innerHTML = `<div class="notice">選考データが不足しておりボトルネック判定できません。応募日・面接日時・ステータスを継続的に更新してください。</div>`;
+        }
+      }
+
+      // 06 次月アクション
+      const actEl = $('reportActions');
+      if(actEl){
+        const actions = [];
+        if(stats.applied < 20){
+          actions.push({ pri: 'mid', title: '母集団形成を強化', body: `応募${stats.applied}名。Indeed原稿・予算・求人条件（給与レンジ／勤務時間）を見直してください。` });
+        }
+        if(c_app_int !== null && c_app_int < 20){
+          actions.push({ pri: 'high', title: '応募→面接率を改善（現在 ' + c_app_int + '%）', body: '応募後24時間以内の初回連絡率を確認。未連絡応募者を抽出し、電話フォローを追加。面接日程確定までの日数を短縮。' });
+        }
+        if(c_int_off !== null && c_int_off < 30 && stats.interview >= 3){
+          actions.push({ pri: 'high', title: '面接→内定率を改善（現在 ' + c_int_off + '%）', body: '面接評価基準を見直し。応募者体験（面接時間・面接官の姿勢）を再点検。' });
+        }
+        if(c_off_acc !== null && c_off_acc < 60 && stats.offered >= 2){
+          actions.push({ pri: 'mid', title: '内定→承諾率を改善（現在 ' + c_off_acc + '%）', body: '内定通知後の連絡頻度・条件提示・入社日調整を早めに。' });
+        }
+        if(cost.total === 0){
+          actions.push({ pri: 'low', title: '費用データ未登録', body: '請求書PDFまたはCSVを取り込んでください（設定 → 採用費用データ）。CPA計算が可能になります。' });
+        }
+        if(actions.length === 0){
+          actions.push({ pri: 'low', title: '今月は特筆すべき改善ポイントなし', body: '現状の運用を継続してください。' });
+        }
+        actEl.innerHTML = actions.map(a => `<div class="action-item pri-${a.pri}"><span class="a-pri">${a.pri === 'high' ? '優先度：高' : (a.pri === 'mid' ? '優先度：中' : '優先度：低')}</span><strong>${escapeHTML(a.title)}</strong><p>${escapeHTML(a.body)}</p></div>`).join('');
+      }
+
+      // 07 職種別成果
+      const jobEl = $('reportByJob');
+      if(jobEl){
+        const cats = [...jobs, 'その他'];
+        const cards = cats.map(job => {
+          const filter = job === 'その他' ? null : job;
+          const s = getMonthlyApplicantStats(ym, filter, sourceFilter);
+          // 「その他」は全体から既存カテゴリ分を除いた残り
+          if(job === 'その他'){
+            const totalAll = getMonthlyApplicantStats(ym, '', sourceFilter);
+            const kn = { applied:0, interview:0, offered:0, accepted:0, joined:0 };
+            jobs.forEach(j => { const t = getMonthlyApplicantStats(ym, j, sourceFilter); Object.keys(kn).forEach(k => kn[k] += t[k]); });
+            s.applied = totalAll.applied - kn.applied;
+            s.interview = totalAll.interview - kn.interview;
+            s.offered = totalAll.offered - kn.offered;
+            s.accepted = totalAll.accepted - kn.accepted;
+            s.joined = totalAll.joined - kn.joined;
+          }
+          if(s.applied === 0 && s.interview === 0 && s.offered === 0) return '';
+          const r = conv(s.interview, s.applied);
+          return `<div class="mini-report-card">
+            <h5>${escapeHTML(job)}<span class="mrc-total">面接率 ${convLabel(r)}</span></h5>
+            <div class="mrc-row"><span>応募</span><div class="mrc-bar"><span style="width:100%"></span></div><strong>${s.applied}</strong></div>
+            <div class="mrc-row"><span>面接</span><div class="mrc-bar"><span style="width:${s.applied>0?s.interview/s.applied*100:0}%"></span></div><strong>${s.interview}</strong></div>
+            <div class="mrc-row"><span>内定</span><div class="mrc-bar"><span style="width:${s.applied>0?s.offered/s.applied*100:0}%"></span></div><strong>${s.offered}</strong></div>
+            <div class="mrc-row"><span>承諾</span><div class="mrc-bar"><span style="width:${s.applied>0?s.accepted/s.applied*100:0}%"></span></div><strong>${s.accepted}</strong></div>
+            <div class="mrc-row"><span>入社</span><div class="mrc-bar"><span style="width:${s.applied>0?s.joined/s.applied*100:0}%"></span></div><strong>${s.joined}</strong></div>
+          </div>`;
+        }).filter(Boolean).join('');
+        jobEl.innerHTML = cards || '<div class="empty">対象月のデータがありません</div>';
+      }
+
+      // 08 雇用形態別成果
+      const empEl = $('reportByEmp');
+      if(empEl){
+        const monthCands = candidates.filter(c => getCandidateAppliedYM(c) === ym && (!jobFilter || c.job === jobFilter) && (!sourceFilter || c.source === sourceFilter));
+        const empGroups = { '正社員': [], 'アルバイト': [], '未確認': [] };
+        monthCands.forEach(c => {
+          const t = normalizeEmploymentType(c.workType);
+          if(empGroups[t]) empGroups[t].push(c);
+        });
+        empEl.innerHTML = Object.entries(empGroups).map(([label, list]) => {
+          if(list.length === 0) return '';
+          const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+          const s = {
+            applied: list.length,
+            interview: list.filter(c => isInterview(c.status)).length,
+            offered: list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length,
+            accepted: list.filter(c => ['内定承諾','入社決定'].includes(c.status)).length,
+            joined: list.filter(c => c.status === '入社決定').length
+          };
+          const r = conv(s.interview, s.applied);
+          return `<div class="mini-report-card">
+            <h5>${escapeHTML(label)}<span class="mrc-total">面接率 ${convLabel(r)}</span></h5>
+            <div class="mrc-row"><span>応募</span><div class="mrc-bar"><span style="width:100%"></span></div><strong>${s.applied}</strong></div>
+            <div class="mrc-row"><span>面接</span><div class="mrc-bar"><span style="width:${s.interview/s.applied*100}%"></span></div><strong>${s.interview}</strong></div>
+            <div class="mrc-row"><span>内定</span><div class="mrc-bar"><span style="width:${s.offered/s.applied*100}%"></span></div><strong>${s.offered}</strong></div>
+            <div class="mrc-row"><span>承諾</span><div class="mrc-bar"><span style="width:${s.accepted/s.applied*100}%"></span></div><strong>${s.accepted}</strong></div>
+            <div class="mrc-row"><span>入社</span><div class="mrc-bar"><span style="width:${s.joined/s.applied*100}%"></span></div><strong>${s.joined}</strong></div>
+          </div>`;
+        }).filter(Boolean).join('') || '<div class="empty">対象月のデータがありません</div>';
+      }
+
+      // 09 媒体別成果（重複排除：source基準で1カード）
+      const mediaEl = $('reportByMedia');
+      if(mediaEl){
+        // 対象月の媒体を source 単位で集約
+        const bySrc = new Map();
+        mediaInScope.forEach(m => {
+          const src = m.source || m.name || 'その他';
+          const c = getMediaMonthlyCost(m, ym);
+          const cur = bySrc.get(src) || { source: src, media: m.media || m.name, listing: 0, success: 0, other: 0, feeTypes: new Set() };
+          cur.listing += c.listing; cur.success += c.successFee; cur.other += c.other;
+          cur.feeTypes.add(m.costType === 'recruitment_fee' ? '紹介' : '広告');
+          bySrc.set(src, cur);
+        });
+        // 応募者側も source 単位で集約（媒体費行数に依存しない）
+        const sources = Array.from(bySrc.keys());
+        if(sources.length === 0){
+          mediaEl.innerHTML = '<div class="empty">対象月に費用計上された媒体がありません</div>';
+        }else{
+          mediaEl.innerHTML = sources.map(src => {
+            const m = bySrc.get(src);
+            const totalCost = m.listing + m.success + m.other;
+            const s = getMonthlyApplicantStats(ym, jobFilter, src);
+            const r = conv(s.interview, s.applied);
+            return `<div class="mini-report-card">
+              <h5>${escapeHTML(m.media || src)}<span class="mrc-total">${Array.from(m.feeTypes).join('/')} ／ 面接率 ${convLabel(r)}</span></h5>
+              <div class="mrc-row"><span>応募</span><div class="mrc-bar"><span style="width:100%"></span></div><strong>${s.applied}</strong></div>
+              <div class="mrc-row"><span>面接</span><div class="mrc-bar"><span style="width:${s.applied>0?s.interview/s.applied*100:0}%"></span></div><strong>${s.interview}</strong></div>
+              <div class="mrc-row"><span>入社</span><div class="mrc-bar"><span style="width:${s.applied>0?s.joined/s.applied*100:0}%"></span></div><strong>${s.joined}</strong></div>
+              <div style="margin-top:10px;padding-top:8px;border-top:1px solid #edf2f7;font-size:11px;color:var(--muted);">費用 <strong style="color:var(--navy);">${totalCost > 0 ? yen(totalCost) : '未登録'}</strong> ／ 応募CPA <strong style="color:var(--navy);">${totalCost > 0 && s.applied > 0 ? yen(Math.round(totalCost/s.applied)) : '-'}</strong> ／ 入社CPA <strong style="color:var(--navy);">${totalCost > 0 && s.joined > 0 ? yen(Math.round(totalCost/s.joined)) : '-'}</strong></div>
+            </div>`;
           }).join('');
         }
       }
 
-      // 月別推移（過去6か月）
-      const trendTbody = $('reportTrendTable');
+      // 10 採用コスト内訳
+      const costEl = $('reportCosts');
+      if(costEl){
+        const costLabel = v => v === 0 ? '未登録' : yen(v);
+        const costSub = (v, base) => (base > 0 && v === 0) ? '' : (base > 0 ? `${Math.round(v/base*100)}% of 総費用` : '');
+        costEl.innerHTML = `<div class="cost-block">
+          <div class="cost-item"><div class="c-label">総採用費</div><div class="c-value">${cost.total === 0 ? '未登録' : yen(cost.total)}</div><div class="c-sub">${ym}</div></div>
+          <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value">${costLabel(cost.ad)}</div><div class="c-sub">${escapeHTML(costSub(cost.ad, cost.total))}</div></div>
+          <div class="cost-item"><div class="c-label">人材紹介手数料</div><div class="c-value">${costLabel(cost.fee)}</div><div class="c-sub">${escapeHTML(costSub(cost.fee, cost.total))}</div></div>
+          <div class="cost-item"><div class="c-label">広告CPA(応募)</div><div class="c-value">${cost.ad > 0 && stats.applied > 0 ? yen(Math.round(cost.ad/stats.applied)) : '-'}</div><div class="c-sub">広告費÷応募</div></div>
+          <div class="cost-item"><div class="c-label">広告CPA(承諾)</div><div class="c-value">${cost.ad > 0 && stats.accepted > 0 ? yen(Math.round(cost.ad/stats.accepted)) : '-'}</div><div class="c-sub">広告費÷承諾</div></div>
+          <div class="cost-item"><div class="c-label">総採用CPA(入社)</div><div class="c-value">${cost.total > 0 && stats.joined > 0 ? yen(Math.round(cost.total/stats.joined)) : '-'}</div><div class="c-sub">総費用÷入社</div></div>
+        </div>`;
+      }
+
+      // 11 採用計画 vs 実績
+      const planEl = $('reportVsPlan');
+      if(planEl){
+        if(!plans.length){
+          planEl.innerHTML = '<div class="empty">採用計画が未登録です</div>';
+        }else{
+          const accepted = candidates.filter(c => c.status === '内定承諾' || c.status === '入社決定').reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {});
+          planEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+            ${plans.map(p => {
+              const cur = accepted[p.job] || 0;
+              const pct = p.total > 0 ? Math.round(cur/p.total*100) : 0;
+              const shortage = Math.max(0, p.total - cur);
+              const status = pct >= 100 ? 'status-good' : (pct >= 50 ? 'status-warn' : 'status-bad');
+              return `<div class="mini-report-card">
+                <h5>${escapeHTML(p.job)}<span class="kpi-status ${status}">${pct}% 達成</span></h5>
+                <div style="font-size:13px;color:var(--muted);margin:6px 0;">目標 <strong style="color:var(--navy);font-size:16px;">${p.total}名</strong> ／ 実績 <strong style="color:var(--navy);font-size:16px;">${cur}名</strong></div>
+                ${shortage > 0 ? `<div style="font-size:12px;color:#b91c1c;font-weight:900;">不足：${shortage}名 → ${shortage <= 2 ? '面接率改善優先' : '応募母数拡大が必要'}</div>` : `<div style="font-size:12px;color:#15803d;font-weight:900;">目標達成</div>`}
+              </div>`;
+            }).join('')}
+          </div>`;
+        }
+      }
+
+      // 12 過去6か月推移
       const trendData = [];
       const [yy, mm] = ym.split('-').map(Number);
       for(let i = 5; i >= 0; i--){
         const d = new Date(yy, mm - 1 - i, 1);
         const tym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        let l=0, sf=0, o=0;
-        mediaInScope.forEach(m => { const c = getMediaMonthlyCost(m, tym); l+=c.listing; sf+=c.successFee; o+=c.other; });
-        const tot = l + sf + o;
-        const st = getMonthlyApplicantStats(tym, jobFilter, sourceFilter);
-        trendData.push({ ym: tym, total: tot, ...st });
+        const tc = computeMonthCosts(mediaInScope, tym);
+        const ts = getMonthlyApplicantStats(tym, jobFilter, sourceFilter);
+        trendData.push({ ym: tym, ...tc, applied: ts.applied, interview: ts.interview, offered: ts.offered, accepted: ts.accepted, joined: ts.joined });
       }
-      if(trendTbody){
-        trendTbody.innerHTML = trendData.map(r => `<tr><td><strong>${r.ym}</strong></td><td>${yen(r.total)}</td><td>${r.applied}</td><td>${r.interview}</td><td>${r.offered}</td><td>${r.accepted}</td><td>${r.joined}</td><td>${cpa(r.total, r.applied)}</td><td>${cpa(r.total, r.accepted)}</td><td>${cpa(r.total, r.joined)}</td></tr>`).join('');
+      const trendEl = $('reportTrend');
+      if(trendEl){
+        const barChart = (label, key, color) => {
+          const max = Math.max(1, ...trendData.map(r => r[key]));
+          const bars = trendData.map(r => {
+            const v = r[key]; const h = Math.max(2, v/max*100);
+            const disp = key === 'total' || key === 'ad' || key === 'fee' ? (v > 0 ? yen(v) : '-') : v;
+            return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;"><div style="height:80px;display:flex;align-items:flex-end;width:100%;justify-content:center;"><div style="width:60%;height:${h}%;background:${color};border-radius:6px 6px 0 0;"></div></div><div style="font-size:10px;color:var(--muted);">${r.ym.slice(5)}</div><div style="font-size:11px;font-weight:900;color:var(--navy);">${disp}</div></div>`;
+          }).join('');
+          return `<div class="mini-report-card"><h5>${escapeHTML(label)}</h5><div style="display:flex;gap:6px;align-items:flex-end;">${bars}</div></div>`;
+        };
+        trendEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">
+          ${barChart('応募数', 'applied', 'linear-gradient(180deg,#60a5fa,#22d3ee)')}
+          ${barChart('面接数', 'interview', 'linear-gradient(180deg,#7c3aed,#a78bfa)')}
+          ${barChart('内定承諾数', 'accepted', 'linear-gradient(180deg,#16a34a,#4ade80)')}
+          ${barChart('入社決定数', 'joined', 'linear-gradient(180deg,#15803d,#22c55e)')}
+          ${barChart('総採用費', 'total', 'linear-gradient(180deg,#ea580c,#fb923c)')}
+          ${barChart('広告費', 'ad', 'linear-gradient(180deg,#2563eb,#60a5fa)')}
+          ${barChart('紹介手数料', 'fee', 'linear-gradient(180deg,#7c3aed,#c084fc)')}
+        </div>`;
       }
 
-      // 簡易グラフ
-      const chartEl = $('reportChart');
-      if(chartEl){
-        const series = [
-          { label: '総費用', data: trendData.map(r => r.total) },
-          { label: '応募数', data: trendData.map(r => r.applied) },
-          { label: '内定承諾数', data: trendData.map(r => r.accepted) },
-          { label: '入社決定数', data: trendData.map(r => r.joined) }
-        ];
-        chartEl.innerHTML = series.map(s => {
-          const max = Math.max(1, ...s.data);
-          const bars = s.data.map((v, i) => `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;"><div style="height:80px;display:flex;align-items:flex-end;width:100%;justify-content:center;"><div style="width:60%;height:${Math.max(2, v/max*100)}%;background:linear-gradient(180deg,#60a5fa,#22d3ee);border-radius:6px 6px 0 0;"></div></div><div style="font-size:10px;color:var(--muted);">${trendData[i].ym.slice(5)}</div><div style="font-size:11px;font-weight:900;color:var(--navy);">${typeof v === 'number' && v > 1000 ? yen(v) : v}</div></div>`).join('');
-          return `<div class="card" style="padding:14px;"><h4 style="margin:0 0 10px;color:var(--navy);">${escapeHTML(s.label)}</h4><div style="display:flex;gap:6px;align-items:flex-end;">${bars}</div></div>`;
-        }).join('');
+      // 13 詳細データ：集約済み媒体別月次表
+      const mTbody = $('reportMediaTable');
+      if(mTbody){
+        // (yearMonth, media, targetJob, costType) で集約
+        const agg = new Map();
+        mediaInScope.forEach(m => {
+          const key = `${ym}|${m.media || m.name}|${m.targetJob || '-'}|${m.costType || 'media'}`;
+          const c = getMediaMonthlyCost(m, ym);
+          const cur = agg.get(key) || { ym, media: m.media || m.name, feeTypeLabel: m.costType === 'recruitment_fee' ? '成功報酬' : '掲載課金', targetJob: m.targetJob || '-', listing: 0, success: 0, other: 0 };
+          cur.listing += c.listing; cur.success += c.successFee; cur.other += c.other;
+          agg.set(key, cur);
+        });
+        const rows = Array.from(agg.values()).filter(r => (r.listing + r.success + r.other) > 0);
+        if(!rows.length){ mTbody.innerHTML = '<tr><td colspan="8"><div class="empty">対象月の費用データがありません</div></td></tr>'; }
+        else{
+          mTbody.innerHTML = rows.map(r => {
+            const tot = r.listing + r.success + r.other;
+            return `<tr><td>${escapeHTML(r.ym)}</td><td><strong>${escapeHTML(r.media)}</strong></td><td>${escapeHTML(r.feeTypeLabel)}</td><td>${escapeHTML(r.targetJob)}</td><td>${yen(r.listing)}</td><td>${yen(r.success)}</td><td>${yen(r.other)}</td><td><strong>${yen(tot)}</strong></td></tr>`;
+          }).join('');
+        }
+      }
+
+      // 詳細：月別推移表
+      const trendTbody = $('reportTrendTable');
+      if(trendTbody){
+        trendTbody.innerHTML = trendData.map(r => `<tr><td><strong>${r.ym}</strong></td><td>${r.total === 0 ? '-' : yen(r.total)}</td><td>${r.ad === 0 ? '-' : yen(r.ad)}</td><td>${r.fee === 0 ? '-' : yen(r.fee)}</td><td>${r.applied}</td><td>${r.interview}</td><td>${r.offered}</td><td>${r.accepted}</td><td>${r.joined}</td><td>${r.total > 0 && r.applied > 0 ? yen(Math.round(r.total/r.applied)) : '-'}</td><td>${r.total > 0 && r.joined > 0 ? yen(Math.round(r.total/r.joined)) : '-'}</td></tr>`).join('');
       }
     }
 
