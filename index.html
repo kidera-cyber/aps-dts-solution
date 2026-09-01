@@ -176,14 +176,28 @@
 
       <section id="list" class="panel">
         <div class="card">
-          <div class="card-head"><div><h3>応募者一覧</h3><p class="hint">検索・絞り込み・詳細確認・編集ができます</p></div><button type="button" class="btn btn-primary" id="btnListForm">＋ 手動登録</button></div>
-          <div class="filters" style="margin-bottom:16px;">
+          <div class="card-head">
+            <div><h3>応募者一覧</h3><p class="hint">検索・絞り込み・詳細確認・編集ができます</p></div>
+            <button type="button" class="btn btn-primary" id="btnListForm">＋ 手動登録</button>
+          </div>
+          <div id="empStatusBanner" style="margin-bottom:12px;"></div>
+          <div class="filters" style="margin-bottom:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
             <label class="field">応募者名検索<input id="searchName" placeholder="例）山田" /></label>
             <label class="field">職種<select id="filterJob"></select></label>
+            <label class="field">雇用形態<select id="filterEmployment"></select></label>
             <label class="field">ステータス<select id="filterStatus"></select></label>
             <label class="field">応募経路<select id="filterSource"></select></label>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>応募者</th><th>職種</th><th>経路</th><th>ステータス</th><th>面接日時</th><th>担当</th><th>履歴書</th><th>操作</th></tr></thead><tbody id="candidateTable"></tbody></table></div>
+          <div class="action-row" style="margin-bottom:10px;font-size:12px;color:var(--muted);">
+            <span id="bulkEmpControls" style="display:none;">
+              <span id="bulkEmpCount">0</span>件選択中｜一括で雇用形態を
+              <select id="bulkEmpSelect" style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);"><option value="">選択…</option><option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="事務">事務</option></select>
+              に設定
+              <button type="button" class="btn btn-small btn-primary" id="btnBulkEmpApply">一括更新</button>
+              <button type="button" class="btn btn-small btn-ghost" id="btnBulkEmpClear">選択解除</button>
+            </span>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th style="width:32px;"><input type="checkbox" id="chkSelectAllRows" title="全選択" /></th><th>応募者</th><th>職種</th><th>雇用形態</th><th>経路</th><th>ステータス</th><th>面接日時</th><th>担当</th><th>履歴書</th><th>操作</th></tr></thead><tbody id="candidateTable"></tbody></table></div>
         </div>
       </section>
 
@@ -839,6 +853,11 @@
       fillSelect('filterJob', jobs, true);
       fillSelect('filterStatus', statuses, true);
       fillSelect('filterSource', sources, true);
+      // 雇用形態フィルタ（件数付きは refreshEmploymentFilter で更新）
+      const empSel = $('filterEmployment');
+      if(empSel && !empSel.options.length){
+        empSel.innerHTML = '<option value="">すべて</option><option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="事務">事務</option><option value="未設定">未設定</option>';
+      }
       fillSelect('mediaFeeType', feeTypes);
       fillSelect('mediaSuccessFeeType', successFeeTypes);
       fillSelect('mediaFeeTriggerStatus', feeTriggerStatuses);
@@ -937,6 +956,18 @@
     }
 
     function renderJobBars(){ renderBars('jobBars', jobs.map(job => ({ label: job, count: candidates.filter(c => c.job === job).length }))); }
+
+    // ===== 応募者一覧向け 4分類（正社員/アルバイト/事務/未設定） =====
+    // 職種=事務系の場合は事務カテゴリを優先（今回の運用要件）
+    function normalizeEmploymentCategory(candidate){
+      const raw = String(candidate && (candidate.workType != null ? candidate.workType : candidate.employmentType) || '').normalize('NFKC').trim();
+      const job = String(candidate && candidate.job || '').normalize('NFKC').trim();
+      if(/正社員|正職員|フルタイム/.test(raw)) return '正社員';
+      if(/アルバイト|バイト|パート/.test(raw)) return 'アルバイト';
+      if(/事務|受付|バックオフィス|経理|総務|人事/.test(raw) || /事務/.test(job)) return '事務';
+      // 「未確認」「不明」「-」「空」などはすべて未設定扱い
+      return '未設定';
+    }
 
     // ===== 雇用形態集計 =====
     function normalizeEmploymentType(value){
@@ -1082,29 +1113,131 @@
       const job = $('filterJob') ? $('filterJob').value : '';
       const status = $('filterStatus') ? $('filterStatus').value : '';
       const source = $('filterSource') ? $('filterSource').value : '';
+      const emp = $('filterEmployment') ? $('filterEmployment').value : '';
       const filtered = candidates.filter(c =>
         (!name || String(c.name || '').toLowerCase().includes(name)) &&
         (!job || c.job === job) &&
         (!status || c.status === status) &&
-        (!source || c.source === source)
+        (!source || c.source === source) &&
+        (!emp || normalizeEmploymentCategory(c) === emp)
       );
       return sortByAppliedDesc(filtered);
     }
 
+    function empBadgeClass(cat){
+      if(cat === '正社員') return 'badge-blue';
+      if(cat === 'アルバイト') return 'badge-green';
+      if(cat === '事務') return 'badge-purple';
+      return 'badge-gray';
+    }
+
+    function renderEmpStatusBanner(){
+      const el = $('empStatusBanner'); if(!el) return;
+      const total = candidates.length;
+      const unset = candidates.filter(c => normalizeEmploymentCategory(c) === '未設定').length;
+      const setCount = total - unset;
+      const rate = total > 0 ? Math.round(setCount / total * 1000) / 10 : 0;
+      if(total === 0){ el.innerHTML = ''; return; }
+      if(unset === 0){
+        el.innerHTML = `<div class="notice success">✅ 雇用形態の未設定はありません（設定済み ${setCount}名 / ${total}名）</div>`;
+      }else{
+        el.innerHTML = `<div class="notice">📌 雇用形態設定状況：設定済み <strong>${setCount}名</strong> ／ <strong style="color:#b91c1c;">未設定 ${unset}名</strong>（設定率 ${rate}%）　<button type="button" class="btn btn-small btn-soft" id="btnShowUnsetOnly" style="margin-left:8px;">未設定だけ表示</button></div>`;
+      }
+    }
+
+    function refreshEmploymentFilterCounts(){
+      const sel = $('filterEmployment'); if(!sel) return;
+      const counts = { '正社員':0, 'アルバイト':0, '事務':0, '未設定':0 };
+      candidates.forEach(c => { const t = normalizeEmploymentCategory(c); if(counts[t] !== undefined) counts[t]++; });
+      const current = sel.value;
+      sel.innerHTML = `<option value="">すべて（${candidates.length}）</option>
+        <option value="正社員">正社員（${counts['正社員']}）</option>
+        <option value="アルバイト">アルバイト（${counts['アルバイト']}）</option>
+        <option value="事務">事務（${counts['事務']}）</option>
+        <option value="未設定">未設定（${counts['未設定']}）</option>`;
+      if(current) sel.value = current;
+    }
+
     function renderTable(){
       const tbody = $('candidateTable'); if(!tbody) return;
+      renderEmpStatusBanner();
+      refreshEmploymentFilterCounts();
       const list = getFilteredCandidates();
-      if(!list.length){ tbody.innerHTML = '<tr><td colspan="8"><div class="empty">該当する応募者がいません</div></td></tr>'; return; }
-      tbody.innerHTML = list.map(c => `<tr>
+      if(!list.length){ tbody.innerHTML = '<tr><td colspan="10"><div class="empty">該当する応募者がいません</div></td></tr>'; updateBulkEmpBar(); return; }
+      tbody.innerHTML = list.map(c => {
+        const cat = normalizeEmploymentCategory(c);
+        const badgeCls = empBadgeClass(cat);
+        const empSelectHtml = `<select class="row-emp-select" data-id="${c.id}" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);font-size:11px;font-weight:900;background:transparent;">
+          <option value="__cur">${escapeHTML(cat)}</option>
+          <option disabled>──変更──</option>
+          <option value="正社員">正社員</option>
+          <option value="アルバイト">アルバイト</option>
+          <option value="事務">事務</option>
+          <option value="__clear">未設定に戻す</option>
+        </select>`;
+        return `<tr>
+        <td><input type="checkbox" class="row-check" data-id="${c.id}" /></td>
         <td><div class="person"><div class="avatar">${escapeHTML((c.name || '?').slice(0,1))}</div><div><strong>${escapeHTML(c.name)}</strong><small>${escapeHTML(c.phone || '-')}<br>${escapeHTML(c.email || '-')}</small></div></div></td>
         <td>${escapeHTML(c.job)}</td>
+        <td><span class="badge ${badgeCls}" style="margin-right:4px;">${escapeHTML(cat)}</span><br>${empSelectHtml}</td>
         <td><span class="badge badge-gray">${escapeHTML(c.source || '-')}</span></td>
         <td><span class="badge ${statusClass(c.status)}">${escapeHTML(c.status)}</span></td>
         <td>${escapeHTML(formatDateTime(c.interviewAt))}</td>
         <td>${escapeHTML(c.owner || '-')}</td>
         <td>${c.resumeUrl ? '<span class="badge badge-green">あり</span>' : '<span class="badge badge-gray">なし</span>'}</td>
         <td><div class="action-row"><button type="button" class="btn btn-small btn-soft" data-action="detail" data-id="${c.id}">詳細</button><button type="button" class="btn btn-small" data-action="edit" data-id="${c.id}">編集</button><button type="button" class="btn btn-small btn-danger" data-action="delete" data-id="${c.id}">削除</button></div></td>
-      </tr>`).join('');
+      </tr>`;
+      }).join('');
+      updateBulkEmpBar();
+    }
+
+    function updateBulkEmpBar(){
+      const checked = document.querySelectorAll('.row-check:checked');
+      const bar = $('bulkEmpControls'), cnt = $('bulkEmpCount');
+      if(!bar || !cnt) return;
+      if(checked.length > 0){ bar.style.display = 'inline'; cnt.textContent = checked.length; }
+      else bar.style.display = 'none';
+    }
+
+    // 雇用形態のインライン変更（1件）
+    async function applyRowEmpChange(id, newCategory){
+      const target = candidates.find(c => c.id === id); if(!target) return;
+      if(newCategory === '__clear'){
+        candidates = candidates.map(c => c.id === id ? { ...c, workType: '未確認', updatedAt: nowDateTime() } : c);
+      }else if(newCategory === '正社員' || newCategory === 'アルバイト' || newCategory === '事務'){
+        // 「事務」は職種側にも影響。雇用形態には正社員/アルバイトを入れるが、事務指定時は職種を事務スタッフに寄せる
+        const patch = { updatedAt: nowDateTime() };
+        if(newCategory === '事務'){
+          patch.job = '事務スタッフ';
+          if(!target.workType || /未確認|不明/.test(target.workType)) patch.workType = target.workType || '未確認';
+        }else{
+          patch.workType = newCategory;
+        }
+        candidates = candidates.map(c => c.id === id ? { ...c, ...patch } : c);
+      }else{
+        return;
+      }
+      await persist();
+      showToast(`雇用形態を「${newCategory === '__clear' ? '未設定' : newCategory}」に変更しました`, 'success', 2500);
+    }
+
+    // 一括変更
+    async function applyBulkEmpChange(){
+      const category = $('bulkEmpSelect') ? $('bulkEmpSelect').value : '';
+      if(!category){ showToast('変更する雇用形態を選択してください', 'warning'); return; }
+      const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(el => el.dataset.id);
+      if(ids.length === 0){ showToast('対象がありません', 'warning'); return; }
+      if(!confirm(`選択中の ${ids.length}件 を「${category}」に一括変更します。よろしいですか？`)) return;
+      const idSet = new Set(ids);
+      candidates = candidates.map(c => {
+        if(!idSet.has(c.id)) return c;
+        const patch = { updatedAt: nowDateTime() };
+        if(category === '事務'){ patch.job = '事務スタッフ'; }
+        else { patch.workType = category; }
+        return { ...c, ...patch };
+      });
+      await persist();
+      showToast(`${ids.length}件の雇用形態を「${category}」に一括変更しました`, 'success');
     }
 
     function normalizeKanbanStatus(s){
@@ -4071,7 +4204,33 @@
       onClick('btnGoReport', () => switchTab('report'));
       ['reportMonth','reportJob','reportSource','reportFeeType'].forEach(id => { const el = $(id); if(el) el.addEventListener('change', renderMonthlyReport); });
 
-      ['searchName','filterJob','filterStatus','filterSource'].forEach(id => { const el = $(id); if(el) el.addEventListener('input', renderTable); });
+      ['searchName','filterJob','filterStatus','filterSource','filterEmployment'].forEach(id => { const el = $(id); if(el) el.addEventListener('input', renderTable); });
+      // 応募者一覧内の行操作（インライン雇用形態変更・チェック・一括操作）
+      document.addEventListener('change', async e => {
+        if(e.target && e.target.classList && e.target.classList.contains('row-emp-select')){
+          const v = e.target.value; const id = e.target.dataset.id;
+          if(v === '__cur') return;
+          e.target.value = '__cur';
+          await applyRowEmpChange(id, v);
+        }
+        if(e.target && e.target.classList && e.target.classList.contains('row-check')){ updateBulkEmpBar(); }
+        if(e.target && e.target.id === 'chkSelectAllRows'){
+          const checked = e.target.checked;
+          document.querySelectorAll('.row-check').forEach(el => { el.checked = checked; });
+          updateBulkEmpBar();
+        }
+      });
+      document.addEventListener('click', async e => {
+        if(e.target && e.target.id === 'btnBulkEmpApply'){ await applyBulkEmpChange(); }
+        if(e.target && e.target.id === 'btnBulkEmpClear'){
+          document.querySelectorAll('.row-check').forEach(el => { el.checked = false; });
+          const all = $('chkSelectAllRows'); if(all) all.checked = false;
+          updateBulkEmpBar();
+        }
+        if(e.target && e.target.id === 'btnShowUnsetOnly'){
+          const sel = $('filterEmployment'); if(sel){ sel.value = '未設定'; renderTable(); }
+        }
+      });
 
       const mediaCsv = $('inputMediaCSV'); if(mediaCsv) mediaCsv.addEventListener('change', e => {
         const f = e.target.files[0];
