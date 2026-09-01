@@ -1413,13 +1413,41 @@
       target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
     }
 
+    // ===== 派生ビュー再計算：candidates/plans/mediaCosts 変更時は必ずここを通す =====
     function renderAll(){
-      renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard(); renderTable(); renderKanban(); renderPlanTable(); renderEmploymentBars(); renderEmploymentByJob();
+      // 整合性チェック（雇用形態集計 vs 総応募数）
+      try{
+        const s = getEmploymentTypeSummary();
+        const empSum = (s['正社員']||0) + (s['アルバイト']||0) + (s['未確認']||0);
+        // 「未確認」以外のキー（契約社員/派遣/業務委託等）も加算
+        const knownKeys = new Set(['正社員','アルバイト','未確認','total']);
+        let extras = 0;
+        Object.keys(s).forEach(k => { if(!knownKeys.has(k)) extras += Number(s[k]||0); });
+        if(empSum + extras !== candidates.length){
+          console.warn('[整合性] 雇用形態集計と総応募数が一致しません', { summary: s, totalCandidates: candidates.length });
+        }
+      }catch(err){ /* 整合性チェック失敗は無視 */ }
+
+      // ダッシュボード系
+      renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard();
+      renderEmploymentBars(); renderEmploymentByJob(); renderThisMonth();
+      // 応募者一覧系
+      renderTable();
+      // 選考系
+      renderKanban();
+      // 採用計画
+      renderPlanTable();
+      // 媒体費用
       refreshReportSourceSelect();
       renderMediaSummary(); renderMediaTable(); renderMediaCompareTable();
+      // 月次レポート
       renderMonthlyReport();
-      renderThisMonth();
     }
+
+    // candidates が変更されたとき用の公開API（将来の呼び出し統一用）
+    function onCandidatesChanged(){ renderAll(); }
+    function onPlansChanged(){ renderAll(); }
+    function onMediaCostsChanged(){ renderAll(); }
 
     function collectFormData(){
       const existingId = $('candidateId') ? $('candidateId').value : '';
@@ -4140,6 +4168,8 @@
     function switchTab(tabId){
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
       document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === tabId));
+      // タブ表示時は必ず最新 candidates で再計算（応募者一覧⇔ダッシュボード間のズレ防止）
+      try{ renderAll(); }catch(err){ console.error('[TAB SWITCH] renderAll failed', err); }
       const titles = {
         dashboard: ['採用状況をひと目で把握','応募者・面接日時・選考ステータス・媒体別効果を確認できます。'],
         list: ['応募者を探す・確認する','検索、絞り込み、詳細確認、編集ができます。'],
