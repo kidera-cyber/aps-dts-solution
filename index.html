@@ -168,7 +168,7 @@
           <div class="card side"><div class="card-head"><div><h3>応募経路別 効果</h3><p class="hint">indeed / PLEX / XMile / リファラル / 紹介</p></div></div><div id="sourceBars"></div></div>
           <div class="card wide"><div class="card-head"><div><h3>採用計画の進捗</h3><p class="hint">内定承諾数を目標と比較します</p></div></div><div id="planSummary"></div></div>
           <div class="card side"><div class="card-head"><div><h3>共有ステータス</h3><p class="hint">クラウド共有モードの接続状態</p></div></div><div id="syncCard" class="sync-card"></div></div>
-          <div class="card wide"><div class="card-head"><div><h3>雇用形態別 応募状況</h3><p class="hint">正社員・アルバイト・未確認の応募人数を表示します</p></div></div><div id="employmentBars"></div></div>
+          <div class="card wide"><div class="card-head"><div><h3>雇用形態別 応募状況</h3><p class="hint">正社員・アルバイト・事務の応募人数を表示します（職種が事務系の応募者は「事務」に分類）</p></div></div><div id="employmentBars"></div></div>
           <div class="card side"><div class="card-head"><div><h3>職種 × 雇用形態</h3><p class="hint">職種ごとの正社員／アルバイト内訳</p></div></div><div id="employmentByJob"></div></div>
           <div class="card full"><div class="card-head"><div><h3>今月の採用費用</h3><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く</button></div><div class="grid" id="thisMonthCards"></div></div>
         </div>
@@ -1006,23 +1006,49 @@
       return result;
     }
 
+    // ダッシュボード表示用の3+1分類集計（応募者一覧の normalizeEmploymentCategory と共通）
+    function getEmploymentDisplaySummary(list){
+      const src = list || candidates;
+      const result = { '正社員': 0, 'アルバイト': 0, '事務': 0, '未設定': 0, total: src.length };
+      src.forEach(c => {
+        const cat = normalizeEmploymentCategory(c); // 正社員/アルバイト/事務/未設定
+        result[cat] = (result[cat] || 0) + 1;
+      });
+      return result;
+    }
+
+    function getEmploymentDisplayByJob(list){
+      const src = list || candidates;
+      const cats = ['正社員','アルバイト','事務','未設定'];
+      const result = {};
+      jobs.forEach(j => { result[j] = { '正社員':0, 'アルバイト':0, '事務':0, '未設定':0, total: 0 }; });
+      src.forEach(c => {
+        const job = jobs.includes(c.job) ? c.job : (c.job || 'その他');
+        if(!result[job]) result[job] = { '正社員':0, 'アルバイト':0, '事務':0, '未設定':0, total: 0 };
+        const cat = normalizeEmploymentCategory(c);
+        result[job][cat] = (result[job][cat] || 0) + 1;
+        result[job].total++;
+      });
+      return result;
+    }
+
     function renderEmploymentBars(){
       const target = $('employmentBars'); if(!target) return;
-      const s = getEmploymentTypeSummary();
+      const s = getEmploymentDisplaySummary();
       const total = s.total;
       if(total === 0){ target.innerHTML = '<div class="empty">応募者データがありません</div>'; return; }
+      // 主要3分類
       const rows = [
         ['正社員', s['正社員'], '#2563eb'],
         ['アルバイト', s['アルバイト'], '#22d3ee'],
-        ['未確認', s['未確認'], '#94a3b8']
+        ['事務', s['事務'], '#7c3aed']
       ];
+      const unset = s['未設定'] || 0;
       // 積み上げ横棒（構成比）
-      let cumulative = 0;
       const stackedHtml = `<div style="display:flex;height:22px;border-radius:11px;overflow:hidden;background:#eaf0f7;margin-bottom:14px;">` + rows.map(([label, count, color]) => {
         const pct = total > 0 ? (count / total * 100) : 0;
-        cumulative += pct;
         return count > 0 ? `<div title="${label}：${count}名（${pct.toFixed(1)}%）" style="width:${pct}%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:900;">${pct >= 10 ? label : ''}</div>` : '';
-      }).join('') + `</div>`;
+      }).join('') + (unset > 0 ? `<div title="未設定：${unset}名" style="width:${(unset/total*100)}%;background:#cbd5e1;"></div>` : '') + `</div>`;
       // 個別バー
       const barsHtml = rows.map(([label, count, color]) => {
         const pct = total > 0 ? (count / total * 100) : 0;
@@ -1032,35 +1058,38 @@
           <span style="text-align:right;font-weight:900;color:var(--navy);">${count}名 <small style="color:var(--muted);font-weight:700;">（${pct.toFixed(1)}%）</small></span>
         </div>`;
       }).join('');
-      target.innerHTML = stackedHtml + barsHtml + `<div style="margin-top:8px;text-align:right;color:var(--muted);font-size:12px;">合計 <strong style="color:var(--navy);font-size:14px;">${total}名</strong></div>`;
+      const unsetHtml = unset > 0
+        ? `<div style="margin-top:8px;padding:6px 10px;background:#f8fafc;border:1px dashed var(--line);border-radius:10px;font-size:11px;color:var(--muted);">補足：未設定 ${unset}名（応募者一覧で「雇用形態」を設定してください）</div>`
+        : `<div style="margin-top:8px;padding:6px 10px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:10px;font-size:11px;color:#15803d;font-weight:900;">✅ 未設定はありません</div>`;
+      target.innerHTML = stackedHtml + barsHtml + `<div style="margin-top:8px;text-align:right;color:var(--muted);font-size:12px;">合計 <strong style="color:var(--navy);font-size:14px;">${total}名</strong>（正社員+アルバイト+事務+未設定）</div>` + unsetHtml;
     }
 
     function renderEmploymentByJob(){
       const target = $('employmentByJob'); if(!target) return;
-      const data = getEmploymentTypeByJob();
+      const data = getEmploymentDisplayByJob();
       const hasAny = Object.values(data).some(v => v.total > 0);
       if(!hasAny){ target.innerHTML = '<div class="empty">応募者データがありません</div>'; return; }
       const globalMax = Math.max(1, ...Object.values(data).map(v => v.total));
       target.innerHTML = jobs.map(job => {
         const d = data[job];
         if(!d) return '';
-        const regularPct = d.total > 0 ? (d['正社員'] / globalMax * 100) : 0;
-        const partPct = d.total > 0 ? (d['アルバイト'] / globalMax * 100) : 0;
-        const unknownPct = d.total > 0 ? (d['未確認'] / globalMax * 100) : 0;
+        const wPct = k => d.total > 0 ? (d[k] / globalMax * 100) : 0;
         return `<div style="padding:10px 0;border-bottom:1px solid #edf2f7;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
             <strong style="color:var(--navy);font-size:13px;">${escapeHTML(job)}</strong>
             <span style="color:var(--muted);font-size:11px;">計 ${d.total}名</span>
           </div>
           <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#eaf0f7;">
-            <div style="width:${regularPct}%;background:#2563eb;" title="正社員 ${d['正社員']}名"></div>
-            <div style="width:${partPct}%;background:#22d3ee;" title="アルバイト ${d['アルバイト']}名"></div>
-            <div style="width:${unknownPct}%;background:#94a3b8;" title="未確認 ${d['未確認']}名"></div>
+            <div style="width:${wPct('正社員')}%;background:#2563eb;" title="正社員 ${d['正社員']}名"></div>
+            <div style="width:${wPct('アルバイト')}%;background:#22d3ee;" title="アルバイト ${d['アルバイト']}名"></div>
+            <div style="width:${wPct('事務')}%;background:#7c3aed;" title="事務 ${d['事務']}名"></div>
+            <div style="width:${wPct('未設定')}%;background:#cbd5e1;" title="未設定 ${d['未設定']}名"></div>
           </div>
-          <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:4px;">
+          <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap;">
             <span><span style="display:inline-block;width:8px;height:8px;background:#2563eb;border-radius:2px;margin-right:3px;"></span>正社員 ${d['正社員']}</span>
             <span><span style="display:inline-block;width:8px;height:8px;background:#22d3ee;border-radius:2px;margin-right:3px;"></span>アルバイト ${d['アルバイト']}</span>
-            ${d['未確認'] > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;background:#94a3b8;border-radius:2px;margin-right:3px;"></span>未確認 ${d['未確認']}</span>` : ''}
+            <span><span style="display:inline-block;width:8px;height:8px;background:#7c3aed;border-radius:2px;margin-right:3px;"></span>事務 ${d['事務']}</span>
+            ${d['未設定'] > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;background:#cbd5e1;border-radius:2px;margin-right:3px;"></span>未設定 ${d['未設定']}</span>` : ''}
           </div>
         </div>`;
       }).join('');
@@ -1415,16 +1444,12 @@
 
     // ===== 派生ビュー再計算：candidates/plans/mediaCosts 変更時は必ずここを通す =====
     function renderAll(){
-      // 整合性チェック（雇用形態集計 vs 総応募数）
+      // 整合性チェック（新3+1分類 vs 総応募数）
       try{
-        const s = getEmploymentTypeSummary();
-        const empSum = (s['正社員']||0) + (s['アルバイト']||0) + (s['未確認']||0);
-        // 「未確認」以外のキー（契約社員/派遣/業務委託等）も加算
-        const knownKeys = new Set(['正社員','アルバイト','未確認','total']);
-        let extras = 0;
-        Object.keys(s).forEach(k => { if(!knownKeys.has(k)) extras += Number(s[k]||0); });
-        if(empSum + extras !== candidates.length){
-          console.warn('[整合性] 雇用形態集計と総応募数が一致しません', { summary: s, totalCandidates: candidates.length });
+        const s = getEmploymentDisplaySummary();
+        const sum = (s['正社員']||0) + (s['アルバイト']||0) + (s['事務']||0) + (s['未設定']||0);
+        if(sum !== candidates.length){
+          console.warn('[整合性] 雇用形態集計(3+1分類)と総応募数が一致しません', { summary: s, totalCandidates: candidates.length });
         }
       }catch(err){ /* 整合性チェック失敗は無視 */ }
 
