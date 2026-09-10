@@ -128,6 +128,40 @@
     .cost-item .c-label{font-size:11px;color:var(--muted);font-weight:900}
     .cost-item .c-value{font-size:20px;font-weight:950;color:var(--navy);margin-top:4px;letter-spacing:-.02em}
     .cost-item .c-sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .hero-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+    @media(max-width:900px){.hero-grid{grid-template-columns:repeat(2,1fr)}}
+    .hero-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;position:relative;overflow:hidden}
+    .hero-card.alert{background:linear-gradient(135deg,#fef3c7,#fff);border-color:#fcd34d}
+    .hero-card.primary{background:linear-gradient(135deg,#eaf2ff,#fff);border-color:#bfdbfe}
+    .hero-card .h-label{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em}
+    .hero-card .h-value{font-size:36px;font-weight:950;color:var(--navy);letter-spacing:-.04em;margin:4px 0;line-height:1}
+    .hero-card .h-unit{font-size:12px;color:var(--muted);margin-left:4px}
+    .hero-card .h-sub{font-size:11px;color:var(--muted);margin-top:6px}
+    .hero-card.alert .h-value{color:#a16207}
+    .hero-card .h-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:900;margin-top:6px;background:#f1f5f9;color:#475569}
+    .hero-card.alert .h-tag{background:#fef9c3;color:#a16207}
+    .job-summary-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}
+    .job-summary-card h5{margin:0 0 10px;color:var(--navy);display:flex;justify-content:space-between;align-items:baseline;font-size:14px}
+    .job-summary-card h5 .js-status{font-size:10px;padding:2px 8px;border-radius:999px;font-weight:900}
+    .job-summary-card .js-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .job-summary-card .js-metric{background:#f8fafc;border-radius:10px;padding:8px 10px}
+    .job-summary-card .js-metric-label{font-size:10px;color:var(--muted);font-weight:900}
+    .job-summary-card .js-metric-value{font-size:18px;font-weight:950;color:var(--navy);letter-spacing:-.02em}
+    .job-summary-card .js-metric.shortage .js-metric-value{color:#b91c1c}
+    .js-progress{height:10px;border-radius:999px;background:#eaf0f7;overflow:hidden}
+    .js-progress>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px}
+    .js-emp-inline{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+    .js-emp-inline strong{color:var(--navy);font-weight:900}
+    .today-action{display:flex;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;align-items:center}
+    .today-action .ta-num{width:28px;height:28px;border-radius:50%;background:var(--blueSoft);color:var(--blue2);display:grid;place-items:center;font-weight:950;font-size:14px;flex-shrink:0}
+    .today-action .ta-body{flex:1;min-width:0}
+    .today-action .ta-title{font-size:13px;color:var(--navy);font-weight:900;line-height:1.3}
+    .today-action .ta-sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .today-action .ta-btn{flex-shrink:0}
+    .today-action.pri-high{border-left:4px solid var(--red)}
+    .today-action.pri-high .ta-num{background:#fee2e2;color:#b91c1c}
+    .today-action.pri-mid{border-left:4px solid var(--amber)}
+    .today-action.pri-mid .ta-num{background:#fef9c3;color:#a16207}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -162,15 +196,64 @@
       </div>
 
       <section id="dashboard" class="panel active">
-        <div class="grid" id="metricGrid"></div>
+        <!-- BLOCK 1: 今日の採用状況（Hero KPI） -->
+        <div id="dashHero"></div>
+
+        <!-- BLOCK 2 + 3: ファネル + 今日やること -->
         <div class="grid" style="margin-top:18px;">
-          <div class="card wide"><div class="card-head"><div><h3>職種別 応募状況</h3><p class="hint">中型ドライバー・運行管理者のみを集計します</p></div></div><div id="jobBars"></div></div>
-          <div class="card side"><div class="card-head"><div><h3>応募経路別 効果</h3><p class="hint">indeed / PLEX / XMile / リファラル / 紹介</p></div></div><div id="sourceBars"></div></div>
-          <div class="card wide"><div class="card-head"><div><h3>採用計画の進捗</h3><p class="hint">内定承諾数を目標と比較します</p></div></div><div id="planSummary"></div></div>
-          <div class="card side"><div class="card-head"><div><h3>共有ステータス</h3><p class="hint">クラウド共有モードの接続状態</p></div></div><div id="syncCard" class="sync-card"></div></div>
-          <div class="card wide"><div class="card-head"><div><h3>雇用形態別 応募状況</h3><p class="hint">正社員・アルバイト・事務の応募人数を表示します（職種が事務系の応募者は「事務」に分類）</p></div></div><div id="employmentBars"></div></div>
-          <div class="card side"><div class="card-head"><div><h3>職種 × 雇用形態</h3><p class="hint">職種ごとの正社員／アルバイト内訳</p></div></div><div id="employmentByJob"></div></div>
-          <div class="card full"><div class="card-head"><div><h3>今月の採用費用</h3><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く</button></div><div class="grid" id="thisMonthCards"></div></div>
+          <div class="card wide">
+            <div class="card-head"><div><h3>採用ファネル</h3><p class="hint">応募 → 面接 → 内定 → 承諾 → 入社 の流れと転換率</p></div></div>
+            <div id="dashFunnel"></div>
+            <div id="dashBottleneck" style="margin-top:12px;"></div>
+          </div>
+          <div class="card side">
+            <div class="card-head"><div><h3>今日やること</h3><p class="hint">優先アクション（自動判定）</p></div></div>
+            <div id="dashActions"></div>
+          </div>
+
+          <!-- BLOCK 4: 職種別 採用状況（採用計画統合） -->
+          <div class="card full">
+            <div class="card-head"><div><h3>職種別 採用状況（目標との差）</h3><p class="hint">応募・採用・目標・不足を1枚で確認</p></div></div>
+            <div id="dashJobs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;"></div>
+          </div>
+
+          <!-- BLOCK 5: 応募経路 + 雇用形態（並列コンパクト） -->
+          <div class="card half">
+            <div class="card-head"><div><h3>応募経路</h3><p class="hint">件数・割合・偏り警告</p></div></div>
+            <div id="dashSources"></div>
+          </div>
+          <div class="card half">
+            <div class="card-head"><div><h3>雇用形態</h3><p class="hint">正社員 / アルバイト / 事務（コンパクト）</p></div></div>
+            <div id="dashEmployment"></div>
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:800;">職種×雇用形態の詳細を見る</summary>
+              <div id="dashEmpByJob" style="margin-top:10px;"></div>
+            </details>
+          </div>
+
+          <!-- BLOCK 6: 今月の採用費用 -->
+          <div class="card full">
+            <div class="card-head"><div><h3>今月の採用費用</h3><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く</button></div>
+            <div id="dashCost"></div>
+          </div>
+
+          <!-- FOOTER: システム -->
+          <div class="card full" style="background:transparent;box-shadow:none;border:0;padding:8px 0;">
+            <div id="dashSystem" style="display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px;gap:12px;flex-wrap:wrap;">
+              <div id="syncCard" class="sync-card" style="flex:1;min-width:240px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 隠しコンテナ（既存関数の呼び出し先を維持） -->
+        <div style="display:none;">
+          <div id="metricGrid"></div>
+          <div id="jobBars"></div>
+          <div id="sourceBars"></div>
+          <div id="planSummary"></div>
+          <div id="employmentBars"></div>
+          <div id="employmentByJob"></div>
+          <div id="thisMonthCards"></div>
         </div>
       </section>
 
@@ -194,6 +277,10 @@
               <select id="bulkEmpSelect" style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);"><option value="">選択…</option><option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="事務">事務</option></select>
               に設定
               <button type="button" class="btn btn-small btn-primary" id="btnBulkEmpApply">一括更新</button>
+              ｜ステータスを
+              <select id="bulkStatusSelect" style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);"><option value="">選択…</option><option value="応募受付">応募受付</option><option value="書類選考中">書類選考中</option><option value="一次面接">一次面接</option><option value="職場見学">職場見学</option><option value="二次面接">二次面接</option><option value="最終面接">最終面接</option><option value="内定">内定</option><option value="内定承諾">内定承諾</option><option value="入社決定">入社決定</option><option value="辞退">辞退</option><option value="不採用">不採用</option><option value="保留">保留</option></select>
+              に設定
+              <button type="button" class="btn btn-small btn-primary" id="btnBulkStatusApply">一括更新</button>
               <button type="button" class="btn btn-small btn-ghost" id="btnBulkEmpClear">選択解除</button>
             </span>
           </div>
@@ -604,7 +691,7 @@
     }
 
     const jobs = ['中型ドライバー', '運行管理者', '事務スタッフ'];
-    const sources = ['indeed', 'PLEX', 'XMile', 'リファラル', '紹介'];
+    const sources = ['indeed', 'PLEX', 'XMile', 'Guidable', 'リファラル', '紹介'];
     const statuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退','不採用','保留'];
     const kanbanStatuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退・不採用'];
     const feeTypes = ['掲載課金型','成功報酬型','掲載＋成功報酬型','無料・リファラル','その他'];
@@ -1204,13 +1291,19 @@
           <option value="事務">事務</option>
           <option value="__clear">未設定に戻す</option>
         </select>`;
+        const statusCls = statusClass(c.status);
+        const statusSelectHtml = `<select class="row-status-select" data-id="${c.id}" data-current="${escapeHTML(c.status)}" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);font-size:11px;font-weight:900;background:transparent;">
+          <option value="__cur">${escapeHTML(c.status)}</option>
+          <option disabled>──変更──</option>
+          ${statuses.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('')}
+        </select>`;
         return `<tr>
         <td><input type="checkbox" class="row-check" data-id="${c.id}" /></td>
         <td><div class="person"><div class="avatar">${escapeHTML((c.name || '?').slice(0,1))}</div><div><strong>${escapeHTML(c.name)}</strong><small>${escapeHTML(c.phone || '-')}<br>${escapeHTML(c.email || '-')}</small></div></div></td>
         <td>${escapeHTML(c.job)}</td>
         <td><span class="badge ${badgeCls}" style="margin-right:4px;">${escapeHTML(cat)}</span><br>${empSelectHtml}</td>
         <td><span class="badge badge-gray">${escapeHTML(c.source || '-')}</span></td>
-        <td><span class="badge ${statusClass(c.status)}">${escapeHTML(c.status)}</span></td>
+        <td><span class="badge ${statusCls}" style="margin-right:4px;">${escapeHTML(c.status)}</span><br>${statusSelectHtml}</td>
         <td>${escapeHTML(formatDateTime(c.interviewAt))}</td>
         <td>${escapeHTML(c.owner || '-')}</td>
         <td>${c.resumeUrl ? '<span class="badge badge-green">あり</span>' : '<span class="badge badge-gray">なし</span>'}</td>
@@ -1248,6 +1341,44 @@
       }
       await persist();
       showToast(`雇用形態を「${newCategory === '__clear' ? '未設定' : newCategory}」に変更しました`, 'success', 2500);
+    }
+
+    // ステータスのインライン変更（1件）
+    async function applyRowStatusChange(id, newStatus){
+      const idx = candidates.findIndex(c => c.id === id); if(idx < 0) return;
+      const oldStatus = candidates[idx].status;
+      if(!newStatus || newStatus === '__cur' || newStatus === oldStatus) return;
+      // 入社決定のみ確認ダイアログ（辞退・不採用は即変更）
+      if(newStatus === '入社決定' && oldStatus !== '入社決定'){
+        if(!confirm(`「${candidates[idx].name}」さんを『入社決定』に変更します。よろしいですか？`)) return;
+      }
+      // 楽観更新（バックアップ保持）
+      const backup = { ...candidates[idx] };
+      candidates[idx] = autoFillStatusDate(normalizeCandidate({ ...candidates[idx], status: newStatus, updatedAt: nowDateTime() }));
+      try{
+        await persist();
+        showToast(`ステータスを「${newStatus}」に変更しました`, 'success', 2000);
+      }catch(err){
+        candidates[idx] = backup;
+        renderAll();
+        showToast(`ステータスの保存に失敗しました：${err.message || '通信状態を確認してください'}`, 'error');
+      }
+    }
+
+    // ステータス 一括変更
+    async function applyBulkStatusChange(){
+      const status = $('bulkStatusSelect') ? $('bulkStatusSelect').value : '';
+      if(!status){ showToast('変更するステータスを選択してください', 'warning'); return; }
+      const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(el => el.dataset.id);
+      if(ids.length === 0){ showToast('対象がありません', 'warning'); return; }
+      if(!confirm(`選択中の ${ids.length}件 のステータスを「${status}」に一括変更します。よろしいですか？`)) return;
+      const idSet = new Set(ids);
+      candidates = candidates.map(c => {
+        if(!idSet.has(c.id)) return c;
+        return autoFillStatusDate(normalizeCandidate({ ...c, status, updatedAt: nowDateTime() }));
+      });
+      await persist();
+      showToast(`${ids.length}件のステータスを「${status}」に一括変更しました`, 'success');
     }
 
     // 一括変更
@@ -1423,6 +1554,260 @@
       </tr>`).join('');
     }
 
+    // ===== 新ホーム画面：意思決定ダッシュボード =====
+    function renderDashboardHero(){
+      const el = $('dashHero'); if(!el) return;
+      const total = candidates.length;
+      const interview = candidates.filter(c => c.interviewAt).length;
+      const hired = candidates.filter(c => c.status === '内定承諾' || c.status === '入社決定').length;
+      const unrated = candidates.filter(c => c.rating === '未評価').length;
+      const unratedPct = total > 0 ? Math.round(unrated / total * 1000) / 10 : 0;
+      // 今月の応募数
+      const ym = todayYM();
+      const monthApplied = candidates.filter(c => getCandidateAppliedYM(c) === ym).length;
+      // 今月の費用
+      const monthCost = computeMonthCosts(mediaCosts, ym);
+      const costLabel = monthCost.total > 0 ? yen(monthCost.total) : '費用未登録';
+      const costTag = monthCost.total > 0 ? '' : '<span class="h-tag">請求書取込を推奨</span>';
+
+      el.innerHTML = `<div class="hero-grid">
+        <div class="hero-card primary">
+          <div class="h-label">総応募者</div>
+          <div class="h-value">${total}<span class="h-unit">名</span></div>
+          <div class="h-sub">今月新規：<strong style="color:var(--navy);">${monthApplied}名</strong></div>
+        </div>
+        <div class="hero-card">
+          <div class="h-label">面接予定</div>
+          <div class="h-value">${interview}<span class="h-unit">名</span></div>
+          <div class="h-sub">日時登録済み</div>
+        </div>
+        <div class="hero-card">
+          <div class="h-label">採用決定</div>
+          <div class="h-value">${hired}<span class="h-unit">名</span></div>
+          <div class="h-sub">内定承諾＋入社決定</div>
+        </div>
+        <div class="hero-card ${unrated > 0 ? 'alert' : ''}">
+          <div class="h-label">未評価</div>
+          <div class="h-value">${unrated}<span class="h-unit">名</span></div>
+          <div class="h-sub">${total > 0 ? `全体の ${unratedPct}%` : '-'}</div>
+          ${unrated > 0 ? '<span class="h-tag">要対応</span>' : '<span class="h-tag">完了</span>'}
+        </div>
+        <div class="hero-card">
+          <div class="h-label">今月の採用費</div>
+          <div class="h-value" style="font-size:${monthCost.total > 0 ? '28px' : '20px'};">${costLabel}</div>
+          <div class="h-sub">${ym}</div>
+          ${costTag}
+        </div>
+      </div>`;
+    }
+
+    function renderDashboardFunnel(){
+      const el = $('dashFunnel'); if(!el) return;
+      const total = candidates.length;
+      const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      const applied = total;
+      const interview = candidates.filter(c => isInterview(c.status)).length;
+      const offered = candidates.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length;
+      const accepted = candidates.filter(c => ['内定承諾','入社決定'].includes(c.status)).length;
+      const joined = candidates.filter(c => c.status === '入社決定').length;
+      const c1 = conv(interview, applied), c2 = conv(offered, interview), c3 = conv(accepted, offered), c4 = conv(joined, accepted);
+      const steps = [
+        { label: '応募', val: applied },
+        { conv: c1 },
+        { label: '面接', val: interview },
+        { conv: c2 },
+        { label: '内定', val: offered },
+        { conv: c3 },
+        { label: '承諾', val: accepted },
+        { conv: c4 },
+        { label: '入社', val: joined }
+      ];
+      el.innerHTML = `<div class="funnel-row">${steps.map(s => {
+        if(s.conv !== undefined){
+          const cls = s.conv === null ? '' : (s.conv < 20 ? 'bad' : (s.conv < 40 ? 'warn' : ''));
+          return `<div class="funnel-conv ${cls}"><span>↓</span><span class="fc-rate">${convLabel(s.conv)}</span></div>`;
+        }
+        return `<div class="funnel-step"><div class="fs-label">${escapeHTML(s.label)}</div><div class="fs-value">${s.val}</div><div class="fs-unit">名</div></div>`;
+      }).join('')}</div>`;
+
+      // ボトルネック
+      const bnEl = $('dashBottleneck'); if(!bnEl) return;
+      const unrated = candidates.filter(c => c.rating === '未評価').length;
+      // 最優先ボトルネック：未評価が過半なら未評価、それ以外は最低転換率
+      if(total > 0 && unrated > total * 0.5){
+        bnEl.innerHTML = `<div class="notice error"><strong>🎯 ボトルネック：未評価応募者が ${unrated}名（${Math.round(unrated/total*100)}%）</strong><br>まず未評価応募者の評価・選考ステータスを更新することが最優先です。</div>`;
+      }else{
+        const stages = [
+          { name: '応募→面接', rate: c1 },
+          { name: '面接→内定', rate: c2 },
+          { name: '内定→承諾', rate: c3 },
+          { name: '承諾→入社', rate: c4 }
+        ].filter(s => s.rate !== null);
+        if(stages.length){
+          const bn = stages.reduce((min, s) => s.rate < min.rate ? s : min, stages[0]);
+          const noticeCls = bn.rate < 20 ? 'error' : (bn.rate < 40 ? '' : 'success');
+          bnEl.innerHTML = `<div class="notice ${noticeCls}"><strong>🎯 ボトルネック：${escapeHTML(bn.name)}（${bn.rate}%）</strong>${bn.rate < 40 ? '<br>この工程の転換率改善が最優先です。' : '<br>各工程の転換率は健全です。'}</div>`;
+        }else{
+          bnEl.innerHTML = `<div class="notice">選考データが不足しています。応募者を登録してください。</div>`;
+        }
+      }
+    }
+
+    function renderDashboardActions(){
+      const el = $('dashActions'); if(!el) return;
+      const total = candidates.length;
+      const unrated = candidates.filter(c => c.rating === '未評価').length;
+      const upcomingInterview = candidates.filter(c => c.interviewAt).length;
+      const jobShortage = [];
+      plans.forEach(p => {
+        const cur = candidates.filter(c => c.job === p.job && (c.status === '内定承諾' || c.status === '入社決定')).length;
+        const sh = Math.max(0, p.total - cur);
+        if(sh > 0) jobShortage.push({ job: p.job, shortage: sh, target: p.total });
+      });
+      const actions = [];
+      if(unrated > 0){
+        actions.push({ pri: unrated > total * 0.3 ? 'high' : 'mid', num: 1, title: `未評価 ${unrated}名を確認`, sub: '評価と選考ステータスを更新', tab: 'list' });
+      }
+      if(upcomingInterview > 0){
+        actions.push({ pri: 'mid', num: actions.length + 1, title: `面接予定 ${upcomingInterview}名の日程確認`, sub: '選考状況カンバンで確認', tab: 'kanban' });
+      }
+      jobShortage.slice(0, 2).forEach(s => {
+        actions.push({ pri: 'mid', num: actions.length + 1, title: `${s.job} 目標${s.target}名に対し${s.target - s.shortage}名`, sub: `不足 ${s.shortage}名`, tab: 'plan' });
+      });
+      if(actions.length === 0){
+        actions.push({ pri: 'low', num: 1, title: '特筆すべき優先アクションなし', sub: '現状の運用を継続してください', tab: 'list' });
+      }
+      el.innerHTML = actions.slice(0, 3).map(a => `<div class="today-action pri-${a.pri}">
+        <div class="ta-num">${a.num}</div>
+        <div class="ta-body">
+          <div class="ta-title">${escapeHTML(a.title)}</div>
+          <div class="ta-sub">${escapeHTML(a.sub)}</div>
+        </div>
+        <button type="button" class="btn btn-small btn-soft ta-btn" data-goto="${a.tab}">開く</button>
+      </div>`).join('');
+    }
+
+    function renderDashboardJobs(){
+      const el = $('dashJobs'); if(!el) return;
+      const empData = getEmploymentDisplayByJob();
+      const planByJob = {};
+      plans.forEach(p => { planByJob[p.job] = p; });
+      const jobList = [...jobs, ...Object.keys(planByJob).filter(j => !jobs.includes(j))];
+      const cards = jobList.map(job => {
+        const list = candidates.filter(c => c.job === job);
+        if(list.length === 0 && !planByJob[job]) return '';
+        const applied = list.length;
+        const hired = list.filter(c => c.status === '内定承諾' || c.status === '入社決定').length;
+        const plan = planByJob[job];
+        const target = plan ? plan.total : 0;
+        const shortage = Math.max(0, target - hired);
+        const rate = target > 0 ? Math.round(hired / target * 100) : null;
+        const status = target === 0 ? '<span class="js-status status-idle">目標未設定</span>' :
+                       (rate >= 100 ? '<span class="js-status status-good">達成</span>' :
+                       (rate >= 50 ? '<span class="js-status status-warn">' + rate + '% 達成</span>' :
+                       '<span class="js-status status-bad">' + (rate || 0) + '% 達成</span>'));
+        const emp = empData[job] || { '正社員': 0, 'アルバイト': 0, '事務': 0, '未設定': 0 };
+        return `<div class="job-summary-card">
+          <h5>${escapeHTML(job)}${status}</h5>
+          <div class="js-metrics">
+            <div class="js-metric"><div class="js-metric-label">応募</div><div class="js-metric-value">${applied}</div></div>
+            <div class="js-metric"><div class="js-metric-label">採用</div><div class="js-metric-value">${hired}</div></div>
+            <div class="js-metric"><div class="js-metric-label">目標</div><div class="js-metric-value">${target || '-'}</div></div>
+            <div class="js-metric ${shortage > 0 ? 'shortage' : ''}"><div class="js-metric-label">不足</div><div class="js-metric-value">${shortage}</div></div>
+          </div>
+          ${target > 0 ? `<div class="js-progress"><span style="width:${Math.min(100, rate || 0)}%"></span></div>` : ''}
+          <div class="js-emp-inline">
+            ${emp['正社員'] > 0 ? `<span>正社員 <strong>${emp['正社員']}</strong></span>` : ''}
+            ${emp['アルバイト'] > 0 ? `<span>アルバイト <strong>${emp['アルバイト']}</strong></span>` : ''}
+            ${emp['事務'] > 0 ? `<span>事務 <strong>${emp['事務']}</strong></span>` : ''}
+            ${emp['未設定'] > 0 ? `<span style="color:#b91c1c;">未設定 <strong>${emp['未設定']}</strong></span>` : ''}
+          </div>
+        </div>`;
+      }).filter(Boolean).join('');
+      el.innerHTML = cards || '<div class="empty">応募者データがありません</div>';
+    }
+
+    function renderDashboardSources(){
+      const el = $('dashSources'); if(!el) return;
+      const total = candidates.length;
+      if(total === 0){ el.innerHTML = '<div class="empty">応募者データがありません</div>'; return; }
+      const counts = sources.map(s => ({ label: s, count: candidates.filter(c => c.source === s).length }));
+      counts.sort((a, b) => b.count - a.count);
+      // その他（未登録sourceに該当）
+      const known = new Set(sources);
+      const otherCount = candidates.filter(c => !known.has(c.source)).length;
+      if(otherCount > 0) counts.push({ label: 'その他', count: otherCount });
+
+      const rows = counts.filter(r => r.count > 0).map(r => {
+        const pct = total > 0 ? Math.round(r.count / total * 1000) / 10 : 0;
+        return `<div style="display:grid;grid-template-columns:80px 1fr 100px;align-items:center;gap:10px;padding:6px 0;">
+          <strong style="color:var(--navy);font-size:13px;">${escapeHTML(r.label)}</strong>
+          <div style="height:10px;border-radius:999px;background:#eaf0f7;overflow:hidden;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px;"></div></div>
+          <div style="text-align:right;font-size:12px;color:var(--navy);font-weight:900;">${r.count}名 <small style="color:var(--muted);">${pct}%</small></div>
+        </div>`;
+      }).join('');
+      // 偏り警告
+      const top = counts[0];
+      const topPct = top && total > 0 ? Math.round(top.count / total * 100) : 0;
+      const warn = top && topPct >= 80 ? `<div class="notice" style="margin-top:10px;font-size:12px;">📢 応募の${topPct}%が${escapeHTML(top.label)}に集中しています。他媒体の活用も検討してください。</div>` : '';
+      el.innerHTML = rows + warn;
+    }
+
+    function renderDashboardEmployment(){
+      const el = $('dashEmployment'); if(!el) return;
+      const s = getEmploymentDisplaySummary();
+      const total = s.total;
+      if(total === 0){ el.innerHTML = '<div class="empty">応募者データがありません</div>'; return; }
+      const rows = [
+        ['正社員', s['正社員'], '#2563eb'],
+        ['アルバイト', s['アルバイト'], '#22d3ee'],
+        ['事務', s['事務'], '#7c3aed']
+      ];
+      const unset = s['未設定'] || 0;
+      // 積み上げバー
+      const stacked = `<div style="display:flex;height:16px;border-radius:8px;overflow:hidden;background:#eaf0f7;margin-bottom:10px;">${rows.map(([l, c, color]) => {
+        const pct = total > 0 ? c / total * 100 : 0;
+        return c > 0 ? `<div title="${l}：${c}名" style="width:${pct}%;background:${color};"></div>` : '';
+      }).join('')}${unset > 0 ? `<div title="未設定：${unset}名" style="width:${unset/total*100}%;background:#cbd5e1;"></div>` : ''}</div>`;
+      const list = rows.map(([l, c, color]) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;"><span><span style="display:inline-block;width:10px;height:10px;background:${color};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>${escapeHTML(l)}</span><strong style="color:var(--navy);">${c}名</strong></div>`).join('');
+      const unsetLine = unset > 0
+        ? `<div style="margin-top:8px;padding:6px 10px;background:#f8fafc;border:1px dashed var(--line);border-radius:8px;font-size:11px;color:var(--muted);">未設定 ${unset}名 → 応募者一覧で設定推奨</div>`
+        : '';
+      el.innerHTML = stacked + list + unsetLine;
+      // 詳細（職種×雇用形態）
+      const detailEl = $('dashEmpByJob'); if(detailEl){
+        const data = getEmploymentDisplayByJob();
+        detailEl.innerHTML = jobs.map(job => {
+          const d = data[job] || { '正社員':0, 'アルバイト':0, '事務':0, '未設定':0, total: 0 };
+          if(d.total === 0) return '';
+          return `<div style="padding:6px 0;border-bottom:1px solid #edf2f7;font-size:12px;">
+            <strong style="color:var(--navy);">${escapeHTML(job)}</strong>（計${d.total}）：
+            正社員 ${d['正社員']} / アルバイト ${d['アルバイト']} / 事務 ${d['事務']}${d['未設定'] > 0 ? ` / <span style="color:#b91c1c;">未設定 ${d['未設定']}</span>` : ''}
+          </div>`;
+        }).filter(Boolean).join('');
+      }
+    }
+
+    function renderDashboardCost(){
+      const el = $('dashCost'); if(!el) return;
+      const ym = todayYM();
+      const c = computeMonthCosts(mediaCosts, ym);
+      const monthApplied = candidates.filter(cc => getCandidateAppliedYM(cc) === ym).length;
+      const monthHired = candidates.filter(cc => getCandidateAppliedYM(cc) === ym && (cc.status === '内定承諾' || cc.status === '入社決定')).length;
+      const labelLbl = $('thisMonthLabel'); if(labelLbl) labelLbl.textContent = `対象月：${ym}`;
+      const costDisplay = c.total > 0 ? yen(c.total) : '費用未登録';
+      const cpaApplied = c.total > 0 && monthApplied > 0 ? yen(Math.round(c.total / monthApplied)) : '-';
+      const cpaHired = c.total > 0 && monthHired > 0 ? yen(Math.round(c.total / monthHired)) : '-';
+      el.innerHTML = `<div class="cost-block">
+        <div class="cost-item"><div class="c-label">総採用費</div><div class="c-value" style="font-size:${c.total > 0 ? '20px' : '16px'};">${costDisplay}</div><div class="c-sub">${ym}</div></div>
+        <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value">${c.ad > 0 ? yen(c.ad) : '未登録'}</div><div class="c-sub">Indeed等</div></div>
+        <div class="cost-item"><div class="c-label">紹介手数料</div><div class="c-value">${c.fee > 0 ? yen(c.fee) : '未登録'}</div><div class="c-sub">PLEX等</div></div>
+        <div class="cost-item"><div class="c-label">今月応募</div><div class="c-value">${monthApplied}<span style="font-size:12px;color:var(--muted);">名</span></div><div class="c-sub">応募日ベース</div></div>
+        <div class="cost-item"><div class="c-label">応募単価</div><div class="c-value">${cpaApplied}</div><div class="c-sub">総費用÷応募</div></div>
+        <div class="cost-item"><div class="c-label">採用単価</div><div class="c-value">${cpaHired}</div><div class="c-sub">総費用÷採用</div></div>
+      </div>`;
+    }
+
     function renderThisMonth(){
       const target = $('thisMonthCards'); if(!target) return;
       const ym = todayYM();
@@ -1453,9 +1838,13 @@
         }
       }catch(err){ /* 整合性チェック失敗は無視 */ }
 
-      // ダッシュボード系
+      // ダッシュボード系（新ホーム画面）
       renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard();
       renderEmploymentBars(); renderEmploymentByJob(); renderThisMonth();
+      // 新ホーム画面ブロック
+      renderDashboardHero(); renderDashboardFunnel(); renderDashboardActions();
+      renderDashboardJobs(); renderDashboardSources(); renderDashboardEmployment();
+      renderDashboardCost();
       // 応募者一覧系
       renderTable();
       // 選考系
@@ -2813,6 +3202,7 @@
         if(/indeed/i.test(rawSrc) || /スポンサー/.test(rawSrc)) source = 'indeed';
         else if(/plex/i.test(rawSrc)) source = 'PLEX';
         else if(/xmile/i.test(rawSrc) || /エックスマイル/.test(rawSrc)) source = 'XMile';
+        else if(/guidable|ガイダブル/i.test(rawSrc)) source = 'Guidable';
         else if(/リファラル/.test(rawSrc)) source = 'リファラル';
         else if(/紹介/.test(rawSrc)) source = '紹介';
         else source = rawSrc || 'indeed';
@@ -2909,6 +3299,7 @@
       if(/indeed|インディード/.test(s)) return 'Indeed';
       if(/plex|プレックス/.test(s)) return 'PLEX';
       if(/xmile|エックスマイル|クロスマイル/.test(s)) return 'XMile';
+      if(/guidable|ガイダブル/.test(s)) return 'Guidable';
       if(/リファラル|referral/.test(s)) return 'リファラル';
       if(/紹介|agent|エージェント/.test(s)) return '紹介';
       return String(text || '').trim();
@@ -4268,6 +4659,13 @@
           e.target.value = '__cur';
           await applyRowEmpChange(id, v);
         }
+        if(e.target && e.target.classList && e.target.classList.contains('row-status-select')){
+          const v = e.target.value; const id = e.target.dataset.id;
+          if(v === '__cur' || !v) return;
+          // 一時的に現在値へ戻して連打防止（applyRowStatusChange 内で renderAll される）
+          e.target.value = '__cur';
+          await applyRowStatusChange(id, v);
+        }
         if(e.target && e.target.classList && e.target.classList.contains('row-check')){ updateBulkEmpBar(); }
         if(e.target && e.target.id === 'chkSelectAllRows'){
           const checked = e.target.checked;
@@ -4277,6 +4675,7 @@
       });
       document.addEventListener('click', async e => {
         if(e.target && e.target.id === 'btnBulkEmpApply'){ await applyBulkEmpChange(); }
+        if(e.target && e.target.id === 'btnBulkStatusApply'){ await applyBulkStatusChange(); }
         if(e.target && e.target.id === 'btnBulkEmpClear'){
           document.querySelectorAll('.row-check').forEach(el => { el.checked = false; });
           const all = $('chkSelectAllRows'); if(all) all.checked = false;
@@ -4285,6 +4684,9 @@
         if(e.target && e.target.id === 'btnShowUnsetOnly'){
           const sel = $('filterEmployment'); if(sel){ sel.value = '未設定'; renderTable(); }
         }
+        // ホーム画面「今日やること」の「開く」ボタンから対象タブへ遷移
+        const gotoBtn = e.target && e.target.dataset && e.target.dataset.goto ? e.target : (e.target && e.target.closest ? e.target.closest('[data-goto]') : null);
+        if(gotoBtn){ switchTab(gotoBtn.dataset.goto); }
       });
 
       const mediaCsv = $('inputMediaCSV'); if(mediaCsv) mediaCsv.addEventListener('change', e => {
