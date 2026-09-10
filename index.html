@@ -190,6 +190,14 @@
     .emp-tile .et-value{font-size:40px;font-weight:950;color:var(--navy);margin-top:8px;letter-spacing:-.03em;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
     .emp-tile .et-unit{font-size:16px;color:var(--muted);margin-left:4px;font-weight:900}
     .emp-tile .et-pct{font-size:14px;color:var(--muted);margin-top:6px;font-weight:800;white-space:nowrap}
+    /* 応募者一覧：一括操作バー */
+    .bulk-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:14px;background:linear-gradient(135deg,#eaf2ff,#f6faff);border:1px solid #bfdbfe;border-radius:14px;box-shadow:0 2px 8px rgba(59,130,246,.08)}
+    .bulk-bar .bb-count{font-size:15px;color:var(--navy);font-weight:900}
+    .bulk-bar .bb-count strong{font-size:22px;font-weight:950;color:var(--blue);margin-right:2px;letter-spacing:-.02em}
+    .bulk-bar .bb-field{display:flex;align-items:center;gap:6px}
+    .bulk-bar .bb-field label{font-size:12px;color:var(--muted);font-weight:900;white-space:nowrap}
+    .bulk-bar .bb-field select{padding:7px 12px;border-radius:10px;border:1px solid var(--line);font-size:14px;font-weight:800;background:#fff;color:var(--navy);min-width:140px}
+    .bulk-bar button:disabled{opacity:.5;cursor:not-allowed}
     /* 応募経路：偏り警告をカード下部の独立ボックスへ */
     .dash-source-warn{margin-top:14px;padding:12px 16px;background:linear-gradient(90deg,#fef3c7,#fffbeb);border:1px solid #fcd34d;border-radius:12px;font-size:14px;color:#78350f;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .dash-source-warn strong{color:#92400e;font-weight:950}
@@ -303,18 +311,38 @@
             <label class="field">ステータス<select id="filterStatus"></select></label>
             <label class="field">応募経路<select id="filterSource"></select></label>
           </div>
-          <div class="action-row" style="margin-bottom:10px;font-size:12px;color:var(--muted);">
-            <span id="bulkEmpControls" style="display:none;">
-              <span id="bulkEmpCount">0</span>件選択中｜一括で雇用形態を
-              <select id="bulkEmpSelect" style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);"><option value="">選択…</option><option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="事務">事務</option></select>
-              に設定
-              <button type="button" class="btn btn-small btn-primary" id="btnBulkEmpApply">一括更新</button>
-              ｜ステータスを
-              <select id="bulkStatusSelect" style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);"><option value="">選択…</option><option value="応募受付">応募受付</option><option value="書類選考中">書類選考中</option><option value="一次面接">一次面接</option><option value="職場見学">職場見学</option><option value="二次面接">二次面接</option><option value="最終面接">最終面接</option><option value="内定">内定</option><option value="内定承諾">内定承諾</option><option value="入社決定">入社決定</option><option value="辞退">辞退</option><option value="不採用">不採用</option><option value="保留">保留</option></select>
-              に設定
-              <button type="button" class="btn btn-small btn-primary" id="btnBulkStatusApply">一括更新</button>
-              <button type="button" class="btn btn-small btn-ghost" id="btnBulkEmpClear">選択解除</button>
-            </span>
+          <div id="bulkEmpControls" class="bulk-bar" style="display:none;">
+            <div class="bb-count"><strong id="bulkEmpCount">0</strong>名選択中</div>
+            <div class="bb-field">
+              <label>雇用形態</label>
+              <select id="bulkEmpSelect">
+                <option value="">変更しない</option>
+                <option value="正社員">正社員</option>
+                <option value="アルバイト">アルバイト</option>
+                <option value="事務">事務</option>
+                <option value="未設定">未設定に戻す</option>
+              </select>
+            </div>
+            <div class="bb-field">
+              <label>ステータス</label>
+              <select id="bulkStatusSelect">
+                <option value="">変更しない</option>
+                <option value="応募受付">応募受付</option>
+                <option value="書類選考中">書類選考中</option>
+                <option value="一次面接">一次面接</option>
+                <option value="職場見学">職場見学</option>
+                <option value="二次面接">二次面接</option>
+                <option value="最終面接">最終面接</option>
+                <option value="内定">内定</option>
+                <option value="内定承諾">内定承諾</option>
+                <option value="入社決定">入社決定</option>
+                <option value="辞退">辞退</option>
+                <option value="不採用">不採用</option>
+                <option value="保留">保留</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-primary" id="btnBulkApply">選択中の<span id="bulkApplyCount">0</span>名に適用</button>
+            <button type="button" class="btn btn-ghost btn-small" id="btnBulkEmpClear">選択解除</button>
           </div>
           <div class="table-wrap"><table><thead><tr><th style="width:32px;"><input type="checkbox" id="chkSelectAllRows" title="全選択" /></th><th>応募者</th><th>職種</th><th>雇用形態</th><th>経路</th><th>ステータス</th><th>面接日時</th><th>担当</th><th>履歴書</th><th>操作</th></tr></thead><tbody id="candidateTable"></tbody></table></div>
         </div>
@@ -1401,10 +1429,15 @@
 
     function updateBulkEmpBar(){
       const checked = document.querySelectorAll('.row-check:checked');
-      const bar = $('bulkEmpControls'), cnt = $('bulkEmpCount');
+      const bar = $('bulkEmpControls'), cnt = $('bulkEmpCount'), applyCnt = $('bulkApplyCount');
       if(!bar || !cnt) return;
-      if(checked.length > 0){ bar.style.display = 'inline'; cnt.textContent = checked.length; }
-      else bar.style.display = 'none';
+      if(checked.length > 0){
+        bar.style.display = 'flex';
+        cnt.textContent = checked.length;
+        if(applyCnt) applyCnt.textContent = checked.length;
+      }else{
+        bar.style.display = 'none';
+      }
     }
 
     // 雇用形態のインライン変更（1件）
@@ -1451,40 +1484,78 @@
       }
     }
 
-    // ステータス 一括変更
-    async function applyBulkStatusChange(){
-      const status = $('bulkStatusSelect') ? $('bulkStatusSelect').value : '';
-      if(!status){ showToast('変更するステータスを選択してください', 'warning'); return; }
+    // 統合 一括変更（雇用形態 + ステータスを1回のpersistでまとめて適用）
+    let bulkApplyBusy = false;
+    async function applyBulkChange(){
+      if(bulkApplyBusy) return;
+      const empSel = $('bulkEmpSelect'), statusSel = $('bulkStatusSelect'), btn = $('btnBulkApply');
+      const empVal = empSel ? empSel.value : '';
+      const statusVal = statusSel ? statusSel.value : '';
+      if(!empVal && !statusVal){
+        showToast('雇用形態またはステータスのいずれかを選択してください（両方「変更しない」のままです）', 'warning');
+        return;
+      }
       const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(el => el.dataset.id);
       if(ids.length === 0){ showToast('対象がありません', 'warning'); return; }
-      if(!confirm(`選択中の ${ids.length}件 のステータスを「${status}」に一括変更します。よろしいですか？`)) return;
+      // 確認ダイアログ（変更内容サマリ）
+      const empMsg = empVal ? `雇用形態：${empVal}` : '雇用形態：変更なし';
+      const statusMsg = statusVal ? `ステータス：${statusVal}` : 'ステータス：変更なし';
+      if(!confirm(`選択中の ${ids.length}名 を一括更新します。\n\n${empMsg}\n${statusMsg}\n\nこの内容で更新しますか？`)) return;
+
+      bulkApplyBusy = true;
+      if(btn){ btn.disabled = true; btn.textContent = `${ids.length}名を更新中...`; }
+      // バックアップ（保存失敗時のロールバック用）
+      const backup = candidates.map(c => ({ ...c }));
       const idSet = new Set(ids);
-      candidates = candidates.map(c => {
-        if(!idSet.has(c.id)) return c;
-        return autoFillStatusDate(normalizeCandidate({ ...c, status, updatedAt: nowDateTime() }));
-      });
-      await persist();
-      showToast(`${ids.length}件のステータスを「${status}」に一括変更しました`, 'success');
+      const now = nowDateTime();
+      try{
+        candidates = candidates.map(c => {
+          if(!idSet.has(c.id)) return c;
+          let next = { ...c, updatedAt: now };
+          // 雇用形態変更（既存の1件変更ロジックと同一：事務は職種側にも影響）
+          if(empVal){
+            if(empVal === '未設定'){
+              next.workType = '未確認';
+            }else if(empVal === '事務'){
+              next.job = '事務スタッフ';
+              if(!c.workType || /未確認|不明/.test(c.workType)) next.workType = c.workType || '未確認';
+            }else{
+              next.workType = empVal;
+            }
+          }
+          // ステータス変更
+          if(statusVal){
+            next = autoFillStatusDate(normalizeCandidate({ ...next, status: statusVal }));
+          }else{
+            next = normalizeCandidate(next);
+          }
+          return next;
+        });
+        // 1回だけ persist（ローカル保存 + クラウド保存 + renderAll をまとめて実行）
+        await persist();
+        const parts = [];
+        if(empVal) parts.push(`雇用形態→${empVal}`);
+        if(statusVal) parts.push(`ステータス→${statusVal}`);
+        showToast(`${ids.length}名を更新しました（${parts.join(' / ')}）`, 'success', 3500);
+        // 選択解除・プルダウンをリセット
+        document.querySelectorAll('.row-check').forEach(el => { el.checked = false; });
+        const all = $('chkSelectAllRows'); if(all) all.checked = false;
+        if(empSel) empSel.value = '';
+        if(statusSel) statusSel.value = '';
+        updateBulkEmpBar();
+      }catch(err){
+        // 保存失敗 → 完全ロールバック
+        candidates = backup;
+        renderAll();
+        showToast(`一括更新に失敗しました：${err.message || err}\n変更前の状態に戻しました。`, 'error', 6000);
+      }finally{
+        bulkApplyBusy = false;
+        if(btn){ btn.disabled = false; btn.innerHTML = `選択中の<span id="bulkApplyCount">${ids.length}</span>名に適用`; }
+      }
     }
 
-    // 一括変更
-    async function applyBulkEmpChange(){
-      const category = $('bulkEmpSelect') ? $('bulkEmpSelect').value : '';
-      if(!category){ showToast('変更する雇用形態を選択してください', 'warning'); return; }
-      const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(el => el.dataset.id);
-      if(ids.length === 0){ showToast('対象がありません', 'warning'); return; }
-      if(!confirm(`選択中の ${ids.length}件 を「${category}」に一括変更します。よろしいですか？`)) return;
-      const idSet = new Set(ids);
-      candidates = candidates.map(c => {
-        if(!idSet.has(c.id)) return c;
-        const patch = { updatedAt: nowDateTime() };
-        if(category === '事務'){ patch.job = '事務スタッフ'; }
-        else { patch.workType = category; }
-        return { ...c, ...patch };
-      });
-      await persist();
-      showToast(`${ids.length}件の雇用形態を「${category}」に一括変更しました`, 'success');
-    }
+    // 旧の分離型一括変更（後方互換のため残存）→ 新しい applyBulkChange に委譲
+    async function applyBulkEmpChange(){ return applyBulkChange(); }
 
     function normalizeKanbanStatus(s){
       if(['辞退','不採用'].includes(s)) return '辞退・不採用';
@@ -4805,8 +4876,7 @@
         }
       });
       document.addEventListener('click', async e => {
-        if(e.target && e.target.id === 'btnBulkEmpApply'){ await applyBulkEmpChange(); }
-        if(e.target && e.target.id === 'btnBulkStatusApply'){ await applyBulkStatusChange(); }
+        if(e.target && (e.target.id === 'btnBulkApply' || e.target.closest && e.target.closest('#btnBulkApply'))){ await applyBulkChange(); }
         if(e.target && e.target.id === 'btnBulkEmpClear'){
           document.querySelectorAll('.row-check').forEach(el => { el.checked = false; });
           const all = $('chkSelectAllRows'); if(all) all.checked = false;
