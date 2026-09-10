@@ -738,8 +738,10 @@
 
     // ===== 自動ポーリング =====
     const POLLING_INTERVAL_MS = 30000;
+    const POLLING_MAX_CONSECUTIVE_FAILS = 3;
     let pollingTimer = null;
     let pollingEnabled = true;
+    let pollingFailCount = 0;
     // 未保存の変更あり → 自動再読込で上書きされないよう防御
     let dirtyLocal = false;
     let lastSaveAt = 0;
@@ -769,17 +771,42 @@
       if(dirtyLocal){ console.warn('[AUTO POLL] スキップ：未保存のローカル変更があります'); return; }
       // 直近3秒以内に保存した直後は Apps Script の書き込み完了待ち
       if(Date.now() - lastSaveAt < 3000) return;
-      try{ await cloudReload(true); }catch(err){ /* syncCard で表示済み */ }
+      try{
+        await cloudReload(true);
+        pollingFailCount = 0; // 成功したのでカウンタリセット
+      }catch(err){
+        pollingFailCount++;
+        console.warn(`[AUTO POLL] 失敗 ${pollingFailCount}/${POLLING_MAX_CONSECUTIVE_FAILS}:`, err.message);
+        if(pollingFailCount >= POLLING_MAX_CONSECUTIVE_FAILS){
+          pauseAutoPolling(`自動更新を一時停止しました（連続${pollingFailCount}回失敗）。接続確認後に「クラウド再読込」で再開されます。`);
+        }
+      }
     }
 
     function startAutoPolling(){
       stopAutoPolling();
       if(!isCloudConfigured() || !pollingEnabled) return;
+      pollingFailCount = 0;
       pollingTimer = setInterval(autoPoll, POLLING_INTERVAL_MS);
     }
 
     function stopAutoPolling(){
       if(pollingTimer){ clearInterval(pollingTimer); pollingTimer = null; }
+    }
+
+    function pauseAutoPolling(reason){
+      stopAutoPolling();
+      pollingEnabled = false;
+      console.warn('[AUTO POLL] 一時停止:', reason);
+      showToast(reason || '自動更新を一時停止しました', 'warning', 6000);
+      renderSyncCard();
+    }
+
+    function resumeAutoPolling(){
+      pollingEnabled = true;
+      pollingFailCount = 0;
+      startAutoPolling();
+      renderSyncCard();
     }
 
     const $ = id => document.getElementById(id);
@@ -804,16 +831,43 @@
       if(!endpoint || !apiKey){
         throw new Error('Apps Script WebアプリURLとAPI Keyを設定してください。');
       }
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ key: apiKey, action, payload })
-      });
+      // URL形式の軽量チェック（設定値は変更しない）
+      if(!/\/exec(\?|$)/.test(endpoint)){
+        console.warn('[CLOUD] WebアプリURLが /exec で終わっていません:', endpoint);
+      }
+      let res;
+      try{
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ key: apiKey, action, payload })
+        });
+      }catch(netErr){
+        console.error('[CLOUD] ネットワークエラー:', netErr);
+        throw new Error(`ネットワークエラー：${netErr.message || netErr}`);
+      }
+      // 生レスポンスを一度テキストで受け取り、詳細を残す
+      const rawText = await res.text();
+      const contentType = res.headers.get('content-type') || '';
+      if(!res.ok){
+        console.error('[CLOUD] HTTPエラー:', { status: res.status, contentType, bodyHead: rawText.slice(0,300) });
+        throw new Error(`Apps Script HTTPエラー：${res.status}（応答の先頭：${rawText.slice(0,120).replace(/\s+/g,' ')}）`);
+      }
+      // HTMLが返っていないか検出（Googleログイン/権限エラー/Apps Scriptエラーページ）
+      const head = rawText.slice(0, 500).toLowerCase();
+      if(head.includes('<!doctype html') || head.includes('<html') || head.includes('accounts.google.com') || head.includes('authorization required')){
+        console.error('[CLOUD] JSONではなくHTMLが返却されました:', { status: res.status, contentType, bodyHead: rawText.slice(0,400) });
+        let hint = 'Apps ScriptのデプロイURL・アクセス権限（「全員」）を確認してください。';
+        if(head.includes('accounts.google.com')) hint = 'Googleログイン画面が返っています。Apps Scriptのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。';
+        else if(head.includes('authorization required') || head.includes('unauthorized')) hint = 'Apps Scriptで承認が必要です。編集画面で手動実行し、認可を完了してください。';
+        throw new Error(`Apps ScriptがJSONではなくHTMLを返しました。${hint}`);
+      }
       let data;
       try{
-        data = await res.json();
+        data = JSON.parse(rawText);
       }catch(parseErr){
-        throw new Error('Apps Scriptからの応答をJSONとして解釈できませんでした。デプロイ設定とコードを確認してください。');
+        console.error('[CLOUD] JSON parse失敗:', { status: res.status, contentType, bodyHead: rawText.slice(0,400), parseErr: parseErr.message });
+        throw new Error(`Apps Scriptの応答をJSONとして解釈できませんでした（content-type: ${contentType || '不明'}、先頭：${rawText.slice(0,100).replace(/\s+/g,' ')}）。doGet/doPostがContentService.MimeType.JSONで返しているか確認してください。`);
       }
       if(!data || data.ok === false){
         throw new Error(data && data.error ? data.error : 'クラウド通信に失敗しました。');
@@ -834,7 +888,7 @@
       }
       const pollingLabel = pollingEnabled
         ? `自動更新：<strong>ON</strong>（${POLLING_INTERVAL_MS/1000}秒ごと）`
-        : `自動更新：<strong>OFF</strong>`;
+        : `自動更新：<strong style="color:#b91c1c;">一時停止中</strong>（連続失敗のため）<button type="button" class="btn btn-small btn-soft" id="btnResumePoll" style="margin-left:8px;">再開</button>`;
       if(syncState.mode === 'ok'){
         el.innerHTML = `<div class="sync-state ok">共有モード：接続中</div><div>最終同期：<strong>${escapeHTML(syncState.lastSyncedAt || '-')}</strong></div><div style="margin-top:8px;font-size:12px;">${pollingLabel}</div><div style="margin-top:4px;color:var(--muted);font-size:12px;">${escapeHTML(syncState.message || '')}</div>`;
         return;
@@ -4578,6 +4632,11 @@
         setSyncState('ok', ping.message || '接続成功');
         const el = $('dataMessage'); if(el){ el.className = 'notice success'; el.innerHTML = diagHtml; }
         showToast('接続確認に成功しました', 'success');
+        // 接続成功したら自動更新を再開（停止していた場合）
+        if(!pollingEnabled){
+          resumeAutoPolling();
+          showToast('自動更新を再開しました', 'success', 3000);
+        }
       }catch(err){
         setSyncState('ng', err.message);
         setDataMessage(`接続エラー：${err.message}`, 'error');
@@ -4590,22 +4649,45 @@
       if(dirtyLocal && !silent){
         if(!confirm('ローカルに未同期の変更があります。クラウドから再読込するとローカル変更が失われます。実行しますか？')) return;
       }
+      // 例外はここでは catch しない → autoPoll 側で連続失敗カウントする
+      if(!silent) setDataMessage('クラウドから読込中です...', 'info');
+      let res;
       try{
-        if(!silent) setDataMessage('クラウドから読込中です...', 'info');
-        const res = await callCloud('load', {});
-        const data = res.data || {};
-        candidates = (Array.isArray(data.candidates) ? data.candidates : []).map(normalizeCandidate);
-        plans = (Array.isArray(data.plans) ? data.plans : []).map(normalizePlan);
-        mediaCosts = (Array.isArray(data.mediaCosts) ? data.mediaCosts : []).map(normalizeMediaCost);
-        saveLocal();
-        renderAll();
-        markClean();
-        setSyncState('ok', silent ? '自動更新成功' : '読込成功');
-        if(!silent) setDataMessage(`クラウドから再読込しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
+        res = await callCloud('load', {});
       }catch(err){
         setSyncState('ng', err.message);
         if(!silent) setDataMessage(`クラウド読込エラー：${err.message}`, 'error');
+        throw err; // 自動更新の失敗カウンタ用に再スロー
       }
+      const data = res && res.data ? res.data : null;
+      // データ保護：res.data 自体が無い/オブジェクトでない場合は既存データを絶対に上書きしない
+      if(!data || typeof data !== 'object'){
+        console.warn('[CLOUD RELOAD] res.data が存在しません。既存データを保護します。', res);
+        setSyncState('ng', 'クラウド応答に data フィールドがありません（既存データは保持されます）');
+        if(!silent) setDataMessage('クラウド応答が想定形式ではありません。既存の表示データは保持しました。', 'warning');
+        throw new Error('クラウド応答形式エラー');
+      }
+      // 各配列も、undefined（キー欠落）なら既存データを保持。空配列[]は「全消し」として尊重する。
+      if(Array.isArray(data.candidates)){
+        candidates = data.candidates.map(normalizeCandidate);
+      }else{
+        console.warn('[CLOUD RELOAD] data.candidates が配列でないため既存データを保持:', data.candidates);
+      }
+      if(Array.isArray(data.plans)){
+        plans = data.plans.map(normalizePlan);
+      }else{
+        console.warn('[CLOUD RELOAD] data.plans が配列でないため既存データを保持');
+      }
+      if(Array.isArray(data.mediaCosts)){
+        mediaCosts = data.mediaCosts.map(normalizeMediaCost);
+      }else{
+        console.warn('[CLOUD RELOAD] data.mediaCosts が配列でないため既存データを保持');
+      }
+      saveLocal();
+      renderAll();
+      markClean();
+      setSyncState('ok', silent ? '自動更新成功' : '読込成功');
+      if(!silent) setDataMessage(`クラウドから再読込しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
     }
 
     async function cloudPush(){
@@ -4649,7 +4731,7 @@
       const onClick = (id, fn) => { const el = $(id); if(el) el.addEventListener('click', fn); };
       onClick('btnQuickForm', () => switchTab('form'));
       onClick('btnListForm', () => switchTab('form'));
-      onClick('btnQuickReload', cloudReload);
+      onClick('btnQuickReload', () => cloudReload(false).catch(() => { /* syncCardに表示済み */ }));
       onClick('btnQuickCSV', exportCandidatesCSV);
       onClick('btnQuickImport', () => {
         switchTab('settings');
@@ -4665,8 +4747,15 @@
       onClick('btnCloseModal', closeModal);
       onClick('btnSaveSettings', saveApiSettings);
       onClick('btnTestConnection', testConnection);
-      onClick('btnCloudReload', () => cloudReload(false));
+      onClick('btnCloudReload', () => cloudReload(false).catch(() => { /* エラーはsyncCardに表示済み */ }));
       onClick('btnCloudPush', cloudPush);
+      // 「自動更新 一時停止中」の再開ボタン（syncCard内に動的生成される）
+      document.addEventListener('click', e => {
+        if(e.target && e.target.id === 'btnResumePoll'){
+          resumeAutoPolling();
+          showToast('自動更新を再開しました', 'success', 2500);
+        }
+      });
       const pollingToggle = $('pollingToggle');
       if(pollingToggle){
         pollingToggle.addEventListener('change', () => {
