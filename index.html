@@ -79,13 +79,14 @@
     details.legacy-url{margin-top:14px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
     details.legacy-url summary{cursor:pointer;font-size:12px;color:var(--muted);font-weight:800}
     details.legacy-url[open] summary{margin-bottom:10px}
-    .funnel-row{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;padding:14px;background:#f8fbff;border-radius:16px;border:1px solid var(--line)}
-    .funnel-step{flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center;position:relative}
-    .funnel-step .fs-label{font-size:11px;color:var(--muted);font-weight:900;letter-spacing:.08em}
-    .funnel-step .fs-value{font-size:28px;font-weight:950;color:var(--navy);margin:4px 0;letter-spacing:-.03em}
-    .funnel-step .fs-unit{font-size:11px;color:var(--muted)}
-    .funnel-conv{display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:80px;font-size:11px;color:var(--muted);font-weight:900}
-    .funnel-conv .fc-rate{font-size:16px;color:var(--blue);font-weight:950;letter-spacing:-.02em}
+    .funnel-row{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;padding:22px 18px;background:linear-gradient(135deg,#f8fbff,#eef4ff);border-radius:18px;border:1px solid var(--line)}
+    .funnel-step{flex:1;min-width:130px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 16px;text-align:center;position:relative;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+    .funnel-step .fs-label{font-size:13px;color:var(--muted);font-weight:900;letter-spacing:.1em}
+    .funnel-step .fs-value{font-size:44px;font-weight:950;color:var(--navy);margin:8px 0 2px;letter-spacing:-.03em;line-height:1}
+    .funnel-step .fs-unit{font-size:12px;color:var(--muted)}
+    .funnel-conv{display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:110px;font-size:12px;color:var(--muted);font-weight:900;gap:4px}
+    .funnel-conv .fc-rate{font-size:22px;color:var(--blue);font-weight:950;letter-spacing:-.02em;line-height:1}
+    .funnel-conv .fc-arrow{font-size:22px;color:var(--muted);line-height:1}
     .funnel-conv.warn .fc-rate{color:var(--amber)}.funnel-conv.bad .fc-rate{color:var(--red)}
     .headline-card{background:linear-gradient(135deg,#eaf2ff,#f8fbff);border:1px solid #bfdbfe;border-radius:20px;padding:20px;margin-bottom:8px}
     .headline-card h4{margin:0 0 10px;color:var(--navy);font-size:18px}
@@ -123,45 +124,63 @@
     .mini-report-card .mrc-row strong{color:var(--navy);font-weight:900}
     .mini-report-card .mrc-bar{height:6px;border-radius:999px;background:#eaf0f7;overflow:hidden}
     .mini-report-card .mrc-bar>span{display:block;height:100%;background:var(--blue);border-radius:999px}
-    .cost-block{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-    .cost-item{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px}
-    .cost-item .c-label{font-size:11px;color:var(--muted);font-weight:900}
-    .cost-item .c-value{font-size:20px;font-weight:950;color:var(--navy);margin-top:4px;letter-spacing:-.02em}
-    .cost-item .c-sub{font-size:11px;color:var(--muted);margin-top:2px}
-    .hero-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-    @media(max-width:900px){.hero-grid{grid-template-columns:repeat(2,1fr)}}
-    .hero-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;position:relative;overflow:hidden}
-    .hero-card.alert{background:linear-gradient(135deg,#fef3c7,#fff);border-color:#fcd34d}
-    .hero-card.primary{background:linear-gradient(135deg,#eaf2ff,#fff);border-color:#bfdbfe}
-    .hero-card .h-label{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em}
-    .hero-card .h-value{font-size:36px;font-weight:950;color:var(--navy);letter-spacing:-.04em;margin:4px 0;line-height:1}
-    .hero-card .h-unit{font-size:12px;color:var(--muted);margin-left:4px}
-    .hero-card .h-sub{font-size:11px;color:var(--muted);margin-top:6px}
+    .cost-block{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+    .cost-item{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:14px;padding:18px 18px}
+    .cost-item .c-label{font-size:13px;color:var(--muted);font-weight:900;letter-spacing:.05em}
+    .cost-item .c-value{font-size:26px;font-weight:950;color:var(--navy);margin-top:6px;letter-spacing:-.02em;line-height:1.1}
+    .cost-item .c-sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .cost-item.highlight{background:linear-gradient(135deg,#eaf2ff,#fff);border-color:#bfdbfe}
+    .cost-item.highlight .c-value{color:var(--blue);font-size:30px}
+    .hero-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+    @media(max-width:1180px){.hero-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:720px){.hero-grid{grid-template-columns:repeat(2,1fr)}}
+    .hero-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px 20px;position:relative;overflow:hidden;min-height:140px;display:flex;flex-direction:column;justify-content:flex-start}
+    .hero-card.alert{background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d;box-shadow:0 2px 8px rgba(251,191,36,.12)}
+    .hero-card.primary{background:linear-gradient(135deg,#eaf2ff,#f6faff);border-color:#bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,.10)}
+    .hero-card .h-label{font-size:14px;color:var(--muted);font-weight:900;letter-spacing:.08em}
+    .hero-card .h-value{font-size:48px;font-weight:950;color:var(--navy);letter-spacing:-.04em;margin:10px 0 6px;line-height:1}
+    .hero-card .h-unit{font-size:14px;color:var(--muted);margin-left:4px;font-weight:900}
+    .hero-card .h-sub{font-size:12px;color:var(--muted);margin-top:auto;padding-top:4px}
     .hero-card.alert .h-value{color:#a16207}
-    .hero-card .h-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:900;margin-top:6px;background:#f1f5f9;color:#475569}
-    .hero-card.alert .h-tag{background:#fef9c3;color:#a16207}
-    .job-summary-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}
-    .job-summary-card h5{margin:0 0 10px;color:var(--navy);display:flex;justify-content:space-between;align-items:baseline;font-size:14px}
-    .job-summary-card h5 .js-status{font-size:10px;padding:2px 8px;border-radius:999px;font-weight:900}
-    .job-summary-card .js-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-    .job-summary-card .js-metric{background:#f8fafc;border-radius:10px;padding:8px 10px}
-    .job-summary-card .js-metric-label{font-size:10px;color:var(--muted);font-weight:900}
-    .job-summary-card .js-metric-value{font-size:18px;font-weight:950;color:var(--navy);letter-spacing:-.02em}
+    .hero-card.primary .h-value{color:var(--blue)}
+    .hero-card .h-tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:900;margin-top:8px;background:#f1f5f9;color:#475569;align-self:flex-start}
+    .hero-card.alert .h-tag{background:#fbbf24;color:#78350f}
+    .job-summary-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px 18px}
+    .job-summary-card h5{margin:0 0 14px;color:var(--navy);display:flex;justify-content:space-between;align-items:baseline;font-size:16px;gap:8px}
+    .job-summary-card h5 .js-status{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:900}
+    .job-summary-card .js-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .job-summary-card .js-metric{background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:12px 14px}
+    .job-summary-card .js-metric-label{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em}
+    .job-summary-card .js-metric-value{font-size:26px;font-weight:950;color:var(--navy);letter-spacing:-.02em;margin-top:2px;line-height:1.1}
+    .job-summary-card .js-metric.shortage{background:#fef2f2;border-color:#fecaca}
     .job-summary-card .js-metric.shortage .js-metric-value{color:#b91c1c}
-    .js-progress{height:10px;border-radius:999px;background:#eaf0f7;overflow:hidden}
-    .js-progress>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px}
-    .js-emp-inline{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+    .js-progress{height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden;margin-bottom:6px}
+    .js-progress>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px;transition:width .3s ease}
+    .js-progress-label{font-size:11px;color:var(--muted);font-weight:900;text-align:right;margin-top:2px}
+    .js-emp-inline{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap;padding-top:10px;border-top:1px dashed #edf2f7}
     .js-emp-inline strong{color:var(--navy);font-weight:900}
-    .today-action{display:flex;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;align-items:center}
-    .today-action .ta-num{width:28px;height:28px;border-radius:50%;background:var(--blueSoft);color:var(--blue2);display:grid;place-items:center;font-weight:950;font-size:14px;flex-shrink:0}
+    .today-action{display:flex;gap:12px;padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;align-items:center}
+    .today-action .ta-num{width:36px;height:36px;border-radius:50%;background:var(--blueSoft);color:var(--blue2);display:grid;place-items:center;font-weight:950;font-size:17px;flex-shrink:0}
     .today-action .ta-body{flex:1;min-width:0}
-    .today-action .ta-title{font-size:13px;color:var(--navy);font-weight:900;line-height:1.3}
-    .today-action .ta-sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .today-action .ta-title{font-size:15px;color:var(--navy);font-weight:900;line-height:1.35}
+    .today-action .ta-sub{font-size:12px;color:var(--muted);margin-top:3px}
     .today-action .ta-btn{flex-shrink:0}
-    .today-action.pri-high{border-left:4px solid var(--red)}
+    .today-action.pri-high{border-left:5px solid var(--red);background:linear-gradient(90deg,#fef2f2,#fff 40%)}
     .today-action.pri-high .ta-num{background:#fee2e2;color:#b91c1c}
-    .today-action.pri-mid{border-left:4px solid var(--amber)}
+    .today-action.pri-mid{border-left:5px solid var(--amber);background:linear-gradient(90deg,#fefce8,#fff 40%)}
     .today-action.pri-mid .ta-num{background:#fef9c3;color:#a16207}
+    /* ダッシュボード用：応募経路・雇用形態の可読性向上 */
+    .dash-list-row{display:grid;grid-template-columns:110px 1fr 120px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #eef2f7;font-size:15px}
+    .dash-list-row:last-child{border-bottom:0}
+    .dash-list-row .dl-label{color:var(--navy);font-weight:900}
+    .dash-list-row .dl-bar{height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden}
+    .dash-list-row .dl-bar>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px}
+    .dash-list-row .dl-count{text-align:right;font-weight:900;color:var(--navy)}
+    .dash-list-row .dl-count small{color:var(--muted);font-weight:700;margin-left:6px;font-size:12px}
+    .dash-emp-row{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;font-size:15px;border-bottom:1px dashed #eef2f7}
+    .dash-emp-row:last-child{border-bottom:0}
+    .dash-emp-row .em-dot{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:middle}
+    .dash-emp-row strong{color:var(--navy);font-weight:900;font-size:16px}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -200,7 +219,7 @@
         <div id="dashHero"></div>
 
         <!-- BLOCK 2 + 3: ファネル + 今日やること -->
-        <div class="grid" style="margin-top:18px;">
+        <div class="grid" style="margin-top:22px;gap:18px;">
           <div class="card wide">
             <div class="card-head"><div><h3>採用ファネル</h3><p class="hint">応募 → 面接 → 内定 → 承諾 → 入社 の流れと転換率</p></div></div>
             <div id="dashFunnel"></div>
@@ -1590,11 +1609,11 @@
           <div class="h-label">未評価</div>
           <div class="h-value">${unrated}<span class="h-unit">名</span></div>
           <div class="h-sub">${total > 0 ? `全体の ${unratedPct}%` : '-'}</div>
-          ${unrated > 0 ? '<span class="h-tag">要対応</span>' : '<span class="h-tag">完了</span>'}
+          ${unrated > 0 ? '<span class="h-tag">⚠ 要対応</span>' : '<span class="h-tag">✓ 完了</span>'}
         </div>
         <div class="hero-card">
           <div class="h-label">今月の採用費</div>
-          <div class="h-value" style="font-size:${monthCost.total > 0 ? '28px' : '20px'};">${costLabel}</div>
+          <div class="h-value" style="${monthCost.total > 0 ? '' : 'font-size:24px;'}">${costLabel}</div>
           <div class="h-sub">${ym}</div>
           ${costTag}
         </div>
@@ -1625,7 +1644,7 @@
       el.innerHTML = `<div class="funnel-row">${steps.map(s => {
         if(s.conv !== undefined){
           const cls = s.conv === null ? '' : (s.conv < 20 ? 'bad' : (s.conv < 40 ? 'warn' : ''));
-          return `<div class="funnel-conv ${cls}"><span>↓</span><span class="fc-rate">${convLabel(s.conv)}</span></div>`;
+          return `<div class="funnel-conv ${cls}"><span class="fc-arrow">→</span><span class="fc-rate">${convLabel(s.conv)}</span></div>`;
         }
         return `<div class="funnel-step"><div class="fs-label">${escapeHTML(s.label)}</div><div class="fs-value">${s.val}</div><div class="fs-unit">名</div></div>`;
       }).join('')}</div>`;
@@ -1715,7 +1734,7 @@
             <div class="js-metric"><div class="js-metric-label">目標</div><div class="js-metric-value">${target || '-'}</div></div>
             <div class="js-metric ${shortage > 0 ? 'shortage' : ''}"><div class="js-metric-label">不足</div><div class="js-metric-value">${shortage}</div></div>
           </div>
-          ${target > 0 ? `<div class="js-progress"><span style="width:${Math.min(100, rate || 0)}%"></span></div>` : ''}
+          ${target > 0 ? `<div class="js-progress"><span style="width:${Math.min(100, rate || 0)}%"></span></div><div class="js-progress-label">達成率 ${rate || 0}%（${hired} / ${target} 名）</div>` : ''}
           <div class="js-emp-inline">
             ${emp['正社員'] > 0 ? `<span>正社員 <strong>${emp['正社員']}</strong></span>` : ''}
             ${emp['アルバイト'] > 0 ? `<span>アルバイト <strong>${emp['アルバイト']}</strong></span>` : ''}
@@ -1740,16 +1759,16 @@
 
       const rows = counts.filter(r => r.count > 0).map(r => {
         const pct = total > 0 ? Math.round(r.count / total * 1000) / 10 : 0;
-        return `<div style="display:grid;grid-template-columns:80px 1fr 100px;align-items:center;gap:10px;padding:6px 0;">
-          <strong style="color:var(--navy);font-size:13px;">${escapeHTML(r.label)}</strong>
-          <div style="height:10px;border-radius:999px;background:#eaf0f7;overflow:hidden;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px;"></div></div>
-          <div style="text-align:right;font-size:12px;color:var(--navy);font-weight:900;">${r.count}名 <small style="color:var(--muted);">${pct}%</small></div>
+        return `<div class="dash-list-row">
+          <span class="dl-label">${escapeHTML(r.label)}</span>
+          <div class="dl-bar"><span style="width:${pct}%;"></span></div>
+          <div class="dl-count">${r.count}名<small>${pct}%</small></div>
         </div>`;
       }).join('');
       // 偏り警告
       const top = counts[0];
       const topPct = top && total > 0 ? Math.round(top.count / total * 100) : 0;
-      const warn = top && topPct >= 80 ? `<div class="notice" style="margin-top:10px;font-size:12px;">📢 応募の${topPct}%が${escapeHTML(top.label)}に集中しています。他媒体の活用も検討してください。</div>` : '';
+      const warn = top && topPct >= 80 ? `<div class="notice" style="margin-top:12px;font-size:13px;">📢 応募の${topPct}%が${escapeHTML(top.label)}に集中しています。他媒体の活用も検討してください。</div>` : '';
       el.innerHTML = rows + warn;
     }
 
@@ -1765,13 +1784,16 @@
       ];
       const unset = s['未設定'] || 0;
       // 積み上げバー
-      const stacked = `<div style="display:flex;height:16px;border-radius:8px;overflow:hidden;background:#eaf0f7;margin-bottom:10px;">${rows.map(([l, c, color]) => {
+      const stacked = `<div style="display:flex;height:22px;border-radius:11px;overflow:hidden;background:#eaf0f7;margin-bottom:14px;">${rows.map(([l, c, color]) => {
         const pct = total > 0 ? c / total * 100 : 0;
         return c > 0 ? `<div title="${l}：${c}名" style="width:${pct}%;background:${color};"></div>` : '';
       }).join('')}${unset > 0 ? `<div title="未設定：${unset}名" style="width:${unset/total*100}%;background:#cbd5e1;"></div>` : ''}</div>`;
-      const list = rows.map(([l, c, color]) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;"><span><span style="display:inline-block;width:10px;height:10px;background:${color};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>${escapeHTML(l)}</span><strong style="color:var(--navy);">${c}名</strong></div>`).join('');
+      const list = rows.map(([l, c, color]) => {
+        const pct = total > 0 ? Math.round(c / total * 1000) / 10 : 0;
+        return `<div class="dash-emp-row"><span><span class="em-dot" style="background:${color};"></span>${escapeHTML(l)}</span><span><strong>${c}名</strong><small style="color:var(--muted);font-weight:700;margin-left:6px;font-size:12px;">${pct}%</small></span></div>`;
+      }).join('');
       const unsetLine = unset > 0
-        ? `<div style="margin-top:8px;padding:6px 10px;background:#f8fafc;border:1px dashed var(--line);border-radius:8px;font-size:11px;color:var(--muted);">未設定 ${unset}名 → 応募者一覧で設定推奨</div>`
+        ? `<div style="margin-top:10px;padding:8px 12px;background:#fef2f2;border:1px dashed #fecaca;border-radius:10px;font-size:12px;color:#b91c1c;font-weight:900;">⚠ 未設定 ${unset}名 → 応募者一覧で設定推奨</div>`
         : '';
       el.innerHTML = stacked + list + unsetLine;
       // 詳細（職種×雇用形態）
@@ -1799,10 +1821,10 @@
       const cpaApplied = c.total > 0 && monthApplied > 0 ? yen(Math.round(c.total / monthApplied)) : '-';
       const cpaHired = c.total > 0 && monthHired > 0 ? yen(Math.round(c.total / monthHired)) : '-';
       el.innerHTML = `<div class="cost-block">
-        <div class="cost-item"><div class="c-label">総採用費</div><div class="c-value" style="font-size:${c.total > 0 ? '20px' : '16px'};">${costDisplay}</div><div class="c-sub">${ym}</div></div>
+        <div class="cost-item highlight"><div class="c-label">総採用費</div><div class="c-value" style="${c.total > 0 ? '' : 'font-size:20px;'}">${costDisplay}</div><div class="c-sub">${ym}</div></div>
         <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value">${c.ad > 0 ? yen(c.ad) : '未登録'}</div><div class="c-sub">Indeed等</div></div>
         <div class="cost-item"><div class="c-label">紹介手数料</div><div class="c-value">${c.fee > 0 ? yen(c.fee) : '未登録'}</div><div class="c-sub">PLEX等</div></div>
-        <div class="cost-item"><div class="c-label">今月応募</div><div class="c-value">${monthApplied}<span style="font-size:12px;color:var(--muted);">名</span></div><div class="c-sub">応募日ベース</div></div>
+        <div class="cost-item"><div class="c-label">今月応募</div><div class="c-value">${monthApplied}<span style="font-size:14px;color:var(--muted);margin-left:4px;">名</span></div><div class="c-sub">応募日ベース</div></div>
         <div class="cost-item"><div class="c-label">応募単価</div><div class="c-value">${cpaApplied}</div><div class="c-sub">総費用÷応募</div></div>
         <div class="cost-item"><div class="c-label">採用単価</div><div class="c-value">${cpaHired}</div><div class="c-sub">総費用÷採用</div></div>
       </div>`;
