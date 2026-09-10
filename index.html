@@ -169,27 +169,30 @@
     .today-action.pri-high .ta-num{background:#fee2e2;color:#b91c1c}
     .today-action.pri-mid{border-left:5px solid var(--amber);background:linear-gradient(90deg,#fefce8,#fff 40%)}
     .today-action.pri-mid .ta-num{background:#fef9c3;color:#a16207}
-    /* ダッシュボード用：応募経路 横長カード内レイアウト */
-    .dash-list-row{display:grid;grid-template-columns:180px 1fr 200px;align-items:center;gap:20px;padding:16px 4px;border-bottom:1px solid #eef2f7}
+    /* ダッシュボード用：応募経路 横長カード内レイアウト（数字を右揃え・折返し禁止） */
+    .dash-list-row{display:grid;grid-template-columns:minmax(160px,220px) 1fr minmax(100px,140px) minmax(70px,90px);align-items:center;column-gap:20px;padding:16px 4px;border-bottom:1px solid #eef2f7}
     .dash-list-row:last-child{border-bottom:0}
-    .dash-list-row .dl-label{color:var(--navy);font-weight:900;font-size:18px;letter-spacing:.01em}
-    .dash-list-row .dl-bar{height:16px;border-radius:999px;background:#eaf0f7;overflow:hidden}
+    .dash-list-row .dl-label{color:var(--navy);font-weight:900;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .dash-list-row .dl-bar{height:16px;border-radius:999px;background:#eaf0f7;overflow:hidden;min-width:80px}
     .dash-list-row .dl-bar>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px;transition:width .3s ease}
-    .dash-list-row .dl-count{text-align:right;font-weight:950;color:var(--navy);font-size:22px;letter-spacing:-.02em}
-    .dash-list-row .dl-count small{color:var(--muted);font-weight:800;margin-left:10px;font-size:15px}
+    .dash-list-row .dl-count{text-align:right;font-weight:950;color:var(--navy);font-size:22px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .dash-list-row .dl-pct{text-align:right;font-weight:800;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
     @media(max-width:900px){
-      .dash-list-row{grid-template-columns:1fr 140px;gap:14px}
-      .dash-list-row .dl-bar{grid-column:1/-1;order:3}
+      .dash-list-row{grid-template-columns:1fr auto auto;column-gap:12px}
+      .dash-list-row .dl-bar{grid-column:1/-1;order:3;margin-top:6px}
     }
-    /* 雇用形態：横長のタイル式 */
-    .emp-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
-    @media(max-width:720px){.emp-tiles{grid-template-columns:1fr}}
-    .emp-tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px;position:relative}
-    .emp-tile .et-label{font-size:14px;color:var(--muted);font-weight:900;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
-    .emp-tile .et-dot{display:inline-block;width:14px;height:14px;border-radius:4px}
-    .emp-tile .et-value{font-size:36px;font-weight:950;color:var(--navy);margin-top:6px;letter-spacing:-.03em;line-height:1}
-    .emp-tile .et-unit{font-size:15px;color:var(--muted);margin-left:4px;font-weight:900}
-    .emp-tile .et-pct{font-size:14px;color:var(--muted);margin-top:4px;font-weight:800}
+    /* 雇用形態：横長のタイル式（3つ横並び・折返し絶対禁止） */
+    .emp-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+    @media(max-width:900px){.emp-tiles{grid-template-columns:1fr}}
+    .emp-tile{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:16px;padding:22px 24px;position:relative;min-width:0}
+    .emp-tile .et-label{font-size:15px;color:var(--muted);font-weight:900;letter-spacing:.05em;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .emp-tile .et-dot{display:inline-block;width:14px;height:14px;border-radius:4px;flex-shrink:0}
+    .emp-tile .et-value{font-size:40px;font-weight:950;color:var(--navy);margin-top:8px;letter-spacing:-.03em;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .emp-tile .et-unit{font-size:16px;color:var(--muted);margin-left:4px;font-weight:900}
+    .emp-tile .et-pct{font-size:14px;color:var(--muted);margin-top:6px;font-weight:800;white-space:nowrap}
+    /* 応募経路：偏り警告をカード下部の独立ボックスへ */
+    .dash-source-warn{margin-top:14px;padding:12px 16px;background:linear-gradient(90deg,#fef3c7,#fffbeb);border:1px solid #fcd34d;border-radius:12px;font-size:14px;color:#78350f;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .dash-source-warn strong{color:#92400e;font-weight:950}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -1772,13 +1775,16 @@
         return `<div class="dash-list-row">
           <span class="dl-label">${escapeHTML(r.label)}</span>
           <div class="dl-bar"><span style="width:${pct}%;"></span></div>
-          <div class="dl-count">${r.count}名<small>${pct}%</small></div>
+          <div class="dl-count">${r.count}<span style="font-size:14px;color:var(--muted);margin-left:4px;">名</span></div>
+          <div class="dl-pct">${pct}%</div>
         </div>`;
       }).join('');
-      // 偏り警告
+      // 偏り警告（カード内下部に独立ボックスとして分離）
       const top = counts[0];
       const topPct = top && total > 0 ? Math.round(top.count / total * 100) : 0;
-      const warn = top && topPct >= 80 ? `<div class="notice" style="margin-top:12px;font-size:13px;">📢 応募の${topPct}%が${escapeHTML(top.label)}に集中しています。他媒体の活用も検討してください。</div>` : '';
+      const warn = top && topPct >= 80
+        ? `<div class="dash-source-warn">📢 <strong>${escapeHTML(top.label)}依存：${topPct}%</strong>　他媒体の活用も検討してください。</div>`
+        : '';
       el.innerHTML = rows + warn;
     }
 
