@@ -169,18 +169,27 @@
     .today-action.pri-high .ta-num{background:#fee2e2;color:#b91c1c}
     .today-action.pri-mid{border-left:5px solid var(--amber);background:linear-gradient(90deg,#fefce8,#fff 40%)}
     .today-action.pri-mid .ta-num{background:#fef9c3;color:#a16207}
-    /* ダッシュボード用：応募経路・雇用形態の可読性向上 */
-    .dash-list-row{display:grid;grid-template-columns:110px 1fr 120px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #eef2f7;font-size:15px}
+    /* ダッシュボード用：応募経路 横長カード内レイアウト */
+    .dash-list-row{display:grid;grid-template-columns:180px 1fr 200px;align-items:center;gap:20px;padding:16px 4px;border-bottom:1px solid #eef2f7}
     .dash-list-row:last-child{border-bottom:0}
-    .dash-list-row .dl-label{color:var(--navy);font-weight:900}
-    .dash-list-row .dl-bar{height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden}
-    .dash-list-row .dl-bar>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px}
-    .dash-list-row .dl-count{text-align:right;font-weight:900;color:var(--navy)}
-    .dash-list-row .dl-count small{color:var(--muted);font-weight:700;margin-left:6px;font-size:12px}
-    .dash-emp-row{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;font-size:15px;border-bottom:1px dashed #eef2f7}
-    .dash-emp-row:last-child{border-bottom:0}
-    .dash-emp-row .em-dot{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:middle}
-    .dash-emp-row strong{color:var(--navy);font-weight:900;font-size:16px}
+    .dash-list-row .dl-label{color:var(--navy);font-weight:900;font-size:18px;letter-spacing:.01em}
+    .dash-list-row .dl-bar{height:16px;border-radius:999px;background:#eaf0f7;overflow:hidden}
+    .dash-list-row .dl-bar>span{display:block;height:100%;background:linear-gradient(90deg,#60a5fa,#22d3ee);border-radius:999px;transition:width .3s ease}
+    .dash-list-row .dl-count{text-align:right;font-weight:950;color:var(--navy);font-size:22px;letter-spacing:-.02em}
+    .dash-list-row .dl-count small{color:var(--muted);font-weight:800;margin-left:10px;font-size:15px}
+    @media(max-width:900px){
+      .dash-list-row{grid-template-columns:1fr 140px;gap:14px}
+      .dash-list-row .dl-bar{grid-column:1/-1;order:3}
+    }
+    /* 雇用形態：横長のタイル式 */
+    .emp-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+    @media(max-width:720px){.emp-tiles{grid-template-columns:1fr}}
+    .emp-tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px;position:relative}
+    .emp-tile .et-label{font-size:14px;color:var(--muted);font-weight:900;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+    .emp-tile .et-dot{display:inline-block;width:14px;height:14px;border-radius:4px}
+    .emp-tile .et-value{font-size:36px;font-weight:950;color:var(--navy);margin-top:6px;letter-spacing:-.03em;line-height:1}
+    .emp-tile .et-unit{font-size:15px;color:var(--muted);margin-left:4px;font-weight:900}
+    .emp-tile .et-pct{font-size:14px;color:var(--muted);margin-top:4px;font-weight:800}
     @media(max-width:1180px){.app-shell{grid-template-columns:1fr}aside{position:relative;height:auto}.tab-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.side-note{display:none}.metric{grid-column:span 4}.wide,.side{grid-column:1/-1}}
     @media(max-width:720px){main{padding:18px}aside{padding:18px}.topbar{flex-direction:column}.quick-actions{justify-content:flex-start}.tab-list{grid-template-columns:1fr 1fr}.metric{grid-column:1/-1}.filters,.form-grid,.form-grid-2,.detail-grid{grid-template-columns:1fr}}
   </style>
@@ -236,17 +245,18 @@
             <div id="dashJobs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;"></div>
           </div>
 
-          <!-- BLOCK 5: 応募経路 + 雇用形態（並列コンパクト） -->
-          <div class="card half">
-            <div class="card-head"><div><h3>応募経路</h3><p class="hint">件数・割合・偏り警告</p></div></div>
+          <!-- BLOCK 5: 応募経路（横長・full幅） -->
+          <div class="card full">
+            <div class="card-head"><div><h3>応募経路</h3><p class="hint">媒体別の応募件数と構成比。数字を主役に表示します。</p></div></div>
             <div id="dashSources"></div>
           </div>
-          <div class="card half">
-            <div class="card-head"><div><h3>雇用形態</h3><p class="hint">正社員 / アルバイト / 事務（コンパクト）</p></div></div>
+          <!-- BLOCK 5b: 雇用形態（横長・full幅） -->
+          <div class="card full">
+            <div class="card-head"><div><h3>雇用形態</h3><p class="hint">正社員 / アルバイト / 事務の件数と構成比。</p></div></div>
             <div id="dashEmployment"></div>
-            <details style="margin-top:10px;">
-              <summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:800;">職種×雇用形態の詳細を見る</summary>
-              <div id="dashEmpByJob" style="margin-top:10px;"></div>
+            <details style="margin-top:14px;">
+              <summary style="cursor:pointer;font-size:13px;color:var(--muted);font-weight:800;">職種×雇用形態の詳細を見る</summary>
+              <div id="dashEmpByJob" style="margin-top:12px;"></div>
             </details>
           </div>
 
@@ -1784,18 +1794,22 @@
       ];
       const unset = s['未設定'] || 0;
       // 積み上げバー
-      const stacked = `<div style="display:flex;height:22px;border-radius:11px;overflow:hidden;background:#eaf0f7;margin-bottom:14px;">${rows.map(([l, c, color]) => {
+      const stacked = `<div style="display:flex;height:26px;border-radius:13px;overflow:hidden;background:#eaf0f7;">${rows.map(([l, c, color]) => {
         const pct = total > 0 ? c / total * 100 : 0;
         return c > 0 ? `<div title="${l}：${c}名" style="width:${pct}%;background:${color};"></div>` : '';
       }).join('')}${unset > 0 ? `<div title="未設定：${unset}名" style="width:${unset/total*100}%;background:#cbd5e1;"></div>` : ''}</div>`;
-      const list = rows.map(([l, c, color]) => {
+      const tiles = `<div class="emp-tiles">${rows.map(([l, c, color]) => {
         const pct = total > 0 ? Math.round(c / total * 1000) / 10 : 0;
-        return `<div class="dash-emp-row"><span><span class="em-dot" style="background:${color};"></span>${escapeHTML(l)}</span><span><strong>${c}名</strong><small style="color:var(--muted);font-weight:700;margin-left:6px;font-size:12px;">${pct}%</small></span></div>`;
-      }).join('');
+        return `<div class="emp-tile">
+          <div class="et-label"><span class="et-dot" style="background:${color};"></span>${escapeHTML(l)}</div>
+          <div class="et-value">${c}<span class="et-unit">名</span></div>
+          <div class="et-pct">構成比 ${pct}%</div>
+        </div>`;
+      }).join('')}</div>`;
       const unsetLine = unset > 0
-        ? `<div style="margin-top:10px;padding:8px 12px;background:#fef2f2;border:1px dashed #fecaca;border-radius:10px;font-size:12px;color:#b91c1c;font-weight:900;">⚠ 未設定 ${unset}名 → 応募者一覧で設定推奨</div>`
+        ? `<div style="margin-top:14px;padding:10px 14px;background:#fef2f2;border:1px dashed #fecaca;border-radius:10px;font-size:13px;color:#b91c1c;font-weight:900;">⚠ 雇用形態 未設定 ${unset}名（全体の ${Math.round(unset/total*1000)/10}%）→ 応募者一覧で設定を推奨</div>`
         : '';
-      el.innerHTML = stacked + list + unsetLine;
+      el.innerHTML = stacked + tiles + unsetLine;
       // 詳細（職種×雇用形態）
       const detailEl = $('dashEmpByJob'); if(detailEl){
         const data = getEmploymentDisplayByJob();
