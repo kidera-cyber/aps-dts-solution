@@ -725,6 +725,19 @@
           </div>
 
           <div class="form-section">
+            <h4>CSV照合による応募者削除</h4>
+            <p class="hint" style="margin-bottom:10px;">CSVに記載された応募者だけをAPSから削除します。<strong>メールアドレス／電話番号を優先照合</strong>し、氏名だけの一致は「要確認」として自動削除対象外にします。他応募者・plans・mediaCosts・API設定には一切影響しません。</p>
+            <div class="action-row">
+              <label class="btn btn-soft btn-file">削除対象CSVを選択<input type="file" id="inputDeleteCSV" accept=".csv,text/csv" /></label>
+              <button class="btn btn-soft" id="btnAnalyzeDeleteCSV" disabled>照合を実行（DRY RUN）</button>
+              <button class="btn btn-danger" id="btnExecuteDeleteCSV" disabled>削除を実行</button>
+            </div>
+            <div id="deleteCsvFileName" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+            <div id="deleteCsvMessage" style="margin-top:10px;"></div>
+            <div id="deleteCsvResult" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
             <h4>その他</h4>
             <div class="action-row">
               <button class="btn btn-soft" id="btnLoadSample">サンプルデータを再投入</button>
@@ -4849,6 +4862,193 @@
       setDataMessage('サンプルデータを再投入しました', 'success');
     }
 
+    // ===== CSV照合による応募者削除 =====
+    // 正規化ユーティリティ
+    function normalizeEmailForMatch(v){ return String(v || '').trim().toLowerCase(); }
+    function normalizePhoneForMatch(v){ return String(v || '').normalize('NFKC').replace(/\D/g, ''); }
+    function normalizeNameForMatch(v){ return String(v || '').normalize('NFKC').replace(/\s+/g, '').trim().toLowerCase(); }
+
+    let deleteCsvState = { file: null, rows: null, analysis: null };
+
+    function handleDeleteCsvFileSelect(e){
+      const f = e.target.files && e.target.files[0];
+      const nameEl = $('deleteCsvFileName'), msgEl = $('deleteCsvMessage'), resEl = $('deleteCsvResult');
+      const btnAnalyze = $('btnAnalyzeDeleteCSV'), btnExec = $('btnExecuteDeleteCSV');
+      if(!f){ deleteCsvState = { file:null, rows:null, analysis:null }; if(nameEl) nameEl.textContent = ''; if(btnAnalyze) btnAnalyze.disabled = true; if(btnExec) btnExec.disabled = true; return; }
+      deleteCsvState.file = f;
+      if(nameEl) nameEl.textContent = `選択中：${f.name}（${(f.size/1024).toFixed(1)} KB）`;
+      if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = 'CSVを選択しました。「照合を実行」を押してください。'; }
+      if(resEl) resEl.innerHTML = '';
+      if(btnAnalyze) btnAnalyze.disabled = false;
+      if(btnExec) btnExec.disabled = true;
+    }
+
+    async function analyzeDeleteCsv(){
+      const f = deleteCsvState.file;
+      const msgEl = $('deleteCsvMessage'), resEl = $('deleteCsvResult'), btnExec = $('btnExecuteDeleteCSV');
+      if(!f){ if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = 'CSVファイルを選択してください。'; } return; }
+      try{
+        const text = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+          r.readAsText(f, 'UTF-8');
+        });
+        const rows = parseCsv(text);
+        const objs = rowsToObjects(rows);
+        if(objs.length === 0){ if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = 'CSVにデータ行がありません。'; } return; }
+
+        // CSVから照合キー抽出（列名は柔軟に対応：メールアドレス/email、電話番号/phone、応募者名/氏名/名前）
+        const pick = (o, keys) => { for(const k of keys){ if(o[k]) return o[k]; } return ''; };
+        const csvRecords = objs.map((o, i) => ({
+          row: i + 2, // 1行目ヘッダなので +2 が実CSV行番号
+          email: pick(o, ['メールアドレス','email','Email','E-mail','mail']),
+          phone: pick(o, ['電話番号','phone','Phone','tel','TEL','携帯番号']),
+          name: pick(o, ['応募者名','氏名','名前','name','Name'])
+        }));
+
+        // APS candidate をインデックス化
+        const byEmail = new Map(), byPhone = new Map(), byName = new Map();
+        candidates.forEach(c => {
+          const e = normalizeEmailForMatch(c.email);
+          const p = normalizePhoneForMatch(c.phone);
+          const n = normalizeNameForMatch(c.name);
+          if(e) (byEmail.get(e) || byEmail.set(e, []).get(e)).push(c);
+          if(p) (byPhone.get(p) || byPhone.set(p, []).get(p)).push(c);
+          if(n) (byName.get(n) || byName.set(n, []).get(n)).push(c);
+        });
+
+        const matchedIds = new Set();      // 自動削除対象
+        const reviewIds = new Set();       // 氏名のみ一致（要確認、自動削除しない）
+        const notFoundRows = [];
+        let emailMatch = 0, phoneMatch = 0, nameOnlyMatch = 0, combinedMatch = 0;
+
+        csvRecords.forEach(rec => {
+          const e = normalizeEmailForMatch(rec.email);
+          const p = normalizePhoneForMatch(rec.phone);
+          const n = normalizeNameForMatch(rec.name);
+          let hitCandidates = [];
+          let hitByEmail = false, hitByPhone = false;
+          if(e && byEmail.has(e)){ hitCandidates = hitCandidates.concat(byEmail.get(e)); hitByEmail = true; }
+          if(p && byPhone.has(p)){ hitCandidates = hitCandidates.concat(byPhone.get(p)); hitByPhone = true; }
+          // 重複排除
+          const uniq = Array.from(new Set(hitCandidates.map(c => c.id))).map(id => hitCandidates.find(c => c.id === id));
+          if(uniq.length > 0){
+            uniq.forEach(c => matchedIds.add(c.id));
+            if(hitByEmail && hitByPhone) combinedMatch++;
+            else if(hitByEmail) emailMatch++;
+            else if(hitByPhone) phoneMatch++;
+          }else if(n && byName.has(n)){
+            // 氏名のみ一致 → 要確認
+            byName.get(n).forEach(c => reviewIds.add(c.id));
+            nameOnlyMatch++;
+          }else{
+            notFoundRows.push(rec.row);
+          }
+        });
+
+        // 要確認から自動削除対象を除外
+        matchedIds.forEach(id => reviewIds.delete(id));
+
+        deleteCsvState.rows = csvRecords;
+        deleteCsvState.analysis = { matchedIds: Array.from(matchedIds), reviewIds: Array.from(reviewIds), notFoundCount: notFoundRows.length, emailMatch, phoneMatch, combinedMatch, nameOnlyMatch };
+
+        const total = candidates.length;
+        const delCount = matchedIds.size;
+        const remain = total - delCount;
+        // 表示（個人情報は出さない）
+        resEl.className = 'notice';
+        resEl.innerHTML = `
+          <div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:8px;">📊 照合結果（DRY RUN）</div>
+          <table style="width:100%;font-size:13px;border-collapse:collapse;">
+            <tr><td style="padding:4px 8px;color:var(--muted);">CSVレコード数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${csvRecords.length}件</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--muted);">　メールアドレス完全一致</td><td style="padding:4px 8px;text-align:right;">${emailMatch}件</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--muted);">　電話番号完全一致</td><td style="padding:4px 8px;text-align:right;">${phoneMatch}件</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--muted);">　メール＋電話 両方一致</td><td style="padding:4px 8px;text-align:right;">${combinedMatch}件</td></tr>
+            <tr><td style="padding:4px 8px;color:#b91c1c;font-weight:900;">自動削除対象（MATCH）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#b91c1c;font-size:16px;">${matchedIds.size}件</td></tr>
+            <tr><td style="padding:4px 8px;color:#a16207;">氏名のみ一致（REVIEW／自動削除しない）</td><td style="padding:4px 8px;text-align:right;color:#a16207;">${reviewIds.size}件</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--muted);">一致なし（NOT_FOUND）</td><td style="padding:4px 8px;text-align:right;">${notFoundRows.length}件</td></tr>
+            <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;"></td></tr>
+            <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">削除前 総応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${total}名</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">削除後 予定応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${remain}名</td></tr>
+          </table>
+          <div style="margin-top:8px;font-size:12px;color:var(--muted);">※ 氏名のみ一致の応募者は同姓同名の可能性があるため、自動削除しません。必要な場合は応募者一覧から個別削除してください。</div>
+        `;
+        if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = '照合が完了しました。内容を確認してから「削除を実行」を押してください。'; }
+        if(btnExec) btnExec.disabled = matchedIds.size === 0;
+        console.log('[CSV DELETE DRY RUN] MATCH件数:', matchedIds.size, 'REVIEW件数:', reviewIds.size, 'NOT_FOUND件数:', notFoundRows.length);
+      }catch(err){
+        console.error('[CSV DELETE] 解析エラー:', err);
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `CSV解析エラー：${err.message || err}`; }
+      }
+    }
+
+    async function executeDeleteCsv(){
+      const a = deleteCsvState.analysis;
+      const msgEl = $('deleteCsvMessage'), resEl = $('deleteCsvResult');
+      if(!a || a.matchedIds.length === 0){ if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = '削除対象がありません。先に「照合を実行」を押してください。'; } return; }
+      const target = new Set(a.matchedIds);
+      const beforeTotal = candidates.length;
+      const beforeNonTargets = candidates.filter(c => !target.has(c.id)).map(c => c.id);
+      const beforeTargetsInApp = candidates.filter(c => target.has(c.id));
+      // 実際に削除できる件数（現時点でAPSに存在するもの）
+      if(beforeTargetsInApp.length === 0){ if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = '削除対象が見つかりません。'; } return; }
+
+      const confirmMsg = `CSV照合による削除を実行します。\n\nCSVレコード：${deleteCsvState.rows.length}件\n削除対象：${beforeTargetsInApp.length}件\n\n削除前：${beforeTotal}名\n削除後：${beforeTotal - beforeTargetsInApp.length}名\n\nこの操作は取り消せません（クラウド保存も実行されます）。\n本当に削除しますか？`;
+      if(!confirm(confirmMsg)){ if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = 'キャンセルしました。'; } return; }
+
+      const btnExec = $('btnExecuteDeleteCSV'), btnAnalyze = $('btnAnalyzeDeleteCSV');
+      if(btnExec){ btnExec.disabled = true; btnExec.textContent = '削除中...'; }
+      if(btnAnalyze) btnAnalyze.disabled = true;
+      const backup = candidates.map(c => ({ ...c }));
+
+      try{
+        candidates = candidates.filter(c => !target.has(c.id));
+        // 対象外応募者の削除がないか検証
+        const afterNonTargets = candidates.map(c => c.id);
+        const missing = beforeNonTargets.filter(id => !afterNonTargets.includes(id));
+        if(missing.length > 0){
+          candidates = backup;
+          throw new Error(`対象外応募者が削除される異常検出（${missing.length}件）：処理を中止し復元しました。`);
+        }
+        await persist();
+        const afterTotal = candidates.length;
+        const stillMatched = candidates.filter(c => target.has(c.id)).length;
+        console.log('[CSV DELETE] 削除前:', beforeTotal, '削除後:', afterTotal, '残存MATCH:', stillMatched);
+        if(resEl){
+          resEl.className = 'notice success';
+          resEl.innerHTML = `
+            <div style="font-size:15px;font-weight:900;color:#15803d;margin-bottom:8px;">✅ 削除完了</div>
+            <table style="width:100%;font-size:13px;">
+              <tr><td style="padding:4px 8px;">CSVレコード</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${deleteCsvState.rows.length}件</td></tr>
+              <tr><td style="padding:4px 8px;">実削除件数</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#b91c1c;">${beforeTargetsInApp.length}件</td></tr>
+              <tr><td style="padding:4px 8px;">削除前 総応募者数</td><td style="padding:4px 8px;text-align:right;">${beforeTotal}名</td></tr>
+              <tr><td style="padding:4px 8px;">削除後 総応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${afterTotal}名</td></tr>
+              <tr><td style="padding:4px 8px;">整合性：削除前 - 削除件数 = 削除後</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${beforeTotal - beforeTargetsInApp.length === afterTotal ? '✓ OK' : '⚠ 不一致'}</td></tr>
+              <tr><td style="padding:4px 8px;">再照合で残存する対象</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${stillMatched === 0 ? '✓ 0件' : `⚠ ${stillMatched}件残存`}</td></tr>
+              <tr><td style="padding:4px 8px;">対象外応募者の削除</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${missing.length === 0 ? '✓ なし（他応募者は無傷）' : `⚠ ${missing.length}件消失`}</td></tr>
+            </table>
+            <div style="margin-top:8px;font-size:12px;color:var(--muted);">クラウドへも保存済み。ダッシュボード・応募経路・月次レポートは自動再計算されました。</div>
+          `;
+        }
+        showToast(`CSV照合削除：${beforeTargetsInApp.length}名を削除しました`, 'success', 5000);
+        // 状態リセット
+        deleteCsvState = { file:null, rows:null, analysis:null };
+        const inp = $('inputDeleteCSV'); if(inp) inp.value = '';
+        const nameEl = $('deleteCsvFileName'); if(nameEl) nameEl.textContent = '';
+        if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = '削除完了。新しいCSVを削除する場合は再度ファイルを選択してください。'; }
+      }catch(err){
+        candidates = backup;
+        renderAll();
+        console.error('[CSV DELETE] 失敗、ロールバック:', err);
+        if(resEl){ resEl.className = 'notice error'; resEl.innerHTML = `❌ 削除失敗：${escapeHTML(err.message || String(err))}<br>データは変更前の状態に完全復元されました。`; }
+        showToast(`削除失敗：${err.message || err}／復元しました`, 'error', 6000);
+      }finally{
+        if(btnExec){ btnExec.disabled = deleteCsvState.analysis ? deleteCsvState.analysis.matchedIds.length === 0 : true; btnExec.textContent = '削除を実行'; }
+        if(btnAnalyze){ btnAnalyze.disabled = !deleteCsvState.file; }
+      }
+    }
+
     // ===== 応募経路別 一括削除：Guidable =====
     function isGuidableCandidate(c){
       const s = String(c && c.source || '').normalize('NFKC').trim().toLowerCase();
@@ -5130,6 +5330,9 @@
       onClick('btnLoadSample', reseedSampleData);
       onClick('btnResetAll', resetAllData);
       onClick('btnPurgeGuidable', purgeGuidableCandidates);
+      const delCsvInp = $('inputDeleteCSV'); if(delCsvInp) delCsvInp.addEventListener('change', handleDeleteCsvFileSelect);
+      onClick('btnAnalyzeDeleteCSV', analyzeDeleteCsv);
+      onClick('btnExecuteDeleteCSV', executeDeleteCsv);
 
       const candidateForm = $('candidateForm'); if(candidateForm) candidateForm.addEventListener('submit', handleCandidateSubmit);
       const planForm = $('planForm'); if(planForm) planForm.addEventListener('submit', handlePlanSubmit);
