@@ -4990,7 +4990,16 @@
         const total = candidates.length;
         const delCount = matchedIds.size;
         const remain = total - delCount;
-        // 表示（個人情報は出さない）
+        // 削除対象のプレビュー（氏名 + id + 照合方法）を一覧表示
+        const matchedCandidates = candidates.filter(c => matchedIds.has(c.id));
+        const matchListHTML = matchedCandidates.slice(0, 100).map(c => {
+          const eHit = c.email && byEmail.has(normalizeEmailForMatch(c.email)) && csvRecords.some(r => normalizeEmailForMatch(r.email) === normalizeEmailForMatch(c.email));
+          const pHit = c.phone && byPhone.has(normalizePhoneForMatch(c.phone)) && csvRecords.some(r => normalizePhoneForMatch(r.phone) === normalizePhoneForMatch(c.phone));
+          const method = eHit && pHit ? '<span style="color:#15803d;font-weight:900;">メール＋電話</span>' : eHit ? '<span style="color:#15803d;">メール一致</span>' : pHit ? '<span style="color:#2563eb;">電話一致</span>' : '<span style="color:var(--muted);">-</span>';
+          return `<div style="display:grid;grid-template-columns:1fr 120px 200px;gap:8px;padding:4px 6px;border-bottom:1px dashed #eef2f7;font-size:12px;"><span style="font-weight:900;color:var(--navy);">${escapeHTML(c.name || '(名前なし)')}</span>${method}<span style="color:var(--muted);font-family:monospace;">${escapeHTML(c.id)}</span></div>`;
+        }).join('');
+        const overflow = matchedCandidates.length > 100 ? `<div style="margin-top:6px;font-size:11px;color:var(--muted);">※ 先頭100件のみ表示（残り${matchedCandidates.length - 100}件）</div>` : '';
+
         resEl.className = 'notice';
         resEl.innerHTML = `
           <div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:8px;">📊 照合結果（DRY RUN）</div>
@@ -5006,8 +5015,11 @@
             <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">削除前 総応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${total}名</td></tr>
             <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">削除後 予定応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${remain}名</td></tr>
           </table>
-          <div style="margin-top:8px;font-size:12px;color:var(--muted);">※ 氏名のみ一致の応募者は同姓同名の可能性があるため、自動削除しません。必要な場合は応募者一覧から個別削除してください。</div>
+          ${matchedCandidates.length > 0 ? `<div style="margin-top:12px;font-size:13px;font-weight:900;color:var(--navy);">削除対象一覧（氏名 / 照合方法 / candidateId）</div><div style="margin-top:6px;max-height:280px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;">${matchListHTML}</div>${overflow}` : ''}
+          <div style="margin-top:8px;font-size:12px;color:var(--muted);">※ 氏名のみ一致の応募者は同姓同名の可能性があるため、自動削除しません。</div>
         `;
+        // ボタン文言に件数を反映
+        if(btnExec){ btnExec.textContent = `一致した${matchedIds.size}件を削除`; }
         if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = '照合が完了しました。内容を確認してから「削除を実行」を押してください。'; }
         if(btnExec) btnExec.disabled = matchedIds.size === 0;
         console.log('[CSV DELETE DRY RUN] MATCH件数:', matchedIds.size, 'REVIEW件数:', reviewIds.size, 'NOT_FOUND件数:', notFoundRows.length);
@@ -5034,43 +5046,111 @@
       const btnExec = $('btnExecuteDeleteCSV'), btnAnalyze = $('btnAnalyzeDeleteCSV');
       if(btnExec){ btnExec.disabled = true; btnExec.textContent = '削除中...'; }
       if(btnAnalyze) btnAnalyze.disabled = true;
+
+      // ⚠ 最重要：削除中は自動更新を必ず停止（30秒ポーリングで古いデータが復活するのを防ぐ）
+      const wasPollingEnabled = pollingEnabled;
+      stopAutoPolling();
+      pollingEnabled = false;
+      console.log('[CSV DELETE] 自動更新を一時停止しました');
+
       const backup = candidates.map(c => ({ ...c }));
 
       try{
+        console.group('[CSV DELETE] 削除処理開始');
+        console.log('before candidates count:', beforeTotal);
+        console.log('delete target ids count:', target.size);
+
+        // ステップ1：ローカルstateから削除（candidates は let 宣言なので再代入OK）
         candidates = candidates.filter(c => !target.has(c.id));
-        // 対象外応募者の削除がないか検証
+        console.log('after local delete:', candidates.length);
+
+        // ステップ2：対象外応募者が消えていないか検証
         const afterNonTargets = candidates.map(c => c.id);
         const missing = beforeNonTargets.filter(id => !afterNonTargets.includes(id));
         if(missing.length > 0){
           candidates = backup;
           throw new Error(`対象外応募者が削除される異常検出（${missing.length}件）：処理を中止し復元しました。`);
         }
+        console.log('対象外応募者の欠損: なし ✓');
+
+        // ステップ3：persist（ローカル保存 + クラウド保存 + renderAll）
+        console.log('persist start');
         await persist();
+        console.log('persist complete, current candidates count:', candidates.length);
+
+        // ステップ4：クラウド再照合で真の永続化を確認
+        console.log('cloud reload verification start');
+        let cloudVerifyOk = false, cloudVerifyMsg = '', cloudCount = -1;
+        if(isCloudConfigured()){
+          try{
+            await new Promise(r => setTimeout(r, 500));
+            const reloadRes = await callCloud('load', {});
+            const cloudData = reloadRes && reloadRes.data ? reloadRes.data : null;
+            if(cloudData && Array.isArray(cloudData.candidates)){
+              cloudCount = cloudData.candidates.length;
+              const stillInCloud = cloudData.candidates.filter(c => target.has(c.id));
+              console.log('cloud reload candidates:', cloudCount, ' still target in cloud:', stillInCloud.length);
+              if(stillInCloud.length === 0){
+                cloudVerifyOk = true;
+                cloudVerifyMsg = `✓ ${cloudCount}名（対象0件残存）`;
+                candidates = cloudData.candidates.map(normalizeCandidate);
+                saveLocal();
+                renderAll();
+              }else{
+                cloudVerifyMsg = `⚠ クラウドに削除対象が ${stillInCloud.length}件 残存`;
+              }
+            }else{
+              cloudVerifyMsg = '⚠ クラウド応答形式エラー';
+            }
+          }catch(err){
+            cloudVerifyMsg = `⚠ 再照合エラー：${err.message || err}`;
+            console.error('[CSV DELETE] cloud reload失敗:', err);
+          }
+        }else{
+          cloudVerifyOk = true;
+          cloudVerifyMsg = '（ローカルモード）';
+        }
+
+        // ステップ5：サンプル3名の消失確認
+        const samples = ['Robertbobby Valle','ダグタイ','Jesussekinemanlulu'];
+        const sampleResults = samples.map(n => {
+          const norm = normalizeNameForMatch(n);
+          const found = candidates.find(c => normalizeNameForMatch(c.name) === norm);
+          return { name: n, deleted: !found };
+        });
+        console.log('sample check:', sampleResults);
+
         const afterTotal = candidates.length;
         const stillMatched = candidates.filter(c => target.has(c.id)).length;
-        console.log('[CSV DELETE] 削除前:', beforeTotal, '削除後:', afterTotal, '残存MATCH:', stillMatched);
+        console.groupEnd();
+
         if(resEl){
-          resEl.className = 'notice success';
+          const allOk = cloudVerifyOk && stillMatched === 0 && sampleResults.every(s => s.deleted || !backup.find(c => normalizeNameForMatch(c.name) === normalizeNameForMatch(s.name)));
+          resEl.className = allOk ? 'notice success' : 'notice warning';
           resEl.innerHTML = `
-            <div style="font-size:15px;font-weight:900;color:#15803d;margin-bottom:8px;">✅ 削除完了</div>
+            <div style="font-size:15px;font-weight:900;color:${allOk ? '#15803d' : '#a16207'};margin-bottom:8px;">${allOk ? '✅ 削除完了' : '⚠ 削除処理完了（要確認）'}</div>
             <table style="width:100%;font-size:13px;">
               <tr><td style="padding:4px 8px;">CSVレコード</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${deleteCsvState.rows.length}件</td></tr>
+              <tr><td style="padding:4px 8px;">MATCH件数（candidate.id取得）</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${target.size}件</td></tr>
               <tr><td style="padding:4px 8px;">実削除件数</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#b91c1c;">${beforeTargetsInApp.length}件</td></tr>
               <tr><td style="padding:4px 8px;">削除前 総応募者数</td><td style="padding:4px 8px;text-align:right;">${beforeTotal}名</td></tr>
-              <tr><td style="padding:4px 8px;">削除後 総応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${afterTotal}名</td></tr>
-              <tr><td style="padding:4px 8px;">整合性：削除前 - 削除件数 = 削除後</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${beforeTotal - beforeTargetsInApp.length === afterTotal ? '✓ OK' : '⚠ 不一致'}</td></tr>
-              <tr><td style="padding:4px 8px;">再照合で残存する対象</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${stillMatched === 0 ? '✓ 0件' : `⚠ ${stillMatched}件残存`}</td></tr>
-              <tr><td style="padding:4px 8px;">対象外応募者の削除</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${missing.length === 0 ? '✓ なし（他応募者は無傷）' : `⚠ ${missing.length}件消失`}</td></tr>
+              <tr><td style="padding:4px 8px;">ローカル削除後</td><td style="padding:4px 8px;text-align:right;">${beforeTotal - beforeTargetsInApp.length}名</td></tr>
+              <tr><td style="padding:4px 8px;">persist完了後</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${afterTotal}名</td></tr>
+              <tr><td style="padding:4px 8px;">クラウド再読込後</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${cloudCount >= 0 ? cloudCount + '名' : '未確認'}</td></tr>
+              <tr><td style="padding:4px 8px;">クラウド検証</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:${cloudVerifyOk ? '#15803d' : '#b91c1c'};">${escapeHTML(cloudVerifyMsg)}</td></tr>
+              <tr><td style="padding:4px 8px;">対象者残存（ローカル）</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${stillMatched === 0 ? '✓ 0件' : `⚠ ${stillMatched}件`}</td></tr>
+              <tr><td style="padding:4px 8px;">対象外応募者の削除</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${missing.length === 0 ? '✓ なし' : `⚠ ${missing.length}件消失`}</td></tr>
+              <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;font-weight:900;color:var(--navy);">サンプル3名の消失確認：</td></tr>
+              ${sampleResults.map(s => `<tr><td style="padding:4px 8px;">${escapeHTML(s.name)}</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:${s.deleted ? '#15803d' : '#b91c1c'};">${s.deleted ? '✓ 削除済み' : '⚠ まだ存在'}</td></tr>`).join('')}
             </table>
-            <div style="margin-top:8px;font-size:12px;color:var(--muted);">クラウドへも保存済み。ダッシュボード・応募経路・月次レポートは自動再計算されました。</div>
+            <div style="margin-top:8px;font-size:12px;color:var(--muted);">${allOk ? 'ダッシュボード・応募者一覧・月次レポートは自動再計算されました。' : 'F12コンソールで詳細ログを確認してください。'}</div>
           `;
         }
-        showToast(`CSV照合削除：${beforeTargetsInApp.length}名を削除しました`, 'success', 5000);
-        // 状態リセット
+        showToast(`CSV照合削除：${beforeTargetsInApp.length}名を削除、現在${candidates.length}名`, cloudVerifyOk && stillMatched === 0 ? 'success' : 'warning', 6000);
         deleteCsvState = { file:null, rows:null, analysis:null };
         const inp = $('inputDeleteCSV'); if(inp) inp.value = '';
         const nameEl = $('deleteCsvFileName'); if(nameEl) nameEl.textContent = '';
-        if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = '削除完了。新しいCSVを削除する場合は再度ファイルを選択してください。'; }
+        if(msgEl){ msgEl.className = 'notice ' + (cloudVerifyOk && stillMatched === 0 ? 'success' : 'warning'); msgEl.textContent = cloudVerifyOk && stillMatched === 0 ? '削除完了。' : '削除処理は実行しましたが検証で警告があります。'; }
       }catch(err){
         candidates = backup;
         renderAll();
@@ -5078,6 +5158,13 @@
         if(resEl){ resEl.className = 'notice error'; resEl.innerHTML = `❌ 削除失敗：${escapeHTML(err.message || String(err))}<br>データは変更前の状態に完全復元されました。`; }
         showToast(`削除失敗：${err.message || err}／復元しました`, 'error', 6000);
       }finally{
+        // 自動更新を元の状態に戻す
+        pollingEnabled = wasPollingEnabled;
+        pollingFailCount = 0;
+        if(pollingEnabled && isCloudConfigured()){
+          startAutoPolling();
+          console.log('[CSV DELETE] 自動更新を再開しました');
+        }
         if(btnExec){ btnExec.disabled = deleteCsvState.analysis ? deleteCsvState.analysis.matchedIds.length === 0 : true; btnExec.textContent = '削除を実行'; }
         if(btnAnalyze){ btnAnalyze.disabled = !deleteCsvState.file; }
       }
