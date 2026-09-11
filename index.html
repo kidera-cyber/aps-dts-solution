@@ -197,6 +197,33 @@
     .emp-tile .et-unit{font-size:16px;color:var(--muted);margin-left:4px;font-weight:900}
     .emp-tile .et-pct{font-size:14px;color:var(--muted);margin-top:6px;font-weight:800;white-space:nowrap}
     /* 応募者一覧：不採用行の控えめスタイル（削除ではないので視認性は維持） */
+    /* ダッシュボード：採用枠別カード（4枠2×2） */
+    .segment-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px 22px;min-width:0;position:relative;overflow:hidden}
+    .segment-card.seg-regular{border-top:5px solid #2563eb}
+    .segment-card.seg-part{border-top:5px solid #06b6d4}
+    .segment-card.seg-office{border-top:5px solid #7c3aed}
+    .segment-card .seg-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:14px}
+    .segment-card .seg-head h5{margin:0;font-size:16px;color:var(--navy);font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .segment-card .seg-head .js-status{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:900;white-space:nowrap;flex-shrink:0}
+    .segment-card .seg-hero{background:linear-gradient(135deg,#f8fafc,#fff);border:1px solid #eef2f7;border-radius:12px;padding:14px 16px;margin-bottom:12px}
+    .segment-card.seg-regular .seg-hero{background:linear-gradient(135deg,#eff6ff,#fff);border-color:#bfdbfe}
+    .segment-card.seg-part .seg-hero{background:linear-gradient(135deg,#ecfeff,#fff);border-color:#a5f3fc}
+    .segment-card.seg-office .seg-hero{background:linear-gradient(135deg,#faf5ff,#fff);border-color:#ddd6fe}
+    .segment-card .seg-hero-label{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em}
+    .segment-card .seg-hero-value{font-size:34px;font-weight:950;color:var(--navy);line-height:1;letter-spacing:-.03em;margin-top:4px;font-variant-numeric:tabular-nums}
+    .segment-card .seg-hero-target{font-size:14px;color:var(--muted);font-weight:900;margin-left:4px}
+    .segment-card .seg-hero-sub{font-size:13px;color:var(--navy);font-weight:800;margin-top:6px}
+    .segment-card .seg-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .segment-card .seg-metric{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:10px 8px;text-align:center}
+    .segment-card .seg-metric-reject{background:#fef2f2;border-color:#fecaca}
+    .segment-card .sm-label{font-size:11px;color:var(--muted);font-weight:900}
+    .segment-card .sm-value{font-size:22px;font-weight:950;color:var(--navy);letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+    .segment-card .seg-metric-reject .sm-value{color:#b91c1c}
+    .segment-card .seg-funnel{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed #edf2f7;font-size:12px;color:var(--muted);font-weight:800}
+    .segment-card .seg-funnel strong{color:var(--navy);font-weight:950;margin-left:4px}
+    @media(max-width:1180px){
+      #dashJobs{grid-template-columns:1fr !important}
+    }
     /* ダッシュボード：選考結果タイル */
     .outcome-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
     @media(max-width:900px){.outcome-grid{grid-template-columns:repeat(2,1fr)}}
@@ -269,10 +296,10 @@
             <div id="dashActions"></div>
           </div>
 
-          <!-- BLOCK 4: 職種別 採用状況（採用計画統合） -->
+          <!-- BLOCK 4: 採用枠別 採用状況（4枠：中型正社員 / 大型正社員 / ドライバーAL / 事務AL） -->
           <div class="card full">
-            <div class="card-head"><div><h3>職種別 採用状況（目標との差）</h3><p class="hint">応募・採用・目標・不足を1枚で確認</p></div></div>
-            <div id="dashJobs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;"></div>
+            <div class="card-head"><div><h3>採用枠別 採用状況</h3><p class="hint">中型ドライバー正社員 / 大型ドライバー正社員 / ドライバーアルバイト / 事務アルバイト を1画面で比較</p></div></div>
+            <div id="dashJobs" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;"></div>
           </div>
 
           <!-- BLOCK 5: 応募経路（横長・full幅） -->
@@ -1944,44 +1971,109 @@
       </div>`).join('');
     }
 
+    // ===== 採用枠（Recruitment Segment）共通分類 =====
+    // 4枠：中型ドライバー正社員 / 大型ドライバー正社員 / ドライバーアルバイト / 事務アルバイト / その他
+    // 月次レポート等でも再利用可能な共通関数
+    function getRecruitmentSegment(c){
+      const job = String(c && c.job || '').normalize('NFKC').trim();
+      const workType = String(c && (c.workType || c.employmentType) || '').normalize('NFKC').trim();
+      const isRegular = /正社員|正職員|フルタイム/.test(workType);
+      const isPartTime = /アルバイト|バイト|パート/.test(workType);
+      // 事務 → アルバイト系（事務は原則アルバイト扱い）
+      if(/事務/.test(job)){
+        if(isPartTime || !isRegular) return '事務アルバイト';
+        return '事務アルバイト'; // 事務は正社員でも事務アルバイト枠へ集約（要件で「事務」枠は1つ）
+      }
+      // ドライバー系
+      if(/大型/.test(job) && isRegular) return '大型ドライバー正社員';
+      if(/中型/.test(job) && isRegular) return '中型ドライバー正社員';
+      if(/ドライバー/.test(job) && isPartTime) return 'ドライバーアルバイト';
+      // 中型/大型でworkType未設定・アルバイトのケース → ドライバーアルバイト扱い
+      if((/中型|大型/.test(job)) && isPartTime) return 'ドライバーアルバイト';
+      return 'その他';
+    }
+
+    // 採用枠と plans の紐付け：plan.job が枠に合致するものを合算
+    function getSegmentTargetTotal(segment){
+      let total = 0;
+      plans.forEach(p => {
+        const j = String(p.job || '').normalize('NFKC');
+        if(segment === '中型ドライバー正社員' && /中型/.test(j) && !/アルバイト/.test(j)) total += (p.total || 0);
+        else if(segment === '大型ドライバー正社員' && /大型/.test(j) && !/アルバイト/.test(j)) total += (p.total || 0);
+        else if(segment === 'ドライバーアルバイト' && /ドライバー/.test(j) && /アルバイト/.test(j)) total += (p.total || 0);
+        else if(segment === '事務アルバイト' && /事務/.test(j)) total += (p.total || 0);
+      });
+      return total;
+    }
+
     function renderDashboardJobs(){
       const el = $('dashJobs'); if(!el) return;
-      const empData = getEmploymentDisplayByJob();
-      const planByJob = {};
-      plans.forEach(p => { planByJob[p.job] = p; });
-      const jobList = [...jobs, ...Object.keys(planByJob).filter(j => !jobs.includes(j))];
-      const cards = jobList.map(job => {
-        const list = candidates.filter(c => c.job === job);
-        if(list.length === 0 && !planByJob[job]) return '';
+      const total = candidates.length;
+      // 4採用枠 + その他 に分類
+      const SEGMENTS = ['中型ドライバー正社員','大型ドライバー正社員','ドライバーアルバイト','事務アルバイト'];
+      const bySegment = { '中型ドライバー正社員':[], '大型ドライバー正社員':[], 'ドライバーアルバイト':[], '事務アルバイト':[], 'その他':[] };
+      candidates.forEach(c => { const seg = getRecruitmentSegment(c); (bySegment[seg] || bySegment['その他']).push(c); });
+
+      const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      const isOffer = s => ['内定','内定承諾','入社決定'].includes(s);
+      const isHired = s => ['内定承諾','入社決定'].includes(s);
+      const conv = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 : null;
+
+      const cards = SEGMENTS.map(seg => {
+        const list = bySegment[seg];
         const applied = list.length;
-        const hired = list.filter(c => c.status === '内定承諾' || c.status === '入社決定').length;
-        const plan = planByJob[job];
-        const target = plan ? plan.total : 0;
+        const interview = list.filter(c => isInterview(c.status)).length;
+        const offered = list.filter(c => isOffer(c.status)).length;
+        const hired = list.filter(c => isHired(c.status)).length;
+        const rejected = list.filter(c => c.status === '不採用').length;
+        const target = getSegmentTargetTotal(seg);
         const shortage = Math.max(0, target - hired);
         const rate = target > 0 ? Math.round(hired / target * 100) : null;
-        const status = target === 0 ? '<span class="js-status status-idle">目標未設定</span>' :
-                       (rate >= 100 ? '<span class="js-status status-good">達成</span>' :
-                       (rate >= 50 ? '<span class="js-status status-warn">' + rate + '% 達成</span>' :
-                       '<span class="js-status status-bad">' + (rate || 0) + '% 達成</span>'));
-        const emp = empData[job] || { '正社員': 0, 'アルバイト': 0, '事務': 0, '未設定': 0 };
-        return `<div class="job-summary-card">
-          <h5>${escapeHTML(job)}${status}</h5>
-          <div class="js-metrics">
-            <div class="js-metric"><div class="js-metric-label">応募</div><div class="js-metric-value">${applied}</div></div>
-            <div class="js-metric"><div class="js-metric-label">採用</div><div class="js-metric-value">${hired}</div></div>
-            <div class="js-metric"><div class="js-metric-label">目標</div><div class="js-metric-value">${target || '-'}</div></div>
-            <div class="js-metric ${shortage > 0 ? 'shortage' : ''}"><div class="js-metric-label">不足</div><div class="js-metric-value">${shortage}</div></div>
+        const c1 = conv(interview, applied), c2 = conv(offered, interview), c3 = conv(hired, offered);
+        const statusBadge = target === 0
+          ? '<span class="js-status status-idle">目標未設定</span>'
+          : (rate >= 100 ? `<span class="js-status status-good">達成 ${rate}%</span>`
+             : rate >= 50 ? `<span class="js-status status-warn">${rate}% 達成</span>`
+             : `<span class="js-status status-bad">${rate || 0}% 達成</span>`);
+        // カラーテーマ
+        const themeClass = seg.includes('正社員') ? 'seg-regular' : (seg === '事務アルバイト' ? 'seg-office' : 'seg-part');
+        return `<div class="segment-card ${themeClass}">
+          <div class="seg-head">
+            <h5>${escapeHTML(seg)}</h5>
+            ${statusBadge}
           </div>
-          ${target > 0 ? `<div class="js-progress"><span style="width:${Math.min(100, rate || 0)}%"></span></div><div class="js-progress-label">達成率 ${rate || 0}%（${hired} / ${target} 名）</div>` : ''}
-          <div class="js-emp-inline">
-            ${emp['正社員'] > 0 ? `<span>正社員 <strong>${emp['正社員']}</strong></span>` : ''}
-            ${emp['アルバイト'] > 0 ? `<span>アルバイト <strong>${emp['アルバイト']}</strong></span>` : ''}
-            ${emp['事務'] > 0 ? `<span>事務 <strong>${emp['事務']}</strong></span>` : ''}
-            ${emp['未設定'] > 0 ? `<span style="color:#b91c1c;">未設定 <strong>${emp['未設定']}</strong></span>` : ''}
+          <div class="seg-hero">
+            <div class="seg-hero-main">
+              <div class="seg-hero-label">採用</div>
+              <div class="seg-hero-value">${hired}${target > 0 ? `<span class="seg-hero-target"> / 目標 ${target}</span>` : ''}</div>
+              ${target > 0 ? `<div class="seg-hero-sub">${shortage > 0 ? `<strong style="color:#b91c1c;">不足 ${shortage}名</strong>` : `<strong style="color:#15803d;">目標達成</strong>`}</div>` : '<div class="seg-hero-sub" style="color:var(--muted);">目標未設定</div>'}
+            </div>
+            ${target > 0 ? `<div class="js-progress" style="margin-top:8px;"><span style="width:${Math.min(100, rate || 0)}%"></span></div>` : ''}
           </div>
+          <div class="seg-metrics">
+            <div class="seg-metric"><div class="sm-label">応募</div><div class="sm-value">${applied}</div></div>
+            <div class="seg-metric"><div class="sm-label">面接</div><div class="sm-value">${interview}</div></div>
+            <div class="seg-metric"><div class="sm-label">内定</div><div class="sm-value">${offered}</div></div>
+            <div class="seg-metric ${rejected > 0 ? 'seg-metric-reject' : ''}"><div class="sm-label">不採用</div><div class="sm-value">${rejected}</div></div>
+          </div>
+          ${applied > 0 ? `<div class="seg-funnel">
+            <span>応募→面接 <strong>${c1 === null ? '-' : c1 + '%'}</strong></span>
+            <span>面接→内定 <strong>${c2 === null ? '-' : c2 + '%'}</strong></span>
+            <span>内定→採用 <strong>${c3 === null ? '-' : c3 + '%'}</strong></span>
+          </div>` : ''}
         </div>`;
-      }).filter(Boolean).join('');
-      el.innerHTML = cards || '<div class="empty">応募者データがありません</div>';
+      }).join('');
+
+      // その他がある場合は末尾に控えめ表示
+      const otherCount = bySegment['その他'].length;
+      const otherNote = otherCount > 0
+        ? `<div style="grid-column:1/-1;padding:10px 14px;background:#f8fafc;border:1px dashed var(--line);border-radius:10px;font-size:12px;color:var(--muted);">※ 上記4枠に分類されない応募者：<strong style="color:var(--navy);">${otherCount}名</strong>（職種・雇用形態の設定を確認してください）</div>`
+        : '';
+      // 分類整合性チェック
+      const sumClassified = SEGMENTS.reduce((s, k) => s + bySegment[k].length, 0) + otherCount;
+      if(sumClassified !== total) console.warn('[整合性] 採用枠分類の合計と総応募者数が不一致:', { sumClassified, total });
+
+      el.innerHTML = cards + otherNote;
     }
 
     function renderDashboardSources(){
