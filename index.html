@@ -689,6 +689,15 @@
           </div>
 
           <div class="form-section">
+            <h4>応募経路別 一括削除</h4>
+            <p class="hint" style="margin-bottom:10px;">特定の応募経路（例：Guidable）のデータだけを一括で削除します。他媒体（Indeed / PLEX / Xmile 等）・採用計画・掲載費用には影響しません。</p>
+            <div class="action-row">
+              <button class="btn btn-danger" id="btnPurgeGuidable">Guidable応募者を一括削除</button>
+            </div>
+            <div id="purgeGuidableMessage" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
             <h4>その他</h4>
             <div class="action-row">
               <button class="btn btn-soft" id="btnLoadSample">サンプルデータを再投入</button>
@@ -4748,6 +4757,100 @@
       setDataMessage('サンプルデータを再投入しました', 'success');
     }
 
+    // ===== 応募経路別 一括削除：Guidable =====
+    function isGuidableCandidate(c){
+      const s = String(c && c.source || '').normalize('NFKC').trim().toLowerCase();
+      return s === 'guidable' || s.includes('guidable') || s.includes('ガイダブル');
+    }
+
+    function countBySource(list){
+      const counts = {};
+      list.forEach(c => {
+        const src = String(c.source || '(未設定)').trim() || '(未設定)';
+        counts[src] = (counts[src] || 0) + 1;
+      });
+      return counts;
+    }
+
+    async function purgeGuidableCandidates(){
+      const msgEl = $('purgeGuidableMessage');
+      const setMsg = (text, type) => { if(msgEl){ msgEl.className = 'notice' + (type ? ' ' + type : ''); msgEl.innerHTML = text; } };
+
+      const beforeTotal = candidates.length;
+      const beforeCounts = countBySource(candidates);
+      const targets = candidates.filter(isGuidableCandidate);
+      const nonGuidable = candidates.filter(c => !isGuidableCandidate(c));
+
+      // 安全確認1：対象が0件
+      if(targets.length === 0){
+        setMsg('Guidable由来の応募者は現在0名です。削除は不要です。', 'info');
+        return;
+      }
+      // 安全確認2：対象が全員 isGuidableCandidate で true か（逆確認）
+      const allGuidable = targets.every(isGuidableCandidate);
+      if(!allGuidable){
+        console.error('[PURGE Guidable] 対象抽出に異常検出。処理中止。', targets);
+        setMsg('内部整合性エラー：対象抽出に問題があるため処理を中止しました（削除は行っていません）。', 'error');
+        return;
+      }
+      // 安全確認3：nonGuidable 側にGuidableが混入していないか
+      if(nonGuidable.some(isGuidableCandidate)){
+        console.error('[PURGE Guidable] 除外側にGuidableが混入。処理中止。');
+        setMsg('内部整合性エラー：除外抽出に問題があるため処理を中止しました。', 'error');
+        return;
+      }
+
+      // 削除前サマリをコンソールに詳細出力
+      console.group('[PURGE Guidable] 削除前サマリ');
+      console.log('削除前 総応募者数:', beforeTotal);
+      console.log('Guidable削除対象:', targets.length);
+      console.log('削除後予定:', nonGuidable.length);
+      console.log('削除対象ID一覧:', targets.map(c => ({ id: c.id, source: c.source, job: c.job, status: c.status })));
+      console.log('削除前 経路別件数:', beforeCounts);
+      console.groupEnd();
+
+      // 確認ダイアログ（明示的なタイプ確認）
+      const confirmMsg = `Guidable由来の応募者 ${targets.length}名 を削除します。\n\n削除前：${beforeTotal}名\n削除後：${nonGuidable.length}名\n\n他媒体（Indeed / PLEX / Xmile / 紹介 / リファラル 等）は無変更です。\n採用計画・掲載費用も無変更です。\n\nこの操作は元に戻せません（クラウド保存も実行されます）。\n本当に削除しますか？`;
+      if(!confirm(confirmMsg)) { setMsg('キャンセルしました。データは変更されていません。', 'info'); return; }
+
+      // バックアップ（完全復元用）
+      const backup = candidates.map(c => ({ ...c }));
+      candidates = nonGuidable;
+
+      try{
+        await persist(); // ローカル + クラウド + renderAll を1回で実行
+        const afterCounts = countBySource(candidates);
+        console.group('[PURGE Guidable] 削除後サマリ');
+        console.log('削除後 総応募者数:', candidates.length);
+        console.log('Guidable残存:', candidates.filter(isGuidableCandidate).length);
+        console.log('削除後 経路別件数:', afterCounts);
+        // 他媒体の件数比較
+        const otherSources = new Set([...Object.keys(beforeCounts), ...Object.keys(afterCounts)].filter(k => !isGuidableCandidate({ source: k })));
+        const changes = [];
+        otherSources.forEach(src => {
+          const b = beforeCounts[src] || 0, a = afterCounts[src] || 0;
+          if(b !== a) changes.push(`${src}: ${b} → ${a} ⚠`);
+        });
+        if(changes.length > 0){
+          console.error('[PURGE Guidable] 他媒体件数に変化を検出:', changes);
+        }else{
+          console.log('他媒体件数：変化なし ✓');
+        }
+        console.groupEnd();
+
+        const remainSummary = Object.entries(afterCounts).map(([k,v]) => `${escapeHTML(k)} ${v}名`).join(' / ');
+        setMsg(`✅ Guidable由来の${targets.length}名を削除しました。<br>削除前 ${beforeTotal}名 → 削除後 ${candidates.length}名<br><br>残存経路：${remainSummary || '（0名）'}<br><br>クラウドへも保存済み。ダッシュボード・応募経路・月次レポートは自動再計算されました。`, 'success');
+        showToast(`Guidable ${targets.length}名を削除しました`, 'success', 4000);
+      }catch(err){
+        // 保存失敗 → 完全ロールバック
+        candidates = backup;
+        renderAll();
+        console.error('[PURGE Guidable] 保存失敗、ロールバック完了:', err);
+        setMsg(`❌ 削除に失敗しました：${escapeHTML(err.message || String(err))}<br>データは変更前の状態に完全復元されました。`, 'error');
+        showToast(`削除失敗：${err.message || err}／変更前に復元しました`, 'error', 6000);
+      }
+    }
+
     async function resetAllData(){
       if(!confirm('全応募者データ・採用計画・媒体費用を削除しますか？この操作は戻せません。')) return;
       candidates = []; plans = []; mediaCosts = [];
@@ -4934,6 +5037,7 @@
       const mediaCsv2 = $('inputMediaCSV2'); if(mediaCsv2) mediaCsv2.addEventListener('change', handleMediaCostCsvFileSelect);
       onClick('btnLoadSample', reseedSampleData);
       onClick('btnResetAll', resetAllData);
+      onClick('btnPurgeGuidable', purgeGuidableCandidates);
 
       const candidateForm = $('candidateForm'); if(candidateForm) candidateForm.addEventListener('submit', handleCandidateSubmit);
       const planForm = $('planForm'); if(planForm) planForm.addEventListener('submit', handlePlanSubmit);
