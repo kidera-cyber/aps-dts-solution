@@ -4863,9 +4863,17 @@
     }
 
     // ===== CSV照合による応募者削除 =====
-    // 正規化ユーティリティ
-    function normalizeEmailForMatch(v){ return String(v || '').trim().toLowerCase(); }
-    function normalizePhoneForMatch(v){ return String(v || '').normalize('NFKC').replace(/\D/g, ''); }
+    // 正規化ユーティリティ（CSV/APS両側で同一の変換を適用）
+    function normalizeEmailForMatch(v){ return String(v || '').normalize('NFKC').trim().toLowerCase(); }
+    function normalizePhoneForMatch(v){
+      // 数字以外を全て除去
+      let s = String(v || '').normalize('NFKC').replace(/\D/g, '');
+      // 日本の携帯：CSV側で先頭0が欠落するケース（例：8529033312）→ 先頭0を復元
+      if(s.length === 10 && !s.startsWith('0')) s = '0' + s;
+      // 国番号81が付いているケース（例：+81 90-...）→ 81を除去して0を付与
+      if(s.length >= 12 && s.startsWith('81')) s = '0' + s.substring(2);
+      return s;
+    }
     function normalizeNameForMatch(v){ return String(v || '').normalize('NFKC').replace(/\s+/g, '').trim().toLowerCase(); }
 
     let deleteCsvState = { file: null, rows: null, analysis: null };
@@ -4907,16 +4915,42 @@
           name: pick(o, ['応募者名','氏名','名前','name','Name'])
         }));
 
+        // 診断：候補のフィールドキーを確認（個人情報は出さない）
+        if(candidates.length > 0){
+          console.log('[CSV DELETE] candidate キー一覧:', Object.keys(candidates[0]));
+          console.log('[CSV DELETE] 総candidate数:', candidates.length);
+          // 電話番号が「文字列」で保持されているか、先頭0が残っているかサンプルチェック
+          const samplePhones = candidates.slice(0, 5).map(c => ({ raw: String(c.phone || ''), normalized: normalizePhoneForMatch(c.phone) }));
+          console.log('[CSV DELETE] APS電話番号正規化サンプル:', samplePhones);
+        }
+
         // APS candidate をインデックス化
         const byEmail = new Map(), byPhone = new Map(), byName = new Map();
         candidates.forEach(c => {
           const e = normalizeEmailForMatch(c.email);
           const p = normalizePhoneForMatch(c.phone);
           const n = normalizeNameForMatch(c.name);
-          if(e) (byEmail.get(e) || byEmail.set(e, []).get(e)).push(c);
-          if(p) (byPhone.get(p) || byPhone.set(p, []).get(p)).push(c);
-          if(n) (byName.get(n) || byName.set(n, []).get(n)).push(c);
+          if(e){ if(!byEmail.has(e)) byEmail.set(e, []); byEmail.get(e).push(c); }
+          if(p){ if(!byPhone.has(p)) byPhone.set(p, []); byPhone.get(p).push(c); }
+          if(n){ if(!byName.has(n)) byName.set(n, []); byName.get(n).push(c); }
         });
+
+        // 診断：サンプル3名のCSV側正規化結果と、APS辞書にヒットするかを確認
+        const sampleChecks = ['Robertbobby Valle', 'ダグタイ', 'Jesussekinemanlulu'].map(sampleName => {
+          const rec = csvRecords.find(r => r.name && normalizeNameForMatch(r.name) === normalizeNameForMatch(sampleName));
+          if(!rec) return { sample: sampleName, csvFound: false };
+          const e = normalizeEmailForMatch(rec.email), p = normalizePhoneForMatch(rec.phone);
+          return {
+            sample: sampleName,
+            csvFound: true,
+            csvEmailNormalized: e,
+            csvPhoneNormalized: p,
+            apsEmailHit: e && byEmail.has(e),
+            apsPhoneHit: p && byPhone.has(p),
+            apsHitCount: (e && byEmail.get(e) ? byEmail.get(e).length : 0) + (p && byPhone.get(p) ? byPhone.get(p).length : 0)
+          };
+        });
+        console.log('[CSV DELETE] サンプル3名照合診断:', sampleChecks);
 
         const matchedIds = new Set();      // 自動削除対象
         const reviewIds = new Set();       // 氏名のみ一致（要確認、自動削除しない）
