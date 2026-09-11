@@ -132,8 +132,10 @@
     .cost-item.highlight{background:linear-gradient(135deg,#eaf2ff,#fff);border-color:#bfdbfe}
     .cost-item.highlight .c-value{color:var(--blue);font-size:30px}
     .hero-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+    .hero-grid.hero-grid-6{grid-template-columns:repeat(6,1fr)}
+    @media(max-width:1400px){.hero-grid.hero-grid-6{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:1180px){.hero-grid{grid-template-columns:repeat(3,1fr)}}
-    @media(max-width:720px){.hero-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:720px){.hero-grid,.hero-grid.hero-grid-6{grid-template-columns:repeat(2,1fr)}}
     .hero-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px 20px;position:relative;overflow:hidden;min-height:140px;display:flex;flex-direction:column;justify-content:flex-start}
     .hero-card.alert{background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d;box-shadow:0 2px 8px rgba(251,191,36,.12)}
     .hero-card.primary{background:linear-gradient(135deg,#eaf2ff,#f6faff);border-color:#bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,.10)}
@@ -145,6 +147,10 @@
     .hero-card.primary .h-value{color:var(--blue)}
     .hero-card .h-tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:900;margin-top:8px;background:#f1f5f9;color:#475569;align-self:flex-start}
     .hero-card.alert .h-tag{background:#fbbf24;color:#78350f}
+    .hero-card.hero-good{background:linear-gradient(135deg,#dcfce7,#f0fdf4);border-color:#86efac}
+    .hero-card.hero-good .h-value{color:#15803d}
+    .hero-card.hero-reject{background:linear-gradient(135deg,#fef2f2,#fff5f5);border-color:#fecaca}
+    .hero-card.hero-reject .h-value{color:#b91c1c}
     .job-summary-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px 18px}
     .job-summary-card h5{margin:0 0 14px;color:var(--navy);display:flex;justify-content:space-between;align-items:baseline;font-size:16px;gap:8px}
     .job-summary-card h5 .js-status{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:900}
@@ -191,6 +197,14 @@
     .emp-tile .et-unit{font-size:16px;color:var(--muted);margin-left:4px;font-weight:900}
     .emp-tile .et-pct{font-size:14px;color:var(--muted);margin-top:6px;font-weight:800;white-space:nowrap}
     /* 応募者一覧：不採用行の控えめスタイル（削除ではないので視認性は維持） */
+    /* ダッシュボード：選考結果タイル */
+    .outcome-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    @media(max-width:900px){.outcome-grid{grid-template-columns:repeat(2,1fr)}}
+    .outcome-tile{border:1px solid;border-radius:14px;padding:14px 16px;min-width:0}
+    .outcome-tile .ot-label{font-size:13px;color:var(--navy);font-weight:900;letter-spacing:.03em;white-space:nowrap}
+    .outcome-tile .ot-value{font-size:30px;font-weight:950;margin-top:6px;letter-spacing:-.03em;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .outcome-tile .ot-unit{font-size:14px;color:var(--muted);margin-left:4px;font-weight:900}
+    .outcome-tile .ot-pct{font-size:12px;color:var(--muted);margin-top:4px;font-weight:800}
     tr.row-rejected{background:#f8fafc;color:#64748b}
     tr.row-rejected td{opacity:.85}
     tr.row-rejected .person strong{color:#64748b}
@@ -248,6 +262,7 @@
             <div class="card-head"><div><h3>採用ファネル</h3><p class="hint">応募 → 面接 → 内定 → 承諾 → 入社 の流れと転換率</p></div></div>
             <div id="dashFunnel"></div>
             <div id="dashBottleneck" style="margin-top:12px;"></div>
+            <div id="dashOutcome" style="margin-top:18px;"></div>
           </div>
           <div class="card side">
             <div class="card-head"><div><h3>今日やること</h3><p class="hint">優先アクション（自動判定）</p></div></div>
@@ -1750,10 +1765,17 @@
     function renderDashboardHero(){
       const el = $('dashHero'); if(!el) return;
       const total = candidates.length;
-      const interview = candidates.filter(c => c.interviewAt).length;
-      const hired = candidates.filter(c => c.status === '内定承諾' || c.status === '入社決定').length;
-      const unrated = candidates.filter(c => c.rating === '未評価').length;
-      const unratedPct = total > 0 ? Math.round(unrated / total * 1000) / 10 : 0;
+      // ステータス集計（既存 statuses 定数を利用、勝手な値は追加しない）
+      const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      const isOffer = s => ['内定','内定承諾','入社決定'].includes(s);
+      const isHired = s => ['内定承諾','入社決定'].includes(s);
+      const interviewCount = candidates.filter(c => isInterview(c.status)).length;
+      const offerCount = candidates.filter(c => isOffer(c.status)).length;
+      const hiredCount = candidates.filter(c => isHired(c.status)).length;
+      const rejectedCount = candidates.filter(c => c.status === '不採用').length;
+      const interviewRate = total > 0 ? Math.round(interviewCount / total * 1000) / 10 : 0;
+      const offerRate = interviewCount > 0 ? Math.round(offerCount / interviewCount * 1000) / 10 : 0;
+      const rejectedRate = total > 0 ? Math.round(rejectedCount / total * 1000) / 10 : 0;
       // 今月の応募数
       const ym = todayYM();
       const monthApplied = candidates.filter(c => getCandidateAppliedYM(c) === ym).length;
@@ -1762,27 +1784,31 @@
       const costLabel = monthCost.total > 0 ? yen(monthCost.total) : '費用未登録';
       const costTag = monthCost.total > 0 ? '' : '<span class="h-tag">請求書取込を推奨</span>';
 
-      el.innerHTML = `<div class="hero-grid">
+      el.innerHTML = `<div class="hero-grid hero-grid-6">
         <div class="hero-card primary">
           <div class="h-label">総応募者</div>
           <div class="h-value">${total}<span class="h-unit">名</span></div>
           <div class="h-sub">今月新規：<strong style="color:var(--navy);">${monthApplied}名</strong></div>
         </div>
         <div class="hero-card">
-          <div class="h-label">面接予定</div>
-          <div class="h-value">${interview}<span class="h-unit">名</span></div>
-          <div class="h-sub">日時登録済み</div>
+          <div class="h-label">面接</div>
+          <div class="h-value">${interviewCount}<span class="h-unit">名</span></div>
+          <div class="h-sub">応募→面接 <strong style="color:var(--navy);">${interviewRate}%</strong></div>
         </div>
         <div class="hero-card">
-          <div class="h-label">採用決定</div>
-          <div class="h-value">${hired}<span class="h-unit">名</span></div>
+          <div class="h-label">内定</div>
+          <div class="h-value">${offerCount}<span class="h-unit">名</span></div>
+          <div class="h-sub">面接→内定 <strong style="color:var(--navy);">${offerRate}%</strong></div>
+        </div>
+        <div class="hero-card hero-good">
+          <div class="h-label">採用・入社</div>
+          <div class="h-value">${hiredCount}<span class="h-unit">名</span></div>
           <div class="h-sub">内定承諾＋入社決定</div>
         </div>
-        <div class="hero-card ${unrated > 0 ? 'alert' : ''}">
-          <div class="h-label">未評価</div>
-          <div class="h-value">${unrated}<span class="h-unit">名</span></div>
-          <div class="h-sub">${total > 0 ? `全体の ${unratedPct}%` : '-'}</div>
-          ${unrated > 0 ? '<span class="h-tag">⚠ 要対応</span>' : '<span class="h-tag">✓ 完了</span>'}
+        <div class="hero-card hero-reject">
+          <div class="h-label">不採用</div>
+          <div class="h-value">${rejectedCount}<span class="h-unit">名</span></div>
+          <div class="h-sub">${total > 0 ? `応募比 <strong>${rejectedRate}%</strong>` : '-'}</div>
         </div>
         <div class="hero-card">
           <div class="h-label">今月の採用費</div>
@@ -1843,6 +1869,36 @@
           bnEl.innerHTML = `<div class="notice">選考データが不足しています。応募者を登録してください。</div>`;
         }
       }
+    }
+
+    // 選考結果ブロック（応募者全員の現在の状態を分類）
+    function renderDashboardOutcome(){
+      const el = $('dashOutcome'); if(!el) return;
+      const total = candidates.length;
+      if(total === 0){ el.innerHTML = ''; return; }
+      // 分類（既存 statuses 定数を利用）
+      const hired = candidates.filter(c => c.status === '内定承諾' || c.status === '入社決定').length;
+      const rejected = candidates.filter(c => c.status === '不採用').length;
+      const withdrawn = candidates.filter(c => c.status === '辞退').length;
+      // 選考継続中：終了ステータス以外
+      const endStatuses = new Set(['内定承諾','入社決定','不採用','辞退']);
+      const ongoing = candidates.filter(c => !endStatuses.has(c.status)).length;
+      // その他（分類不能のステータス）→ 現在の統合定義では発生しないはずだが検算用
+      const other = total - hired - rejected - withdrawn - ongoing;
+      const pct = n => total > 0 ? Math.round(n / total * 1000) / 10 : 0;
+      const items = [
+        { label: '選考継続中', count: ongoing, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+        { label: '採用・入社', count: hired, color: '#15803d', bg: '#f0fdf4', border: '#86efac' },
+        { label: '不採用', count: rejected, color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' },
+        { label: '辞退', count: withdrawn, color: '#64748b', bg: '#f8fafc', border: '#cbd5e1' }
+      ];
+      const cards = items.map(it => `<div class="outcome-tile" style="background:${it.bg};border-color:${it.border};">
+        <div class="ot-label">${escapeHTML(it.label)}</div>
+        <div class="ot-value" style="color:${it.color};">${it.count}<span class="ot-unit">名</span></div>
+        <div class="ot-pct">${pct(it.count)}%</div>
+      </div>`).join('');
+      const otherNote = other !== 0 ? `<div style="margin-top:8px;font-size:11px;color:var(--muted);">※ その他 ${other}名（未分類ステータス／内定のみ）</div>` : '';
+      el.innerHTML = `<div class="card-head" style="margin-bottom:10px;"><div><h3 style="font-size:15px;">選考結果</h3><p class="hint">応募者全員の現在の状態（合計 ${total}名）</p></div></div><div class="outcome-grid">${cards}</div>${otherNote}`;
     }
 
     function renderDashboardActions(){
@@ -2044,7 +2100,7 @@
       renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard();
       renderEmploymentBars(); renderEmploymentByJob(); renderThisMonth();
       // 新ホーム画面ブロック
-      renderDashboardHero(); renderDashboardFunnel(); renderDashboardActions();
+      renderDashboardHero(); renderDashboardFunnel(); renderDashboardOutcome(); renderDashboardActions();
       renderDashboardJobs(); renderDashboardSources(); renderDashboardEmployment();
       renderDashboardCost();
       // 応募者一覧系
