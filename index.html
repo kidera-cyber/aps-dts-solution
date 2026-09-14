@@ -40,7 +40,7 @@
     textarea{resize:vertical;min-height:110px}.table-wrap{overflow-x:auto;border-radius:18px;border:1px solid var(--line)}
     table{width:100%;border-collapse:collapse;background:#fff;min-width:1040px}th,td{padding:14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle;font-size:13px}th{background:#f8fbff;color:#475569;font-size:11px;letter-spacing:.08em;font-weight:950;white-space:nowrap}tbody tr:hover td{background:#fbfdff}
     .person{display:flex;align-items:center;gap:10px;min-width:190px}.avatar{width:38px;height:38px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#dbeafe,#cffafe);color:var(--navy);font-weight:950}.person strong{display:block;color:var(--navy);font-size:14px}.person small{color:var(--muted)}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.badge-blue{background:var(--blueSoft);color:var(--blue2)}.badge-green{background:var(--greenSoft);color:#15803d}.badge-yellow{background:var(--amberSoft);color:#a16207}.badge-red{background:var(--redSoft);color:#b91c1c}.badge-gray{background:#f1f5f9;color:#475569}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.badge-blue{background:var(--blueSoft);color:var(--blue2)}.badge-green{background:var(--greenSoft);color:#15803d}.badge-yellow{background:var(--amberSoft);color:#a16207}.badge-red{background:var(--redSoft);color:#b91c1c}.badge-orange{background:#fed7aa;color:#9a3412}.badge-gray{background:#f1f5f9;color:#475569}
     .action-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.empty{padding:28px;border:1px dashed #cbd5e1;border-radius:18px;color:var(--muted);text-align:center;background:#fff}
     .kanban{display:grid;grid-template-columns:repeat(10,minmax(210px,1fr));gap:14px;overflow-x:auto;padding-bottom:8px}.kanban-col{min-height:520px;border-radius:22px;padding:14px;background:#f6f9fd;border:1px solid var(--line)}.kanban-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;color:var(--navy);font-weight:950}
     .candidate-card{background:#fff;border:1px solid #dfe7f0;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 8px 18px rgba(15,39,71,.07)}.candidate-card strong{color:var(--navy);display:block;margin-bottom:7px}.candidate-card p{margin:6px 0;color:var(--muted);font-size:12px;line-height:1.55}.candidate-card select{width:100%;border-radius:12px;border:1px solid var(--line);padding:9px 10px;margin-top:8px}
@@ -383,6 +383,7 @@
                 <option value="応募受付">応募受付</option>
                 <option value="書類選考中">書類選考中</option>
                 <option value="一次面接">一次面接</option>
+                <option value="面接不参加">面接不参加</option>
                 <option value="職場見学">職場見学</option>
                 <option value="二次面接">二次面接</option>
                 <option value="最終面接">最終面接</option>
@@ -834,7 +835,7 @@
     function isHiredCandidate(c){ return HIRED_STATUSES.includes(c && c.status); }
     // 面接不参加：面接予定だったが実施されなかった応募者。面接実績にはカウントしない
     const NO_SHOW_STATUS = '面接不参加';
-    const kanbanStatuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退・不採用'];
+    const kanbanStatuses = ['応募受付','書類選考中','一次面接','面接不参加','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退・不採用'];
     const feeTypes = ['掲載課金型','成功報酬型','掲載＋成功報酬型','無料・リファラル','その他'];
     const successFeeTypes = ['固定金額','理論年収の％','手入力'];
     const feeTriggerStatuses = ['内定','内定承諾','入社決定','採用','手動'];
@@ -1164,6 +1165,7 @@
     function statusClass(s){
       if(['内定','内定承諾','入社決定'].includes(s)) return 'badge-green';
       if(['一次面接','職場見学','二次面接','最終面接'].includes(s)) return 'badge-blue';
+      if(s === '面接不参加') return 'badge-orange';
       if(['書類選考中','保留'].includes(s)) return 'badge-yellow';
       if(['辞退','不採用'].includes(s)) return 'badge-red';
       return 'badge-gray';
@@ -2541,9 +2543,11 @@
       });
       const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
       // 運用ルール：内定＝入社決定として扱う（accepted / joined も同一）
+      // 面接不参加は面接実績には含めない（noShowとして別集計）
       return {
         applied: list.length,
         interview: list.filter(c => isInterview(c.status)).length,
+        noShow: list.filter(c => c.status === NO_SHOW_STATUS).length,
         offered: list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length,
         accepted: list.filter(c => isHiredCandidate(c)).length,
         joined: list.filter(c => isHiredCandidate(c)).length
