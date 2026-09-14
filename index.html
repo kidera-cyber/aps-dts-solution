@@ -481,6 +481,31 @@
 
       <section id="media" class="panel">
         <div class="card">
+          <div class="card-head"><div><h3>媒体別 採用進捗</h3><p class="hint">媒体×職種の採用コミット人数と現在実績・達成率・費用対効果を1画面で確認</p></div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <label style="font-size:12px;color:var(--muted);font-weight:900;">対象月<input id="commitMonth" type="month" style="margin-left:6px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);" /></label>
+              <button type="button" class="btn btn-small btn-soft" id="btnEditCommits">コミット編集</button>
+            </div>
+          </div>
+          <div id="commitSummary" style="margin-bottom:14px;"></div>
+          <div id="commitByJob" style="margin-bottom:14px;"></div>
+          <div id="commitCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:14px;"></div>
+          <div id="commitAlerts" style="margin-bottom:14px;"></div>
+          <details id="commitEditor" style="margin-bottom:18px;padding:12px 14px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;">
+            <summary style="cursor:pointer;font-weight:900;color:var(--navy);font-size:14px;">媒体別採用コミット設定（月×職種×媒体）</summary>
+            <div style="margin-top:12px;">
+              <div class="form-grid" style="grid-template-columns:repeat(4,1fr);gap:10px;">
+                <label class="field">対象月<input id="commitFormMonth" type="month" /></label>
+                <label class="field">職種<select id="commitFormJob"><option value="中型ドライバー">中型ドライバー</option><option value="大型ドライバー">大型ドライバー</option><option value="運行管理者">運行管理者</option><option value="事務スタッフ">事務スタッフ</option></select></label>
+                <label class="field">媒体<select id="commitFormMedia"><option value="リファラル">リファラル</option><option value="indeed_社員">indeed_社員</option><option value="indeed_AP">indeed_AP</option><option value="PLEX">PLEX</option><option value="ドラピタ">ドラピタ</option><option value="ガイダブル">ガイダブル</option><option value="Goドライバー">Goドライバー</option><option value="XMile">XMile</option><option value="派遣_ランスタ">派遣_ランスタ</option><option value="派遣_エクスプレス">派遣_エクスプレス</option><option value="紹介">紹介</option></select></label>
+                <label class="field">コミット人数<input id="commitFormTarget" type="number" min="0" value="0" /></label>
+              </div>
+              <div class="action-row" style="margin-top:10px;">
+                <button type="button" class="btn btn-primary btn-small" id="btnAddCommit">追加/更新</button>
+              </div>
+              <div id="commitEditList" style="margin-top:12px;max-height:280px;overflow-y:auto;"></div>
+            </div>
+          </details>
           <div class="card-head"><div><h3>掲載費用管理</h3><p class="hint">媒体・紹介会社ごとに費用タイプを分けて管理し、応募者ステータスから成功報酬対象を自動計算します</p></div></div>
           <div class="grid" id="mediaSummary" style="margin-bottom:18px;"></div>
           <form id="mediaForm" class="form-section">
@@ -768,6 +793,7 @@
     const STORAGE_CANDIDATES = 'apsLocal.candidates.v2';
     const STORAGE_PLANS = 'apsLocal.plans.v2';
     const STORAGE_MEDIA = 'apsLocal.mediaCosts.v1';
+    const STORAGE_MEDIA_COMMITS = 'apsLocal.mediaCommitPlans.v1';
     const STORAGE_API_URL = 'aps_api_url';
     const STORAGE_API_KEY = 'aps_api_key';
 
@@ -844,6 +870,7 @@
 
     let candidates = [];
     let plans = [];
+    let mediaCommitPlans = [];
     let syncState = { mode: 'idle', message: '', lastSyncedAt: '' };
 
     // ===== 自動ポーリング =====
@@ -1016,6 +1043,7 @@
         localStorage.setItem(STORAGE_CANDIDATES, JSON.stringify(candidates));
         localStorage.setItem(STORAGE_PLANS, JSON.stringify(plans));
         localStorage.setItem(STORAGE_MEDIA, JSON.stringify(mediaCosts));
+        localStorage.setItem(STORAGE_MEDIA_COMMITS, JSON.stringify(mediaCommitPlans));
       }catch(err){ console.error('localStorage保存エラー', err); }
     }
 
@@ -1023,7 +1051,25 @@
       try{ candidates = JSON.parse(localStorage.getItem(STORAGE_CANDIDATES) || '[]').map(normalizeCandidate); }catch{ candidates = []; }
       try{ plans = JSON.parse(localStorage.getItem(STORAGE_PLANS) || '[]').map(normalizePlan); }catch{ plans = []; }
       try{ mediaCosts = JSON.parse(localStorage.getItem(STORAGE_MEDIA) || '[]').map(normalizeMediaCost); }catch{ mediaCosts = []; }
+      try{ mediaCommitPlans = JSON.parse(localStorage.getItem(STORAGE_MEDIA_COMMITS) || '[]'); }catch{ mediaCommitPlans = []; }
+      // 初回：採用目標シート由来の初期コミットをロード
+      if(mediaCommitPlans.length === 0) mediaCommitPlans = getDefaultMediaCommitPlans();
       if(!candidates.length && !plans.length && !mediaCosts.length) loadSampleData();
+    }
+
+    // 添付「採用目標シート - 割振り.pdf」由来の初期コミット（媒体×職種×月×目標人数）
+    function getDefaultMediaCommitPlans(){
+      const defs = [];
+      // 中型ドライバー
+      const midMonthly = { 'リファラル':1, 'indeed_社員':2, 'PLEX':2, 'ドラピタ':1, 'ガイダブル':1, 'Goドライバー':1 };
+      // 大型ドライバー
+      const largeMonthly = { 'PLEX':1, 'indeed_社員':1 };
+      const months = ['2026-07','2026-08','2026-09','2026-10','2026-11','2026-12','2027-01','2027-02','2027-03','2027-04','2027-05'];
+      months.forEach(m => {
+        Object.entries(midMonthly).forEach(([media, t]) => defs.push({ id: `mcp_${m}_中型_${media}`, month: m, job: '中型ドライバー', media, target: t }));
+        Object.entries(largeMonthly).forEach(([media, t]) => defs.push({ id: `mcp_${m}_大型_${media}`, month: m, job: '大型ドライバー', media, target: t }));
+      });
+      return defs;
     }
 
     async function persist(showCloudMessage = false){
@@ -1032,7 +1078,7 @@
       markDirty();
       if(isCloudConfigured()){
         try{
-          const res = await callCloud('save', { candidates, plans, mediaCosts });
+          const res = await callCloud('save', { candidates, plans, mediaCosts, mediaCommitPlans });
           const cleaned = (res && typeof res.cleanedDuplicates === 'number') ? res.cleanedDuplicates : 0;
           setSyncState('ok', cleaned > 0 ? `保存しました（重複${cleaned}行を整理）` : '保存しました');
           if(showCloudMessage) setDataMessage(`クラウドへ保存しました${cleaned > 0 ? `（重複${cleaned}行を整理）` : ''}`, 'success');
@@ -1734,6 +1780,208 @@
     const yen = n => `¥${Number(n||0).toLocaleString()}`;
     const cpa = (cost, count) => count > 0 ? yen(Math.round(cost / count)) : '-';
 
+    // ===== 媒体別 採用進捗（コミット vs 実績） =====
+    // 媒体名正規化：応募者側のsource + 雇用形態 から採用目標シート側のキーへ寄せる
+    function normalizeMediaKey(source, workType){
+      const v = String(source || '').normalize('NFKC').trim().toLowerCase();
+      const w = String(workType || '').normalize('NFKC').trim();
+      if(v.includes('indeed') || v.includes('インディード')){
+        if(/アルバイト|パート|バイト/.test(w)) return 'indeed_AP';
+        return 'indeed_社員'; // 未設定・正社員系はデフォルト社員
+      }
+      if(v.includes('plex') || v.includes('プレックス')) return 'PLEX';
+      if(v.includes('xmile') || v.includes('エックスマイル') || v.includes('クロスマイル')) return 'XMile';
+      if(v.includes('guidable') || v.includes('ガイダブル')) return 'ガイダブル';
+      if(v.includes('ドラピタ') || v.includes('dorapita') || v.includes('dora-pita')) return 'ドラピタ';
+      if(v.includes('go') && v.includes('ドライバー')) return 'Goドライバー';
+      if(v.includes('goドライバー')) return 'Goドライバー';
+      if(v.includes('リファラル') || v.includes('referral')) return 'リファラル';
+      if(v.includes('ランスタ')) return '派遣_ランスタ';
+      if(v.includes('エクスプレス') || v.includes('express')) return '派遣_エクスプレス';
+      if(v.includes('紹介') || v.includes('agent')) return '紹介';
+      return String(source || '(未設定)').trim() || '(未設定)';
+    }
+
+    // 媒体×職種×月 の採用実績を candidates から集計（内定＝入社決定として集計）
+    function getMediaHiredCount(mediaKey, job, yyyyMm){
+      return candidates.filter(c => {
+        if(!isHiredCandidate(c)) return false;
+        if(c.job !== job) return false;
+        if(normalizeMediaKey(c.source, c.workType) !== mediaKey) return false;
+        // 月フィルタ：応募月ベース（内定日データがないため）
+        if(yyyyMm && getCandidateAppliedYM(c) !== yyyyMm) return false;
+        return true;
+      }).length;
+    }
+    function getMediaAppliedCount(mediaKey, job, yyyyMm){
+      return candidates.filter(c => {
+        if(c.job !== job) return false;
+        if(normalizeMediaKey(c.source, c.workType) !== mediaKey) return false;
+        if(yyyyMm && getCandidateAppliedYM(c) !== yyyyMm) return false;
+        return true;
+      }).length;
+    }
+    function getMediaInterviewCount(mediaKey, job, yyyyMm){
+      const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      return candidates.filter(c => {
+        if(!isInterview(c.status)) return false;
+        if(c.job !== job) return false;
+        if(normalizeMediaKey(c.source, c.workType) !== mediaKey) return false;
+        if(yyyyMm && getCandidateAppliedYM(c) !== yyyyMm) return false;
+        return true;
+      }).length;
+    }
+
+    // 媒体×職種の 掲載費用集計（当月分）
+    function getMediaCostForKeyJob(mediaKey, job, yyyyMm){
+      let total = 0;
+      mediaCosts.forEach(m => {
+        const mk = normalizeMediaKey(m.source || m.name, '');
+        if(mk !== mediaKey) return;
+        if(m.job && m.job !== job) return;
+        const c = getMediaMonthlyCost(m, yyyyMm);
+        total += (c.listing || 0) + (c.successFee || 0) + (c.other || 0);
+      });
+      return total;
+    }
+
+    function statusFromRate(rate){
+      if(rate >= 100) return { label: '達成', cls: 'status-good' };
+      if(rate >= 70) return { label: '順調', cls: 'status-good' };
+      if(rate >= 30) return { label: '要確認', cls: 'status-warn' };
+      return { label: '未達', cls: 'status-bad' };
+    }
+
+    function renderMediaCommitProgress(){
+      const wrap = $('commitSummary'); if(!wrap) return;
+      const monthEl = $('commitMonth');
+      if(!monthEl.value) monthEl.value = todayYM();
+      const ym = monthEl.value;
+      const monthPlans = mediaCommitPlans.filter(p => p.month === ym);
+
+      // 上部サマリー
+      const totalCommit = monthPlans.reduce((s,p) => s + (p.target||0), 0);
+      const totalHired = monthPlans.reduce((s,p) => s + getMediaHiredCount(p.media, p.job, ym), 0);
+      const remain = Math.max(0, totalCommit - totalHired);
+      const rate = totalCommit > 0 ? Math.round(totalHired / totalCommit * 1000) / 10 : 0;
+      const totalCost = monthPlans.reduce((s,p) => s + getMediaCostForKeyJob(p.media, p.job, ym), 0);
+      wrap.innerHTML = `<div class="hero-grid hero-grid-6">
+        <div class="hero-card primary"><div class="h-label">今月コミット合計</div><div class="h-value">${totalCommit}<span class="h-unit">名</span></div><div class="h-sub">${escapeHTML(ym)}</div></div>
+        <div class="hero-card hero-good"><div class="h-label">採用実績</div><div class="h-value">${totalHired}<span class="h-unit">名</span></div><div class="h-sub">内定＝入社決定として集計</div></div>
+        <div class="hero-card ${remain > 0 ? 'alert' : ''}"><div class="h-label">残り</div><div class="h-value">${remain}<span class="h-unit">名</span></div><div class="h-sub">${remain > 0 ? '要注力' : '目標達成'}</div></div>
+        <div class="hero-card"><div class="h-label">達成率</div><div class="h-value">${rate}<span class="h-unit">%</span></div><div class="h-sub">実績÷コミット</div></div>
+        <div class="hero-card"><div class="h-label">当月媒体費</div><div class="h-value" style="font-size:24px;">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(ym)}</div></div>
+        <div class="hero-card"><div class="h-label">採用単価</div><div class="h-value" style="font-size:24px;">${totalCost > 0 && totalHired > 0 ? yen(Math.round(totalCost / totalHired)) : '-'}</div><div class="h-sub">総費用÷実績</div></div>
+      </div>`;
+
+      // 職種別サマリー
+      const jobEl = $('commitByJob');
+      const byJob = {};
+      monthPlans.forEach(p => {
+        if(!byJob[p.job]) byJob[p.job] = { commit:0, hired:0 };
+        byJob[p.job].commit += (p.target||0);
+        byJob[p.job].hired += getMediaHiredCount(p.media, p.job, ym);
+      });
+      const jobRows = Object.entries(byJob).map(([job, v]) => {
+        const jrate = v.commit > 0 ? Math.round(v.hired / v.commit * 1000) / 10 : 0;
+        const st = statusFromRate(jrate);
+        return `<div style="display:grid;grid-template-columns:180px 1fr 120px 120px 120px;align-items:center;gap:12px;padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;">
+          <strong style="color:var(--navy);font-size:15px;">${escapeHTML(job)}</strong>
+          <div style="height:12px;border-radius:999px;background:#eaf0f7;overflow:hidden;"><div style="height:100%;width:${Math.min(100, jrate)}%;background:linear-gradient(90deg,#60a5fa,#22d3ee);"></div></div>
+          <div style="font-size:14px;color:var(--navy);"><strong>${v.hired}</strong> / ${v.commit}名</div>
+          <div style="font-size:14px;color:var(--navy);font-weight:900;">達成率 ${jrate}%</div>
+          <span class="js-status ${st.cls}" style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:900;text-align:center;">${st.label}</span>
+        </div>`;
+      }).join('');
+      jobEl.innerHTML = jobRows ? `<div style="font-weight:900;color:var(--navy);margin-bottom:8px;font-size:14px;">職種別サマリー</div>${jobRows}` : `<div class="notice">対象月（${escapeHTML(ym)}）のコミット設定がありません。「コミット編集」から追加してください。</div>`;
+
+      // 媒体×職種カード
+      const cardsEl = $('commitCards');
+      cardsEl.innerHTML = monthPlans.map(p => {
+        const hired = getMediaHiredCount(p.media, p.job, ym);
+        const applied = getMediaAppliedCount(p.media, p.job, ym);
+        const interview = getMediaInterviewCount(p.media, p.job, ym);
+        const remainC = Math.max(0, p.target - hired);
+        const rateC = p.target > 0 ? Math.round(hired / p.target * 100) : 0;
+        const st = statusFromRate(rateC);
+        const cost = getMediaCostForKeyJob(p.media, p.job, ym);
+        const cpaVal = cost > 0 && hired > 0 ? yen(Math.round(cost / hired)) : (cost > 0 ? '未採用' : '-');
+        const overflow = hired > p.target ? `<span class="badge badge-green" style="margin-left:6px;">+${hired - p.target}名超過</span>` : '';
+        return `<div class="segment-card seg-regular" style="min-width:0;">
+          <div class="seg-head"><h5>${escapeHTML(p.media)} × ${escapeHTML(p.job)}</h5><span class="js-status ${st.cls}">${st.label}</span></div>
+          <div class="seg-hero">
+            <div class="seg-hero-label">採用実績</div>
+            <div class="seg-hero-value">${hired}<span class="seg-hero-target"> / 目標 ${p.target}</span></div>
+            <div class="seg-hero-sub">${remainC > 0 ? `<strong style="color:#b91c1c;">残り ${remainC}名</strong>` : `<strong style="color:#15803d;">目標達成</strong>`}${overflow}</div>
+            <div class="js-progress" style="margin-top:8px;"><span style="width:${Math.min(100, rateC)}%"></span></div>
+            <div class="js-progress-label">達成率 ${rateC}%</div>
+          </div>
+          <div class="seg-metrics" style="grid-template-columns:repeat(3,1fr);">
+            <div class="seg-metric"><div class="sm-label">応募</div><div class="sm-value">${applied}</div></div>
+            <div class="seg-metric"><div class="sm-label">面接</div><div class="sm-value">${interview}</div></div>
+            <div class="seg-metric"><div class="sm-label">採用単価</div><div class="sm-value" style="font-size:15px;">${cpaVal}</div></div>
+          </div>
+          <div class="seg-funnel"><span>媒体費：<strong>${cost > 0 ? yen(cost) : '未登録'}</strong></span></div>
+        </div>`;
+      }).join('');
+
+      // 要対応アラート
+      const alertsEl = $('commitAlerts');
+      const alerts = monthPlans.map(p => {
+        const hired = getMediaHiredCount(p.media, p.job, ym);
+        const cost = getMediaCostForKeyJob(p.media, p.job, ym);
+        const remainC = Math.max(0, p.target - hired);
+        const rateC = p.target > 0 ? (hired / p.target * 100) : 100;
+        if(rateC >= 70) return null;
+        let reason = `目標${p.target}名に対して実績${hired}名（残り${remainC}名）`;
+        if(cost > 0 && hired === 0) reason += ` — 媒体費 ${yen(cost)} が発生しているのに採用0、単価悪化リスク`;
+        else if(cost > 0) reason += ` — 現時点の採用単価 ${yen(Math.round(cost / hired))}`;
+        return { text: `<strong>${escapeHTML(p.media)} × ${escapeHTML(p.job)}</strong>：${reason}`, rate: rateC };
+      }).filter(Boolean).sort((a,b) => a.rate - b.rate);
+      if(alerts.length > 0){
+        alertsEl.innerHTML = `<div class="notice" style="background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d;">
+          <div style="font-weight:900;color:#78350f;margin-bottom:6px;font-size:14px;">⚠ 要対応（達成率70%未満）</div>
+          <ul style="margin:0;padding-left:20px;">${alerts.slice(0,5).map(a => `<li style="margin:4px 0;color:#78350f;">${a.text}</li>`).join('')}</ul>
+        </div>`;
+      }else{
+        alertsEl.innerHTML = '';
+      }
+
+      // 編集エディタ内のリスト
+      renderCommitEditList();
+    }
+
+    function renderCommitEditList(){
+      const el = $('commitEditList'); if(!el) return;
+      const list = mediaCommitPlans.slice().sort((a,b) => (b.month||'').localeCompare(a.month||''));
+      if(list.length === 0){ el.innerHTML = '<div class="empty">コミット設定なし</div>'; return; }
+      el.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <thead><tr style="background:#eef2f7;"><th style="padding:6px 8px;text-align:left;">月</th><th style="padding:6px 8px;text-align:left;">職種</th><th style="padding:6px 8px;text-align:left;">媒体</th><th style="padding:6px 8px;text-align:right;">目標</th><th style="padding:6px 8px;">操作</th></tr></thead>
+        <tbody>${list.map(p => `<tr style="border-bottom:1px solid #eef2f7;"><td style="padding:6px 8px;">${escapeHTML(p.month)}</td><td style="padding:6px 8px;">${escapeHTML(p.job)}</td><td style="padding:6px 8px;">${escapeHTML(p.media)}</td><td style="padding:6px 8px;text-align:right;font-weight:900;">${p.target}名</td><td style="padding:6px 8px;text-align:center;"><button type="button" class="btn btn-small btn-danger" data-commit-del="${escapeHTML(p.id)}">削除</button></td></tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    async function addOrUpdateCommit(){
+      const month = $('commitFormMonth').value;
+      const job = $('commitFormJob').value;
+      const media = $('commitFormMedia').value;
+      const target = Number($('commitFormTarget').value) || 0;
+      if(!month || !job || !media){ showToast('月・職種・媒体を入力してください', 'warning'); return; }
+      const id = `mcp_${month}_${job}_${media}`;
+      const idx = mediaCommitPlans.findIndex(p => p.id === id);
+      if(idx >= 0){ mediaCommitPlans[idx] = { id, month, job, media, target }; }
+      else { mediaCommitPlans.push({ id, month, job, media, target }); }
+      await persist();
+      showToast(`コミット保存：${month} ${job} × ${media} = ${target}名`, 'success', 2500);
+    }
+
+    async function deleteCommit(id){
+      if(!confirm('このコミット設定を削除しますか？')) return;
+      mediaCommitPlans = mediaCommitPlans.filter(p => p.id !== id);
+      await persist();
+      showToast('コミットを削除しました', 'success', 2000);
+    }
+
     function renderMediaSummary(){
       const target = $('mediaSummary'); if(!target) return;
       let totalCost = 0, listingTotal = 0, successTotal = 0;
@@ -2234,7 +2482,7 @@
       renderPlanTable();
       // 媒体費用
       refreshReportSourceSelect();
-      renderMediaSummary(); renderMediaTable(); renderMediaCompareTable();
+      renderMediaCommitProgress(); renderMediaSummary(); renderMediaTable(); renderMediaCompareTable();
       // 月次レポート
       renderMonthlyReport();
     }
@@ -3363,7 +3611,7 @@
       let cloudSaved = false, cloudError = '';
       if(isCloudConfigured()){
         try{
-          await callCloud('save', { candidates, plans, mediaCosts });
+          await callCloud('save', { candidates, plans, mediaCosts, mediaCommitPlans });
           setSyncState('ok', `${label} 取込`);
           cloudSaved = true;
           markClean();
@@ -4472,7 +4720,7 @@
         saveLocal(); renderAll();
         let cloudSaved = false, cloudError = '';
         if(isCloudConfigured()){
-          try{ await callCloud('save', { candidates, plans, mediaCosts }); setSyncState('ok','JSON取込'); cloudSaved = true; }
+          try{ await callCloud('save', { candidates, plans, mediaCosts, mediaCommitPlans }); setSyncState('ok','JSON取込'); cloudSaved = true; }
           catch(err){ setSyncState('ng', err.message); cloudError = err.message || String(err); }
         }
         const cloudLine = cloudError
@@ -5373,6 +5621,10 @@
       }else{
         console.warn('[CLOUD RELOAD] data.mediaCosts が配列でないため既存データを保持');
       }
+      if(Array.isArray(data.mediaCommitPlans)){
+        mediaCommitPlans = data.mediaCommitPlans;
+      }
+      // data.mediaCommitPlans が未対応の旧サーバの場合は既存ローカルを保持
       saveLocal();
       renderAll();
       markClean();
@@ -5383,7 +5635,7 @@
     async function cloudPush(){
       try{
         setDataMessage('クラウドへ反映中です...', 'info');
-        await callCloud('save', { candidates, plans, mediaCosts });
+        await callCloud('save', { candidates, plans, mediaCosts, mediaCommitPlans });
         setSyncState('ok', '反映成功');
         setDataMessage(`クラウドへ反映しました（応募者${candidates.length}件 / 採用計画${plans.length}件 / 媒体費用${mediaCosts.length}件）`, 'success');
         markClean();
@@ -5463,6 +5715,20 @@
       onClick('btnLoadSample', reseedSampleData);
       onClick('btnResetAll', resetAllData);
       onClick('btnPurgeGuidable', purgeGuidableCandidates);
+      // 媒体別採用進捗
+      const commitMonthEl = $('commitMonth');
+      if(commitMonthEl){
+        if(!commitMonthEl.value) commitMonthEl.value = todayYM();
+        commitMonthEl.addEventListener('change', renderMediaCommitProgress);
+      }
+      const commitFormMonthEl = $('commitFormMonth');
+      if(commitFormMonthEl && !commitFormMonthEl.value) commitFormMonthEl.value = todayYM();
+      onClick('btnEditCommits', () => { const d = $('commitEditor'); if(d) d.open = true; d.scrollIntoView({behavior:'smooth', block:'center'}); });
+      onClick('btnAddCommit', addOrUpdateCommit);
+      document.addEventListener('click', e => {
+        const btn = e.target && e.target.dataset && e.target.dataset.commitDel ? e.target : null;
+        if(btn) deleteCommit(btn.dataset.commitDel);
+      });
       const delCsvInp = $('inputDeleteCSV'); if(delCsvInp) delCsvInp.addEventListener('change', handleDeleteCsvFileSelect);
       onClick('btnAnalyzeDeleteCSV', analyzeDeleteCsv);
       onClick('btnExecuteDeleteCSV', executeDeleteCsv);
