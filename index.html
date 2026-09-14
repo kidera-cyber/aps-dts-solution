@@ -296,6 +296,16 @@
             <div id="dashActions"></div>
           </div>
 
+          <!-- BLOCK 3b: 媒体別採用コミット進捗（要対応 Top5 のみ） -->
+          <div class="card full">
+            <div class="card-head">
+              <div><h3>媒体別 採用コミット進捗</h3><p class="hint">今月の媒体×職種の進捗。日々の判断用に「要対応」上位のみ表示。</p></div>
+              <button type="button" class="btn btn-small btn-soft" data-goto="media">詳細を見る</button>
+            </div>
+            <div id="dashCommitSummary" style="margin-bottom:12px;"></div>
+            <div id="dashCommitAlerts"></div>
+          </div>
+
           <!-- BLOCK 4: 採用枠別 採用状況（4枠：中型正社員 / 大型正社員 / ドライバーAL / 事務AL） -->
           <div class="card full">
             <div class="card-head"><div><h3>採用枠別 採用状況</h3><p class="hint">中型ドライバー正社員 / 大型ドライバー正社員 / ドライバーアルバイト / 事務アルバイト を1画面で比較</p></div></div>
@@ -602,6 +612,15 @@
           <!-- 10 採用コスト -->
           <div class="card-head" style="margin-top:22px;"><h3>採用コスト内訳</h3></div>
           <div id="reportCosts"></div>
+
+          <!-- 10b 媒体別採用コミット進捗（月次） -->
+          <div class="card-head" style="margin-top:22px;"><div><h3>媒体別 採用コミット進捗（月次）</h3><p class="hint">媒体×職種のコミット vs 実績・費用対効果・要改善媒体</p></div></div>
+          <div id="reportCommitSummary" style="margin-bottom:14px;"></div>
+          <div id="reportCommitByJob" style="margin-bottom:14px;"></div>
+          <div id="reportCommitTable" style="margin-bottom:14px;"></div>
+          <div id="reportCommitAlerts" style="margin-bottom:14px;"></div>
+          <div id="reportCommitTrend" style="margin-bottom:14px;"></div>
+          <div id="reportCommitCumulative" style="margin-bottom:14px;"></div>
 
           <!-- 11 採用計画 vs 実績 -->
           <div class="card-head" style="margin-top:22px;"><h3>採用計画 vs 実績</h3></div>
@@ -1961,6 +1980,209 @@
       </table>`;
     }
 
+    // ホーム画面用：媒体別採用コミット進捗のコンパクト表示（要対応Top5）
+    function renderDashboardMediaCommit(){
+      const sumEl = $('dashCommitSummary'), alertEl = $('dashCommitAlerts');
+      if(!sumEl || !alertEl) return;
+      const ym = todayYM();
+      const monthPlans = mediaCommitPlans.filter(p => p.month === ym);
+      if(monthPlans.length === 0){
+        sumEl.innerHTML = `<div class="notice">今月（${escapeHTML(ym)}）のコミット設定がありません。<a href="#" data-goto="media" style="color:var(--blue);font-weight:900;">掲載費用画面で設定</a>してください。</div>`;
+        alertEl.innerHTML = '';
+        return;
+      }
+      const totalCommit = monthPlans.reduce((s,p) => s + (p.target||0), 0);
+      const totalHired = monthPlans.reduce((s,p) => s + getMediaHiredCount(p.media, p.job, ym), 0);
+      const remain = Math.max(0, totalCommit - totalHired);
+      const rate = totalCommit > 0 ? Math.round(totalHired / totalCommit * 1000) / 10 : 0;
+      // 達成状況カウント
+      let good = 0, warn = 0, bad = 0;
+      monthPlans.forEach(p => {
+        const h = getMediaHiredCount(p.media, p.job, ym);
+        const r = p.target > 0 ? (h / p.target * 100) : 0;
+        if(r >= 100) good++;
+        else if(r >= 30) warn++;
+        else bad++;
+      });
+      sumEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;">
+        <div class="hero-card primary" style="padding:14px 12px;min-height:auto;"><div class="h-label">今月コミット</div><div class="h-value" style="font-size:28px;">${totalCommit}<span class="h-unit">名</span></div></div>
+        <div class="hero-card hero-good" style="padding:14px 12px;min-height:auto;"><div class="h-label">採用実績</div><div class="h-value" style="font-size:28px;">${totalHired}<span class="h-unit">名</span></div></div>
+        <div class="hero-card ${remain > 0 ? 'alert' : ''}" style="padding:14px 12px;min-height:auto;"><div class="h-label">残り</div><div class="h-value" style="font-size:28px;">${remain}<span class="h-unit">名</span></div></div>
+        <div class="hero-card" style="padding:14px 12px;min-height:auto;"><div class="h-label">達成率</div><div class="h-value" style="font-size:28px;">${rate}<span class="h-unit">%</span></div></div>
+        <div class="hero-card hero-good" style="padding:14px 12px;min-height:auto;"><div class="h-label">達成媒体</div><div class="h-value" style="font-size:28px;">${good}</div></div>
+        <div class="hero-card" style="padding:14px 12px;min-height:auto;"><div class="h-label">要確認</div><div class="h-value" style="font-size:28px;">${warn}</div></div>
+        <div class="hero-card hero-reject" style="padding:14px 12px;min-height:auto;"><div class="h-label">未達</div><div class="h-value" style="font-size:28px;">${bad}</div></div>
+      </div>`;
+
+      // 要対応Top5 = 未達成の中で 残り人数×(1-達成率) が大きい順
+      const alerts = monthPlans.map(p => {
+        const hired = getMediaHiredCount(p.media, p.job, ym);
+        const applied = getMediaAppliedCount(p.media, p.job, ym);
+        const interview = getMediaInterviewCount(p.media, p.job, ym);
+        const cost = getMediaCostForKeyJob(p.media, p.job, ym);
+        const rem = Math.max(0, p.target - hired);
+        const r = p.target > 0 ? (hired / p.target * 100) : 100;
+        if(r >= 70) return null;
+        // 優先度：残り人数が多い×達成率が低い×媒体費0でない
+        const priority = rem * (100 - r) * (cost > 0 ? 1.5 : 1);
+        return { p, hired, applied, interview, cost, rem, r, priority };
+      }).filter(Boolean).sort((a,b) => b.priority - a.priority).slice(0, 5);
+
+      if(alerts.length === 0){
+        alertEl.innerHTML = '<div class="notice success" style="font-weight:900;">✓ 要対応の媒体はありません（達成率70%以上）</div>';
+        return;
+      }
+      alertEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+        ${alerts.map(a => {
+          const st = statusFromRate(a.r);
+          const rateInt = Math.round(a.r);
+          return `<div class="segment-card seg-part" style="padding:14px 16px;">
+            <div class="seg-head" style="margin-bottom:10px;"><h5 style="font-size:14px;">${escapeHTML(a.p.media)} × ${escapeHTML(a.p.job)}</h5><span class="js-status ${st.cls}">${st.label}</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+              <span style="font-size:12px;color:var(--muted);font-weight:900;">採用</span>
+              <span style="font-size:22px;font-weight:950;color:var(--navy);">${a.hired}<span style="font-size:12px;color:var(--muted);font-weight:900;"> / 目標 ${a.p.target}</span></span>
+            </div>
+            <div class="js-progress" style="margin-bottom:4px;"><span style="width:${Math.min(100, rateInt)}%"></span></div>
+            <div style="font-size:12px;color:${a.rem > 0 ? '#b91c1c' : '#15803d'};font-weight:900;margin-bottom:8px;">${a.rem > 0 ? `残り ${a.rem}名（達成率 ${rateInt}%）` : `目標達成`}</div>
+            <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);border-top:1px dashed #eef2f7;padding-top:8px;">
+              <span>応募 <strong style="color:var(--navy);">${a.applied}</strong></span>
+              <span>面接 <strong style="color:var(--navy);">${a.interview}</strong></span>
+              <span>媒体費 <strong style="color:var(--navy);">${a.cost > 0 ? yen(a.cost) : '未登録'}</strong></span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    // 月次レポート用：媒体別採用コミット進捗（全媒体・グルーピング表示）
+    function renderReportMediaCommit(){
+      let ym = $('reportMonth') && $('reportMonth').value || todayYM();
+      const monthPlans = mediaCommitPlans.filter(p => p.month === ym);
+      const sumEl = $('reportCommitSummary'), jobEl = $('reportCommitByJob'), tblEl = $('reportCommitTable'), alertsEl = $('reportCommitAlerts'), trendEl = $('reportCommitTrend'), cumEl = $('reportCommitCumulative');
+      if(!sumEl) return;
+
+      // 上部：今月の採用結果
+      const totalCommit = monthPlans.reduce((s,p) => s + (p.target||0), 0);
+      const totalHired = monthPlans.reduce((s,p) => s + getMediaHiredCount(p.media, p.job, ym), 0);
+      const remain = Math.max(0, totalCommit - totalHired);
+      const rate = totalCommit > 0 ? Math.round(totalHired / totalCommit * 1000) / 10 : 0;
+      let good = 0, warn = 0, bad = 0;
+      monthPlans.forEach(p => {
+        const h = getMediaHiredCount(p.media, p.job, ym);
+        const r = p.target > 0 ? (h / p.target * 100) : 0;
+        if(r >= 100) good++; else if(r >= 30) warn++; else bad++;
+      });
+      sumEl.innerHTML = monthPlans.length === 0
+        ? `<div class="notice">対象月（${escapeHTML(ym)}）のコミット設定なし</div>`
+        : `<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
+        <div class="hero-card primary" style="padding:16px;min-height:auto;"><div class="h-label">今月コミット</div><div class="h-value" style="font-size:30px;">${totalCommit}<span class="h-unit">名</span></div></div>
+        <div class="hero-card hero-good" style="padding:16px;min-height:auto;"><div class="h-label">採用実績</div><div class="h-value" style="font-size:30px;">${totalHired}<span class="h-unit">名</span></div></div>
+        <div class="hero-card ${remain > 0 ? 'alert' : ''}" style="padding:16px;min-height:auto;"><div class="h-label">未達</div><div class="h-value" style="font-size:30px;">${remain}<span class="h-unit">名</span></div></div>
+        <div class="hero-card" style="padding:16px;min-height:auto;"><div class="h-label">達成率</div><div class="h-value" style="font-size:30px;">${rate}<span class="h-unit">%</span></div></div>
+        <div class="hero-card hero-good" style="padding:16px;min-height:auto;"><div class="h-label">達成媒体</div><div class="h-value" style="font-size:30px;">${good}</div></div>
+        <div class="hero-card hero-reject" style="padding:16px;min-height:auto;"><div class="h-label">未達媒体</div><div class="h-value" style="font-size:30px;">${bad}</div></div>
+      </div>`;
+
+      // 職種別サマリー
+      const byJob = {};
+      monthPlans.forEach(p => {
+        if(!byJob[p.job]) byJob[p.job] = { commit:0, hired:0 };
+        byJob[p.job].commit += (p.target||0);
+        byJob[p.job].hired += getMediaHiredCount(p.media, p.job, ym);
+      });
+      jobEl.innerHTML = Object.keys(byJob).length === 0 ? '' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:8px;">${Object.entries(byJob).map(([job, v]) => {
+        const r = v.commit > 0 ? Math.round(v.hired / v.commit * 1000) / 10 : 0;
+        const st = statusFromRate(r);
+        return `<div class="job-summary-card"><h5>${escapeHTML(job)}<span class="js-status ${st.cls}">${st.label}</span></h5>
+          <div class="js-metrics"><div class="js-metric"><div class="js-metric-label">コミット</div><div class="js-metric-value">${v.commit}</div></div><div class="js-metric"><div class="js-metric-label">実績</div><div class="js-metric-value">${v.hired}</div></div><div class="js-metric ${v.commit-v.hired>0?'shortage':''}"><div class="js-metric-label">残り</div><div class="js-metric-value">${Math.max(0,v.commit-v.hired)}</div></div><div class="js-metric"><div class="js-metric-label">達成率</div><div class="js-metric-value">${r}%</div></div></div>
+          <div class="js-progress"><span style="width:${Math.min(100,r)}%"></span></div>
+        </div>`;
+      }).join('')}</div>`;
+
+      // 媒体別テーブル（職種でグルーピング）
+      if(monthPlans.length === 0){ tblEl.innerHTML = ''; alertsEl.innerHTML = ''; trendEl.innerHTML = ''; cumEl.innerHTML = ''; return; }
+      const jobOrder = Array.from(new Set(monthPlans.map(p => p.job)));
+      const tables = jobOrder.map(job => {
+        const rows = monthPlans.filter(p => p.job === job).map(p => {
+          const hired = getMediaHiredCount(p.media, p.job, ym);
+          const applied = getMediaAppliedCount(p.media, p.job, ym);
+          const interview = getMediaInterviewCount(p.media, p.job, ym);
+          const cost = getMediaCostForKeyJob(p.media, p.job, ym);
+          const r = p.target > 0 ? Math.round(hired / p.target * 100) : 0;
+          const rem = Math.max(0, p.target - hired);
+          const st = statusFromRate(r);
+          return `<tr><td>${escapeHTML(p.media)}</td><td style="text-align:right;font-weight:900;">${p.target}</td><td style="text-align:right;font-weight:900;color:${hired>=p.target?'#15803d':'var(--navy)'};">${hired}</td><td style="text-align:right;color:${rem>0?'#b91c1c':'#15803d'};font-weight:900;">${rem}</td><td style="text-align:right;font-weight:900;">${r}%</td><td style="text-align:center;"><span class="js-status ${st.cls}" style="padding:2px 8px;border-radius:999px;font-size:10px;">${st.label}</span></td><td style="text-align:right;">${applied}</td><td style="text-align:right;">${interview}</td><td style="text-align:right;">${cost > 0 ? yen(cost) : '費用未登録'}</td><td style="text-align:right;font-weight:900;">${cost > 0 && hired > 0 ? yen(Math.round(cost / hired)) : '-'}</td></tr>`;
+        }).join('');
+        return `<div style="margin-top:14px;"><div style="font-weight:950;color:var(--navy);font-size:15px;margin-bottom:6px;">${escapeHTML(job)}</div><div class="table-wrap"><table><thead><tr><th>媒体</th><th style="text-align:right;">目標</th><th style="text-align:right;">実績</th><th style="text-align:right;">残り</th><th style="text-align:right;">達成率</th><th>ステータス</th><th style="text-align:right;">応募</th><th style="text-align:right;">面接</th><th style="text-align:right;">媒体費</th><th style="text-align:right;">採用単価</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      }).join('');
+      tblEl.innerHTML = tables;
+
+      // 要改善媒体（達成率<30% を優先、コメント自動生成）
+      const alerts = monthPlans.map(p => {
+        const hired = getMediaHiredCount(p.media, p.job, ym);
+        const applied = getMediaAppliedCount(p.media, p.job, ym);
+        const interview = getMediaInterviewCount(p.media, p.job, ym);
+        const cost = getMediaCostForKeyJob(p.media, p.job, ym);
+        const r = p.target > 0 ? (hired / p.target * 100) : 100;
+        if(r >= 30) return null;
+        let comment = '';
+        if(applied === 0) comment = '応募母数不足が主因です。媒体条件・求人訴求の見直しを検討してください。';
+        else if(interview === 0) comment = '応募は発生していますが面接に至っていません。連絡・スクリーニングを見直してください。';
+        else if(hired === 0) comment = '応募・面接は発生していますが採用につながっていません。面接後の歩留まりを確認してください。';
+        else comment = '目標達成まで残りがあります。母集団拡大または歩留まり改善が必要です。';
+        return { p, hired, applied, interview, cost, r, comment };
+      }).filter(Boolean).sort((a,b) => a.r - b.r).slice(0, 5);
+      alertsEl.innerHTML = alerts.length === 0 ? '' : `<div class="notice" style="background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d;margin-top:14px;">
+        <div style="font-weight:900;color:#78350f;margin-bottom:8px;font-size:14px;">⚠ 要改善媒体（達成率30%未満）</div>
+        ${alerts.map(a => `<div style="padding:8px 0;border-top:1px dashed #fcd34d;"><strong style="color:#92400e;">${escapeHTML(a.p.media)} × ${escapeHTML(a.p.job)}</strong>：目標${a.p.target}名 / 実績${a.hired}名 / 応募${a.applied}名 / 面接${a.interview}名<br><span style="color:#78350f;font-size:12px;">${escapeHTML(a.comment)}</span></div>`).join('')}
+      </div>`;
+
+      // 月別推移（過去6ヶ月）
+      const trendMonths = [];
+      const base = new Date(ym + '-01');
+      for(let i = 5; i >= 0; i--){
+        const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+        trendMonths.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+      }
+      const trendRows = trendMonths.map(m => {
+        const mp = mediaCommitPlans.filter(p => p.month === m);
+        const c = mp.reduce((s,p) => s + (p.target||0), 0);
+        const h = mp.reduce((s,p) => s + getMediaHiredCount(p.media, p.job, m), 0);
+        const r = c > 0 ? Math.round(h / c * 100) : 0;
+        return { m, c, h, r };
+      });
+      const maxCommit = Math.max(1, ...trendRows.map(r => Math.max(r.c, r.h)));
+      trendEl.innerHTML = `<div style="margin-top:14px;"><div style="font-weight:900;color:var(--navy);margin-bottom:8px;font-size:14px;">月別推移（過去6ヶ月）</div>
+        <div style="display:grid;grid-template-columns:80px 1fr 100px;gap:12px;font-size:13px;">
+          ${trendRows.map(t => `<div style="color:var(--navy);font-weight:900;">${escapeHTML(t.m)}</div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <div style="display:flex;align-items:center;gap:6px;"><span style="width:40px;font-size:11px;color:var(--muted);">目標</span><div style="flex:1;height:8px;background:#eaf0f7;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${t.c/maxCommit*100}%;background:#94a3b8;"></div></div><span style="width:30px;text-align:right;">${t.c}</span></div>
+              <div style="display:flex;align-items:center;gap:6px;"><span style="width:40px;font-size:11px;color:var(--muted);">実績</span><div style="flex:1;height:8px;background:#eaf0f7;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${t.h/maxCommit*100}%;background:linear-gradient(90deg,#60a5fa,#22d3ee);"></div></div><span style="width:30px;text-align:right;font-weight:900;">${t.h}</span></div>
+            </div>
+            <div style="text-align:right;font-weight:900;color:${t.r>=100?'#15803d':t.r>=50?'var(--navy)':'#b91c1c'};">${t.r}%</div>`).join('')}
+        </div>
+      </div>`;
+
+      // 年度累計（当年度＝2026-07〜2027-05 を対象）
+      const yearMonths = ['2026-07','2026-08','2026-09','2026-10','2026-11','2026-12','2027-01','2027-02','2027-03','2027-04','2027-05'];
+      const pairs = new Map();
+      mediaCommitPlans.filter(p => yearMonths.includes(p.month)).forEach(p => {
+        const key = `${p.media}|${p.job}`;
+        const cur = pairs.get(key) || { media:p.media, job:p.job, commit:0, hired:0 };
+        cur.commit += (p.target||0);
+        pairs.set(key, cur);
+      });
+      pairs.forEach(v => {
+        yearMonths.forEach(m => { v.hired += getMediaHiredCount(v.media, v.job, m); });
+      });
+      const cumList = Array.from(pairs.values()).sort((a,b) => (a.job.localeCompare(b.job)) || (a.media.localeCompare(b.media)));
+      cumEl.innerHTML = cumList.length === 0 ? '' : `<div style="margin-top:14px;"><div style="font-weight:900;color:var(--navy);margin-bottom:8px;font-size:14px;">年度累計（2026-07 〜 2027-05）</div>
+        <div class="table-wrap"><table><thead><tr><th>媒体</th><th>職種</th><th style="text-align:right;">年間コミット</th><th style="text-align:right;">累計実績</th><th style="text-align:right;">残り</th><th style="text-align:right;">達成率</th></tr></thead><tbody>
+        ${cumList.map(v => { const r = v.commit > 0 ? Math.round(v.hired / v.commit * 100) : 0; const rem = Math.max(0, v.commit - v.hired); return `<tr><td>${escapeHTML(v.media)}</td><td>${escapeHTML(v.job)}</td><td style="text-align:right;font-weight:900;">${v.commit}名</td><td style="text-align:right;font-weight:900;">${v.hired}名</td><td style="text-align:right;color:${rem>0?'#b91c1c':'#15803d'};font-weight:900;">${rem}名</td><td style="text-align:right;font-weight:900;">${r}%</td></tr>`; }).join('')}
+        </tbody></table></div>
+      </div>`;
+    }
+
     async function addOrUpdateCommit(){
       const month = $('commitFormMonth').value;
       const job = $('commitFormJob').value;
@@ -2472,6 +2694,7 @@
       renderEmploymentBars(); renderEmploymentByJob(); renderThisMonth();
       // 新ホーム画面ブロック
       renderDashboardHero(); renderDashboardFunnel(); renderDashboardOutcome(); renderDashboardActions();
+      renderDashboardMediaCommit();
       renderDashboardJobs(); renderDashboardSources(); renderDashboardEmployment();
       renderDashboardCost();
       // 応募者一覧系
@@ -3255,6 +3478,9 @@
       if(trendTbody){
         trendTbody.innerHTML = trendData.map(r => `<tr><td><strong>${r.ym}</strong></td><td>${r.total === 0 ? '-' : yen(r.total)}</td><td>${r.ad === 0 ? '-' : yen(r.ad)}</td><td>${r.fee === 0 ? '-' : yen(r.fee)}</td><td>${r.applied}</td><td>${r.interview}</td><td>${r.offered}</td><td>${r.accepted}</td><td>${r.joined}</td><td>${r.total > 0 && r.applied > 0 ? yen(Math.round(r.total/r.applied)) : '-'}</td><td>${r.total > 0 && r.joined > 0 ? yen(Math.round(r.total/r.joined)) : '-'}</td></tr>`).join('');
       }
+
+      // 媒体別採用コミット進捗（同じ集計関数を再利用）
+      renderReportMediaCommit();
     }
 
     function exportMonthlyReportCSV(){
