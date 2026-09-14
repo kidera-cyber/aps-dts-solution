@@ -827,7 +827,13 @@
 
     const jobs = ['中型ドライバー', '運行管理者', '事務スタッフ'];
     const sources = ['indeed', 'PLEX', 'XMile', 'Guidable', 'リファラル', '紹介'];
-    const statuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退','不採用','保留'];
+    const statuses = ['応募受付','書類選考中','一次面接','面接不参加','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退','不採用','保留'];
+    // 共通集計ルール：「内定」以降を採用・入社決定として扱う（実データのステータスは書き換えない）
+    // 運用上、内定＝入社決定 と見なす。承諾/入社決定 も含む。
+    const HIRED_STATUSES = ['内定','内定承諾','入社決定'];
+    function isHiredCandidate(c){ return HIRED_STATUSES.includes(c && c.status); }
+    // 面接不参加：面接予定だったが実施されなかった応募者。面接実績にはカウントしない
+    const NO_SHOW_STATUS = '面接不参加';
     const kanbanStatuses = ['応募受付','書類選考中','一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退・不採用'];
     const feeTypes = ['掲載課金型','成功報酬型','掲載＋成功報酬型','無料・リファラル','その他'];
     const successFeeTypes = ['固定金額','理論年収の％','手入力'];
@@ -1214,8 +1220,8 @@
       const groups = [
         { label: '総応募者数', value: s.total, sub: '登録済み', extra: jobBreakdownHtml },
         { label: '面接予定', value: candidates.filter(c => c.interviewAt).length, sub: '日時設定済み' },
-        { label: '選考中', value: candidates.filter(c => !['内定承諾','辞退','不採用'].includes(c.status)).length, sub: '対応対象' },
-        { label: '内定承諾', value: candidates.filter(c => c.status === '内定承諾').length, sub: '採用確定' },
+        { label: '選考中', value: candidates.filter(c => !isHiredCandidate(c) && !['辞退','不採用'].includes(c.status)).length, sub: '対応対象' },
+        { label: '採用・入社決定', value: candidates.filter(c => isHiredCandidate(c)).length, sub: '内定＋承諾＋入社決定' },
         { label: '履歴書あり', value: candidates.filter(c => c.resumeUrl).length, sub: 'URL登録済み' },
         { label: '未評価', value: candidates.filter(c => c.rating === '未評価').length, sub: '評価待ち' }
       ];
@@ -1372,7 +1378,7 @@
     }
     function renderSourceBars(){ renderBars('sourceBars', sources.map(source => ({ label: source, count: candidates.filter(c => c.source === source).length }))); }
 
-    function countAcceptedByJob(){ return candidates.filter(c => c.status === '内定承諾').reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {}); }
+    function countAcceptedByJob(){ return candidates.filter(c => isHiredCandidate(c)).reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {}); }
 
     function renderPlanSummary(){
       const accepted = countAcceptedByJob();
@@ -1695,8 +1701,9 @@
     function getMediaStats(m){
       const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
       const isOffer = s => ['内定','内定承諾','入社決定'].includes(s);
-      const isAccepted = s => ['内定承諾','入社決定'].includes(s);
-      const isJoined = s => s === '入社決定';
+      // 運用ルール：内定＝入社決定（採用単価・成功報酬発生条件でも同一扱い）
+      const isAccepted = s => HIRED_STATUSES.includes(s);
+      const isJoined = s => HIRED_STATUSES.includes(s);
       const applied = countCandidatesForMedia(m);
       const interview = countCandidatesForMedia(m, isInterview);
       const offered = countCandidatesForMedia(m, isOffer);
@@ -1735,15 +1742,16 @@
         successTotal += s.successFeeTotal;
       });
       const applied = candidates.length;
-      const accepted = candidates.filter(c => ['内定承諾','入社決定'].includes(c.status)).length;
-      const joined = candidates.filter(c => c.status === '入社決定').length;
+      // 運用ルール：内定＝入社決定として集計
+      const accepted = candidates.filter(c => isHiredCandidate(c)).length;
+      const joined = candidates.filter(c => isHiredCandidate(c)).length;
       const groups = [
         ['総費用', yen(totalCost), '全媒体合計'],
         ['掲載費用', yen(listingTotal), '固定掲載'],
         ['成功報酬', yen(successTotal), '採用連動'],
         ['応募数', applied, '全体'],
-        ['内定承諾数', accepted, '全体'],
-        ['入社決定数', joined, '全体'],
+        ['採用・入社決定数', accepted, '内定含む'],
+        ['入社決定数（同上）', joined, '内定＝入社扱い'],
         ['応募単価', cpa(totalCost, applied), '総費用÷応募'],
         ['内定承諾単価', cpa(totalCost, accepted), '総費用÷承諾'],
         ['入社決定単価', cpa(totalCost, joined), '総費用÷入社']
@@ -1817,7 +1825,8 @@
       // ステータス集計（既存 statuses 定数を利用、勝手な値は追加しない）
       const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
       const isOffer = s => ['内定','内定承諾','入社決定'].includes(s);
-      const isHired = s => ['内定承諾','入社決定'].includes(s);
+      // 内定＝採用・入社決定として扱う（共通ルール）
+      const isHired = s => HIRED_STATUSES.includes(s);
       const interviewCount = candidates.filter(c => isInterview(c.status)).length;
       const offerCount = candidates.filter(c => isOffer(c.status)).length;
       const hiredCount = candidates.filter(c => isHired(c.status)).length;
@@ -1850,9 +1859,9 @@
           <div class="h-sub">面接→内定 <strong style="color:var(--navy);">${offerRate}%</strong></div>
         </div>
         <div class="hero-card hero-good">
-          <div class="h-label">採用・入社</div>
+          <div class="h-label">採用・入社決定</div>
           <div class="h-value">${hiredCount}<span class="h-unit">名</span></div>
-          <div class="h-sub">内定承諾＋入社決定</div>
+          <div class="h-sub">内定＋内定承諾＋入社決定</div>
         </div>
         <div class="hero-card hero-reject">
           <div class="h-label">不採用</div>
@@ -1875,9 +1884,9 @@
       const applied = total;
       const interview = candidates.filter(c => isInterview(c.status)).length;
       const offered = candidates.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length;
-      const accepted = candidates.filter(c => ['内定承諾','入社決定'].includes(c.status)).length;
-      const joined = candidates.filter(c => c.status === '入社決定').length;
-      const c1 = conv(interview, applied), c2 = conv(offered, interview), c3 = conv(accepted, offered), c4 = conv(joined, accepted);
+      // 運用ルール：内定＝入社決定として扱う（承諾ステップは省略）
+      const joined = candidates.filter(c => isHiredCandidate(c)).length;
+      const c1 = conv(interview, applied), c2 = conv(offered, interview), c3 = conv(joined, offered);
       const steps = [
         { label: '応募', val: applied },
         { conv: c1 },
@@ -1885,9 +1894,7 @@
         { conv: c2 },
         { label: '内定', val: offered },
         { conv: c3 },
-        { label: '承諾', val: accepted },
-        { conv: c4 },
-        { label: '入社', val: joined }
+        { label: '入社決定', val: joined }
       ];
       el.innerHTML = `<div class="funnel-row">${steps.map(s => {
         if(s.conv !== undefined){
@@ -1907,8 +1914,7 @@
         const stages = [
           { name: '応募→面接', rate: c1 },
           { name: '面接→内定', rate: c2 },
-          { name: '内定→承諾', rate: c3 },
-          { name: '承諾→入社', rate: c4 }
+          { name: '内定→入社決定', rate: c3 }
         ].filter(s => s.rate !== null);
         if(stages.length){
           const bn = stages.reduce((min, s) => s.rate < min.rate ? s : min, stages[0]);
@@ -1926,11 +1932,11 @@
       const total = candidates.length;
       if(total === 0){ el.innerHTML = ''; return; }
       // 分類（既存 statuses 定数を利用）
-      const hired = candidates.filter(c => c.status === '内定承諾' || c.status === '入社決定').length;
+      const hired = candidates.filter(c => isHiredCandidate(c)).length;
       const rejected = candidates.filter(c => c.status === '不採用').length;
       const withdrawn = candidates.filter(c => c.status === '辞退').length;
-      // 選考継続中：終了ステータス以外
-      const endStatuses = new Set(['内定承諾','入社決定','不採用','辞退']);
+      // 選考継続中：終了ステータス以外（内定以降は入社決定として終了扱い）
+      const endStatuses = new Set(['内定','内定承諾','入社決定','不採用','辞退']);
       const ongoing = candidates.filter(c => !endStatuses.has(c.status)).length;
       // その他（分類不能のステータス）→ 現在の統合定義では発生しないはずだが検算用
       const other = total - hired - rejected - withdrawn - ongoing;
@@ -1957,7 +1963,7 @@
       const upcomingInterview = candidates.filter(c => c.interviewAt).length;
       const jobShortage = [];
       plans.forEach(p => {
-        const cur = candidates.filter(c => c.job === p.job && (c.status === '内定承諾' || c.status === '入社決定')).length;
+        const cur = candidates.filter(c => c.job === p.job && isHiredCandidate(c)).length;
         const sh = Math.max(0, p.total - cur);
         if(sh > 0) jobShortage.push({ job: p.job, shortage: sh, target: p.total });
       });
@@ -2029,7 +2035,8 @@
 
       const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
       const isOffer = s => ['内定','内定承諾','入社決定'].includes(s);
-      const isHired = s => ['内定承諾','入社決定'].includes(s);
+      // 運用ルール：内定＝入社決定として扱う
+      const isHired = s => HIRED_STATUSES.includes(s);
       const conv = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 : null;
 
       const cards = SEGMENTS.map(seg => {
@@ -2165,7 +2172,7 @@
       const ym = todayYM();
       const c = computeMonthCosts(mediaCosts, ym);
       const monthApplied = candidates.filter(cc => getCandidateAppliedYM(cc) === ym).length;
-      const monthHired = candidates.filter(cc => getCandidateAppliedYM(cc) === ym && (cc.status === '内定承諾' || cc.status === '入社決定')).length;
+      const monthHired = candidates.filter(cc => getCandidateAppliedYM(cc) === ym && isHiredCandidate(cc)).length;
       const labelLbl = $('thisMonthLabel'); if(labelLbl) labelLbl.textContent = `対象月：${ym}`;
       const costDisplay = c.total > 0 ? yen(c.total) : '費用未登録';
       const cpaApplied = c.total > 0 && monthApplied > 0 ? yen(Math.round(c.total / monthApplied)) : '-';
@@ -2533,12 +2540,13 @@
         return true;
       });
       const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
+      // 運用ルール：内定＝入社決定として扱う（accepted / joined も同一）
       return {
         applied: list.length,
         interview: list.filter(c => isInterview(c.status)).length,
         offered: list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length,
-        accepted: list.filter(c => ['内定承諾','入社決定'].includes(c.status)).length,
-        joined: list.filter(c => c.status === '入社決定').length
+        accepted: list.filter(c => isHiredCandidate(c)).length,
+        joined: list.filter(c => isHiredCandidate(c)).length
       };
     }
 
@@ -2849,8 +2857,8 @@
             applied: list.length,
             interview: list.filter(c => isInterview(c.status)).length,
             offered: list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length,
-            accepted: list.filter(c => ['内定承諾','入社決定'].includes(c.status)).length,
-            joined: list.filter(c => c.status === '入社決定').length
+            accepted: list.filter(c => isHiredCandidate(c)).length,
+            joined: list.filter(c => isHiredCandidate(c)).length
           };
           const r = conv(s.interview, s.applied);
           return `<div class="mini-report-card">
@@ -2919,7 +2927,7 @@
         if(!plans.length){
           planEl.innerHTML = '<div class="empty">採用計画が未登録です</div>';
         }else{
-          const accepted = candidates.filter(c => c.status === '内定承諾' || c.status === '入社決定').reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {});
+          const accepted = candidates.filter(c => isHiredCandidate(c)).reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {});
           planEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
             ${plans.map(p => {
               const cur = accepted[p.job] || 0;
