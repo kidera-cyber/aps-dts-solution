@@ -658,7 +658,7 @@
           <div class="form-section" style="margin-top:16px;">
             <h4>クラウド共有設定</h4>
             <div class="form-grid-2">
-              <label class="field">Apps Script WebアプリURL<input id="apiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" /></label>
+              <label class="field">Apps Script WebアプリURL<input id="apiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" /><small style="color:var(--muted);font-size:11px;font-weight:700;margin-top:4px;">必ず <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">/exec</code> で終わるURL。再デプロイ後は新URLに更新してください（旧URLは404になります）</small></label>
               <label class="field">共有キー / API Key<input id="apiKey" type="text" placeholder="任意の長いランダム文字列" /></label>
             </div>
             <div class="action-row" style="margin-top:14px;">
@@ -666,6 +666,7 @@
               <button class="btn btn-soft" id="btnTestConnection">接続確認</button>
               <button class="btn" id="btnCloudReload">クラウドから再読込</button>
               <button class="btn btn-ghost" id="btnCloudPush">現在データをクラウドへ反映</button>
+              <button class="btn btn-small btn-ghost" id="btnOpenUrl" title="現在のURLを新しいタブで開いて、JSONが返るか目視確認します">URLを直接開く</button>
             </div>
             <div class="radio-row" style="margin-top:14px;">自動更新（30秒ごと）：
               <label><input type="checkbox" id="pollingToggle" checked /> ON</label>
@@ -1006,7 +1007,17 @@
       const rawText = await res.text();
       const contentType = res.headers.get('content-type') || '';
       if(!res.ok){
-        console.error('[CLOUD] HTTPエラー:', { status: res.status, contentType, bodyHead: rawText.slice(0,300) });
+        console.error('[CLOUD] HTTPエラー:', { status: res.status, contentType, bodyHead: rawText.slice(0,300), endpoint });
+        // 404 = URL不正の可能性が最も高い
+        if(res.status === 404){
+          throw new Error(`Apps Script WebアプリURLが無効です（404）。設定画面で最新の /exec URLを確認してください。\n現在のURL: ${endpoint}\n※ Apps Scriptを再デプロイした場合、新しいデプロイIDが発行されるため、旧URLは404になります。「デプロイを管理」から最新の /exec URLをコピーして再設定してください。`);
+        }
+        if(res.status === 403){
+          throw new Error(`Apps Scriptアクセス拒否（403）。デプロイ設定で「アクセスできるユーザー」が「全員」になっているか確認してください。`);
+        }
+        if(res.status === 401){
+          throw new Error(`Apps Script認可エラー（401）。編集画面で手動実行して承認を完了してください。`);
+        }
         throw new Error(`Apps Script HTTPエラー：${res.status}（応答の先頭：${rawText.slice(0,120).replace(/\s+/g,' ')}）`);
       }
       // HTMLが返っていないか検出（Googleログイン/権限エラー/Apps Scriptエラーページ）
@@ -5764,14 +5775,24 @@
       if($('apiKey')) $('apiKey').value = key;
     }
 
+    function isValidAppsScriptUrl(url){
+      return /^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec(\?.*)?$/.test(url);
+    }
+
     function saveApiSettings(){
       const url = ($('apiUrl') && $('apiUrl').value || '').trim();
       const key = ($('apiKey') && $('apiKey').value || '').trim();
+      // URL形式チェック（保存はするが警告を出す）
+      if(url && !isValidAppsScriptUrl(url)){
+        const warn = `⚠ WebアプリURL形式が正しくない可能性があります。\n\n期待形式：https://script.google.com/macros/s/XXXXX/exec\n入力値：${url}\n\n以下は無効です：\n・/dev で終わる（開発用URL）\n・/edit を含む（エディタURL）\n・デプロイIDのみ\n・script.google.com/home/... 形式\n\nこのまま保存しますか？`;
+        if(!confirm(warn)){ return; }
+      }
       if(url) localStorage.setItem(STORAGE_API_URL, url); else localStorage.removeItem(STORAGE_API_URL);
       if(key) localStorage.setItem(STORAGE_API_KEY, key); else localStorage.removeItem(STORAGE_API_KEY);
       setDataMessage('クラウド共有設定を保存しました。「接続確認」を押してテストしてください。', 'success');
       renderSyncCard();
       startAutoPolling();
+      console.log('[CLOUD] Apps Script URL saved:', url ? url.slice(0,60) + '...' : '(未設定)');
     }
 
     async function testConnection(){
@@ -5914,6 +5935,12 @@
       onClick('btnResetPlanForm', resetPlanForm);
       onClick('btnCloseModal', closeModal);
       onClick('btnSaveSettings', saveApiSettings);
+      onClick('btnOpenUrl', () => {
+        const url = (localStorage.getItem(STORAGE_API_URL) || '').trim();
+        if(!url){ showToast('WebアプリURLが未設定です', 'warning'); return; }
+        window.open(url, '_blank', 'noopener');
+        showToast('新しいタブで開きました。JSONが返れば正常、404/HTMLが返ればURL要修正', 'info', 5000);
+      });
       onClick('btnTestConnection', testConnection);
       onClick('btnCloudReload', () => cloudReload(false).catch(() => { /* エラーはsyncCardに表示済み */ }));
       onClick('btnCloudPush', cloudPush);
