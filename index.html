@@ -762,6 +762,18 @@
           </div>
 
           <div class="form-section">
+            <h4>データ復旧診断（読取専用・ローカル vs クラウド差分）</h4>
+            <p class="hint" style="margin-bottom:10px;">ローカルデータとクラウドデータを <strong>上書きせずに比較</strong> し、消失候補（特にPLEX）を検出します。診断は完全に読取専用。復旧は個別承認制です。</p>
+            <div class="action-row">
+              <button class="btn btn-soft" id="btnDiagnoseSync">診断を実行</button>
+              <button class="btn btn-soft" id="btnDownloadLocalBackup">現在ローカルをJSON保存</button>
+              <button class="btn btn-primary" id="btnMergePlexRecovery" disabled>PLEX復旧を実行（マージ）</button>
+            </div>
+            <div id="diagnoseMessage" style="margin-top:10px;"></div>
+            <div id="diagnoseResult" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
             <h4>応募経路別 一括削除</h4>
             <p class="hint" style="margin-bottom:10px;">特定の応募経路（例：Guidable）のデータだけを一括で削除します。他媒体（Indeed / PLEX / Xmile 等）・採用計画・掲載費用には影響しません。</p>
             <div class="action-row">
@@ -5359,6 +5371,219 @@
       setDataMessage('サンプルデータを再投入しました', 'success');
     }
 
+    // ===== データ復旧診断（読取専用） =====
+    // ローカルとクラウドを別変数で保持して比較。上書きは一切しない。
+    let diagnoseState = { local: null, cloud: null, plexRecoveryList: [] };
+
+    function isPlexSource(c){
+      const s = String(c && c.source || '').normalize('NFKC').trim().toLowerCase();
+      return s.includes('plex') || s.includes('プレックス');
+    }
+
+    async function runSyncDiagnosis(){
+      const msgEl = $('diagnoseMessage'), resEl = $('diagnoseResult'), mergeBtn = $('btnMergePlexRecovery');
+      if(mergeBtn) mergeBtn.disabled = true;
+
+      if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = '診断中...（ローカルとクラウドを読取専用で比較しています）'; }
+
+      // 完全バックアップ（メモリ内・ローカル上書き前）
+      const localSnapshot = {
+        candidates: JSON.parse(JSON.stringify(candidates)),
+        plans: JSON.parse(JSON.stringify(plans)),
+        mediaCosts: JSON.parse(JSON.stringify(mediaCosts)),
+        mediaCommitPlans: JSON.parse(JSON.stringify(mediaCommitPlans))
+      };
+      diagnoseState.local = localSnapshot;
+
+      // クラウド接続確認
+      if(!isCloudConfigured()){
+        if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = 'クラウド未設定のため、ローカル情報のみ表示します。'; }
+        showLocalOnlyDiagnosis(localSnapshot, resEl);
+        return;
+      }
+
+      // 読取専用：クラウドから load して別変数へ
+      let cloudData = null, cloudError = null;
+      try{
+        const res = await callCloud('load', {});
+        cloudData = res && res.data ? res.data : null;
+      }catch(err){
+        cloudError = err.message || String(err);
+        console.error('[DIAGNOSE] cloud load失敗:', err);
+      }
+
+      if(cloudError){
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `クラウド取得失敗：${cloudError}（ローカルデータは保護されています）`; }
+        showLocalOnlyDiagnosis(localSnapshot, resEl);
+        return;
+      }
+
+      // クラウドデータを別変数で保持（絶対に candidates に代入しない）
+      const cloudCandidates = Array.isArray(cloudData && cloudData.candidates) ? cloudData.candidates : [];
+      diagnoseState.cloud = { candidates: cloudCandidates };
+
+      // 差分分析
+      const localById = new Map(localSnapshot.candidates.map(c => [c.id, c]));
+      const cloudById = new Map(cloudCandidates.map(c => [c.id, c]));
+      const localByEmail = new Map(); const localByPhone = new Map();
+      localSnapshot.candidates.forEach(c => {
+        const e = normalizeEmailForMatch(c.email); if(e) localByEmail.set(e, c);
+        const p = normalizePhoneForMatch(c.phone); if(p) localByPhone.set(p, c);
+      });
+
+      // PLEX抽出
+      const localPlex = localSnapshot.candidates.filter(isPlexSource);
+      const cloudPlex = cloudCandidates.filter(isPlexSource);
+
+      // ローカルにだけあるPLEX（クラウドから消えた可能性）
+      const localOnlyPlex = localPlex.filter(lc => {
+        if(cloudById.has(lc.id)) return false;
+        const e = normalizeEmailForMatch(lc.email);
+        const p = normalizePhoneForMatch(lc.phone);
+        const eHit = e && cloudCandidates.some(cc => normalizeEmailForMatch(cc.email) === e);
+        const pHit = p && cloudCandidates.some(cc => normalizePhoneForMatch(cc.phone) === p);
+        return !eHit && !pHit;
+      });
+
+      // クラウドにだけあるPLEX（ローカルから消えた可能性 = 復旧候補）
+      const cloudOnlyPlex = cloudPlex.filter(cc => {
+        if(localById.has(cc.id)) return false;
+        const e = normalizeEmailForMatch(cc.email);
+        const p = normalizePhoneForMatch(cc.phone);
+        const eHit = e && localByEmail.has(e);
+        const pHit = p && localByPhone.has(p);
+        return !eHit && !pHit;
+      });
+
+      // updatedAt 差分（両方に存在、日時比較）
+      const conflictPlex = [];
+      cloudPlex.forEach(cc => {
+        const lc = localById.get(cc.id);
+        if(!lc) return;
+        const ct = cc.updatedAt || '', lt = lc.updatedAt || '';
+        if(ct !== lt) conflictPlex.push({ id: cc.id, name: cc.name, localUpdated: lt, cloudUpdated: ct, cloudNewer: ct > lt });
+      });
+
+      diagnoseState.plexRecoveryList = cloudOnlyPlex;
+      if(mergeBtn) mergeBtn.disabled = cloudOnlyPlex.length === 0;
+
+      // 画面表示
+      const localTotal = localSnapshot.candidates.length;
+      const cloudTotal = cloudCandidates.length;
+      resEl.className = 'notice';
+      resEl.innerHTML = `
+        <div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:10px;">🔍 診断結果（読取専用・データは変更していません）</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--muted);">現在ローカル 応募者総数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${localTotal}名</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--muted);">クラウド 応募者総数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${cloudTotal}名</td></tr>
+          <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;font-weight:900;color:var(--navy);">PLEX抽出</td></tr>
+          <tr><td style="padding:4px 8px;">ローカルPLEX</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${localPlex.length}名</td></tr>
+          <tr><td style="padding:4px 8px;">クラウドPLEX</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${cloudPlex.length}名</td></tr>
+          <tr><td style="padding:4px 8px;">ローカルのみに存在（クラウド未反映）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:${localOnlyPlex.length>0?'#a16207':'#15803d'};">${localOnlyPlex.length}名</td></tr>
+          <tr><td style="padding:4px 8px;">クラウドのみに存在（ローカルから消えた可能性 = <strong style="color:#b91c1c;">復旧候補</strong>）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:${cloudOnlyPlex.length>0?'#b91c1c':'#15803d'};">${cloudOnlyPlex.length}名</td></tr>
+          <tr><td style="padding:4px 8px;">updatedAt競合（両方に存在・日時差）</td><td style="padding:4px 8px;text-align:right;">${conflictPlex.length}名</td></tr>
+        </table>
+        ${cloudOnlyPlex.length > 0 ? `
+          <div style="margin-top:12px;font-weight:900;color:#b91c1c;font-size:13px;">🚨 ローカルから消えたPLEX候補（クラウドに存在、ローカルに存在しない）</div>
+          <div style="margin-top:6px;max-height:280px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;">
+            ${cloudOnlyPlex.slice(0,100).map(c => `<div style="display:grid;grid-template-columns:1fr 100px 120px 200px;gap:8px;padding:4px 6px;border-bottom:1px dashed #eef2f7;font-size:12px;"><span style="font-weight:900;color:var(--navy);">${escapeHTML(c.name || '(名前なし)')}</span><span>${escapeHTML(c.status || '-')}</span><span style="color:var(--muted);">${escapeHTML(c.appliedAt || c.createdAt || '-')}</span><span style="color:var(--muted);font-family:monospace;">${escapeHTML(c.id || '-')}</span></div>`).join('')}
+            ${cloudOnlyPlex.length > 100 ? `<div style="padding:6px;font-size:11px;color:var(--muted);">※ 先頭100件のみ表示（残り${cloudOnlyPlex.length - 100}件）</div>` : ''}
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:var(--muted);">上部の「PLEX復旧を実行（マージ）」ボタンで、これら${cloudOnlyPlex.length}名を現在のローカルにマージできます（クラウドで上書きしません、他応募者は無変更）。</div>
+        ` : `<div style="margin-top:10px;font-size:12px;color:#15803d;">クラウドのみに存在するPLEX候補はありません。</div>`}
+        ${localOnlyPlex.length > 0 ? `
+          <div style="margin-top:12px;font-weight:900;color:#a16207;font-size:13px;">⚠ ローカルのみに存在するPLEX（クラウド未反映）</div>
+          <div style="margin-top:6px;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;">
+            ${localOnlyPlex.slice(0,50).map(c => `<div style="padding:4px 6px;border-bottom:1px dashed #eef2f7;font-size:12px;"><strong>${escapeHTML(c.name)}</strong> — ${escapeHTML(c.status || '')} — ${escapeHTML(c.appliedAt || '-')}</div>`).join('')}
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:#78350f;">これらはクラウドに反映されていません。次回の save で反映されます。今は自動保存が止まっているため、接続復旧後に「現在データをクラウドへ反映」を押してください。</div>
+        ` : ''}
+        <div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--muted);">
+          最終クラウド保存: ${escapeHTML(syncState.lastSyncedAt || '未記録')} / 自動更新: ${pollingEnabled ? '有効' : '<strong style="color:#b91c1c;">一時停止中</strong>'} / 現在の同期状態: <strong>${escapeHTML(syncState.mode || '-')}</strong> ${syncState.message ? '(' + escapeHTML(syncState.message) + ')' : ''}
+        </div>
+      `;
+      if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = '診断完了。データは変更していません。復旧候補がある場合は「PLEX復旧を実行」で個別承認後にマージできます。'; }
+      console.log('[DIAGNOSE] 完了:', { localTotal, cloudTotal, localPlex: localPlex.length, cloudPlex: cloudPlex.length, localOnlyPlex: localOnlyPlex.length, cloudOnlyPlex: cloudOnlyPlex.length, conflictPlex: conflictPlex.length });
+    }
+
+    function showLocalOnlyDiagnosis(local, resEl){
+      const localPlex = local.candidates.filter(isPlexSource);
+      resEl.className = 'notice';
+      resEl.innerHTML = `<div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:10px;">🔍 ローカルのみ診断</div>
+        <table style="width:100%;font-size:13px;">
+          <tr><td style="padding:4px 8px;">現在ローカル 応募者総数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${local.candidates.length}名</td></tr>
+          <tr><td style="padding:4px 8px;">ローカルPLEX</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${localPlex.length}名</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);">クラウド接続が確立できないため、差分比較はできません。「現在ローカルをJSON保存」で必ずバックアップを取得してください。</div>`;
+    }
+
+    function downloadLocalBackup(){
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        candidates,
+        plans,
+        mediaCosts,
+        mediaCommitPlans
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `pre_recovery_backup_${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 100);
+      showToast(`ローカルバックアップを保存しました（応募者${candidates.length}名）`, 'success', 3000);
+    }
+
+    async function mergePlexRecovery(){
+      const list = diagnoseState.plexRecoveryList || [];
+      if(list.length === 0){ showToast('復旧候補がありません。先に「診断を実行」してください。', 'warning'); return; }
+      const msg = `PLEX復旧を実行します。\n\n復旧対象：${list.length}名（クラウドにのみ存在、ローカルから消えていたPLEX応募者）\n\n実行内容：\n・現在ローカル ${candidates.length}名 + 復旧 ${list.length}名 のマージ\n・id / email / phone による重複排除\n・他応募者・plans・mediaCosts は無変更\n・完了後、クラウドへ1回だけ保存\n\n実行しますか？`;
+      if(!confirm(msg)) return;
+
+      // 完全バックアップ
+      const backup = candidates.map(c => ({ ...c }));
+
+      // 重複排除しつつマージ
+      const localIds = new Set(candidates.map(c => c.id));
+      const localEmails = new Set(candidates.map(c => normalizeEmailForMatch(c.email)).filter(Boolean));
+      const localPhones = new Set(candidates.map(c => normalizePhoneForMatch(c.phone)).filter(Boolean));
+      const merged = [...candidates];
+      let added = 0;
+      list.forEach(rc => {
+        const e = normalizeEmailForMatch(rc.email), p = normalizePhoneForMatch(rc.phone);
+        if(localIds.has(rc.id) || (e && localEmails.has(e)) || (p && localPhones.has(p))) return;
+        merged.push(normalizeCandidate(rc));
+        localIds.add(rc.id); if(e) localEmails.add(e); if(p) localPhones.add(p);
+        added++;
+      });
+
+      if(added === 0){ showToast('マージ対象なし（すべて既に存在します）', 'info'); return; }
+
+      // 自動更新を停止（マージ中の巻き戻し防止）
+      const wasEnabled = pollingEnabled;
+      stopAutoPolling();
+      pollingEnabled = false;
+
+      try{
+        candidates = merged;
+        await persist();
+        showToast(`✅ PLEX復旧完了：${added}名マージ / 現在 ${candidates.length}名`, 'success', 5000);
+        console.log('[DIAGNOSE] PLEX復旧完了:', { added, total: candidates.length });
+        diagnoseState.plexRecoveryList = [];
+        const mergeBtn = $('btnMergePlexRecovery'); if(mergeBtn) mergeBtn.disabled = true;
+      }catch(err){
+        candidates = backup;
+        renderAll();
+        console.error('[DIAGNOSE] マージ失敗、ロールバック:', err);
+        showToast(`マージ失敗：${err.message || err}／復元しました`, 'error', 6000);
+      }finally{
+        pollingEnabled = wasEnabled;
+        if(pollingEnabled && isCloudConfigured()) startAutoPolling();
+      }
+    }
+
     // ===== CSV照合による応募者削除 =====
     // 正規化ユーティリティ（CSV/APS両側で同一の変換を適用）
     function normalizeEmailForMatch(v){ return String(v || '').normalize('NFKC').trim().toLowerCase(); }
@@ -5968,6 +6193,11 @@
       onClick('btnLoadSample', reseedSampleData);
       onClick('btnResetAll', resetAllData);
       onClick('btnPurgeGuidable', purgeGuidableCandidates);
+      onClick('btnDiagnoseSync', runSyncDiagnosis);
+      onClick('btnDownloadLocalBackup', downloadLocalBackup);
+      onClick('btnMergePlexRecovery', mergePlexRecovery);
+      // 診断中の復旧ボタンは診断完了まで有効化しない
+      const mergeBtnInit = $('btnMergePlexRecovery'); if(mergeBtnInit) mergeBtnInit.disabled = true;
       // 媒体別採用進捗
       const commitMonthEl = $('commitMonth');
       if(commitMonthEl){
