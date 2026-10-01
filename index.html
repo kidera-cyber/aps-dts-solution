@@ -4283,6 +4283,35 @@
     }
 
     // ===== 請求元判定・ディスパッチ =====
+    // PLEX採用課金型：内定者名の正規化（氏名基準の重複判定用）
+    function normalizeCandidateNameForPlex(v){
+      return String(v || '').normalize('NFKC').replace(/様/g, '').replace(/\s+/g, '').trim().toLowerCase();
+    }
+
+    // PLEX重複判定：既存mediaCostsの中に同じ媒体×同じ内定者名が存在するか
+    // 戻り値：{ status: 'exact' | 'candidate' | 'new', existing: 一致行配列 }
+    //   exact = 完全重複（同一invoiceNumber＋同一applicantName）
+    //   candidate = 重複候補（同一applicantName+同額、INV番号違い。訂正・返金・再請求の可能性）
+    //   new = 新規請求
+    function checkPlexInvoiceDuplicate(parsed, applicantName, amount){
+      const nameKey = normalizeCandidateNameForPlex(applicantName);
+      if(!nameKey) return { status: 'new', existing: [] };
+      const plexRows = mediaCosts.filter(m => {
+        const med = String(m.media || m.name || '').toLowerCase();
+        return med.includes('plex') || med.includes('プレックス');
+      });
+      const sameName = plexRows.filter(m => normalizeCandidateNameForPlex(m.applicantName) === nameKey);
+      if(sameName.length === 0) return { status: 'new', existing: [] };
+      // 完全重複：同一INV番号
+      const invMatch = sameName.filter(m => m.invoiceNumber && parsed.invoiceNumber && m.invoiceNumber === parsed.invoiceNumber);
+      if(invMatch.length > 0) return { status: 'exact', existing: invMatch };
+      // 重複候補：同一氏名+同額、INV番号違い
+      const amtMatch = sameName.filter(m => Number(m.amount) === Number(amount));
+      if(amtMatch.length > 0) return { status: 'candidate', existing: amtMatch };
+      // 氏名のみ一致（金額違い）→ 別請求として扱う
+      return { status: 'new', existing: sameName };
+    }
+
     function detectInvoiceVendor(text){
       const T = normalizeInvoiceText(text);
       if(/株式会社\s*プレックス|プレックス|PLEX/i.test(T)) return 'PLEX';
@@ -4450,7 +4479,10 @@
       }
 
       const yearMonth = invoiceDate ? invoiceDate.slice(0,7) : (transactionDate ? transactionDate.slice(0,7) : '');
-      const seed = `PLEX|${invoiceNumber}|${invoiceDate}|${total}|${fileName}`;
+      // PLEXは採用課金型：内定者名を seed に含めて、同じINV番号でも別人なら別請求として扱う
+      // 逆に同じ内定者＋同じ金額なら INV番号が違っても重複候補として検出可能にする
+      const nameKey = normalizeCandidateNameForPlex(applicantName);
+      const seed = `PLEX|${nameKey}|${invoiceNumber}|${total}`;
       const invoiceId = 'inv_' + btoa(unescape(encodeURIComponent(seed))).replace(/[^A-Za-z0-9]/g,'').slice(0,16);
 
       return {
@@ -4690,9 +4722,17 @@
           const guessJob = cand ? cand.job : '中型ドライバー';
           const guessEmp = (cand && cand.workType && cand.workType !== '未確認') ? cand.workType : '';
           const guessMedia = cand && cand.source ? normalizeMediaName(cand.source) : 'PLEX';
+          // PLEX重複判定：同一氏名+金額をチェック
+          let dupBadge = '';
+          if(/plex|プレックス/i.test(parsed.media || '')){
+            const dup = checkPlexInvoiceDuplicate(parsed, it.applicantName, it.amount);
+            if(dup.status === 'exact') dupBadge = `<span class="badge badge-red" title="同一INV番号+同一内定者">完全重複</span>`;
+            else if(dup.status === 'candidate') dupBadge = `<span class="badge badge-orange" title="同一内定者+同額だがINV番号違い。訂正/返金/再請求の可能性">重複候補</span>`;
+            else dupBadge = `<span class="badge badge-blue">新規請求</span>`;
+          }
           return `<tr>
             <td>${i+1}</td>
-            <td><input data-idx="${i}" data-key="applicantName" class="preview-input" value="${escapeHTML(it.applicantName || '')}" style="width:130px;" /></td>
+            <td><input data-idx="${i}" data-key="applicantName" class="preview-input" value="${escapeHTML(it.applicantName || '')}" style="width:130px;" />${dupBadge ? '<br>' + dupBadge : ''}</td>
             <td>${matchLabel}<input type="hidden" data-idx="${i}" data-key="candidateId" class="preview-input" value="${escapeHTML(cand ? cand.id : '')}" /></td>
             <td><select data-idx="${i}" data-key="media" class="preview-input">${mediaOptions.replace(`value="${escapeHTML(guessMedia)}"`, `value="${escapeHTML(guessMedia)}" selected`)}</select></td>
             <td><select data-idx="${i}" data-key="job" class="preview-input">${jobOptions.replace(`value="${escapeHTML(guessJob)}"`, `value="${escapeHTML(guessJob)}" selected`)}</select></td>
