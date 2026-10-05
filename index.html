@@ -625,8 +625,8 @@
           <!-- 05 ボトルネック -->
           <div id="reportBottleneck" style="margin-top:16px;"></div>
 
-          <!-- 06 次月アクション -->
-          <div class="card-head" style="margin-top:22px;"><h3>次月アクション（自動生成）</h3></div>
+          <!-- 06 次月の重点アクション（図解型アクションボード） -->
+          <div class="card-head" style="margin-top:22px;"><div><h3>次月の重点アクション</h3><p class="hint">今月の結果 → ボトルネック → 来月の重点対応をフロー表示</p></div></div>
           <div id="reportActions"></div>
 
           <!-- 07 職種別成果 -->
@@ -3648,39 +3648,115 @@
         }
       }
 
-      // 06 次月アクション
+      // 06 次月の重点アクション（図解型アクションボード）
       const actEl = $('reportActions');
       if(actEl){
+        // アクション構造：{ pri, title, metric: {label, cur, prev, diff, unit}, cause, action, target }
         const actions = [];
+        // 1. 応募母集団
         if(stats.applied < 20){
-          actions.push({ pri: 'mid', title: '母集団形成を強化', body: `応募${stats.applied}名。Indeed原稿・予算・求人条件（給与レンジ／勤務時間）を見直してください。` });
+          const diffPct = prevStats && prevStats.applied > 0 ? Math.round((stats.applied - prevStats.applied) / prevStats.applied * 100) : null;
+          actions.push({
+            pri: stats.applied < 5 ? 'high' : 'mid',
+            title: '応募母集団の強化',
+            metric: { label: '応募数', cur: stats.applied, prev: prevStats ? prevStats.applied : null, diff: diffPct, unit: '名' },
+            cause: '応募チャネルの流入不足',
+            action: 'Indeed原稿見直し / 予算確認 / 給与レンジ見直し',
+            target: '応募数 20名以上'
+          });
         }
+        // 2. 応募→面接率（最優先：ボトルネックと連動）
         if(c_app_int !== null && c_app_int < 20){
-          actions.push({ pri: 'high', title: '応募→面接率を改善（現在 ' + c_app_int + '%）', body: '応募後24時間以内の初回連絡率を確認。未連絡応募者を抽出し、電話フォローを追加。面接日程確定までの日数を短縮。' });
+          actions.push({
+            pri: 'high',
+            title: '応募→面接率の改善',
+            metric: { label: '応募→面接率', cur: c_app_int, prev: null, diff: null, unit: '%', target: 35 },
+            cause: '初回連絡の遅延 / 面接日程調整の遅さ',
+            action: '応募後24h以内の電話フォロー徹底 / 日程候補を3つ即提示',
+            target: '面接化率 35%以上'
+          });
         }
+        // 3. 面接→内定率
         if(c_int_off !== null && c_int_off < 30 && stats.interview >= 3){
-          actions.push({ pri: 'high', title: '面接→内定率を改善（現在 ' + c_int_off + '%）', body: '面接評価基準を見直し。応募者体験（面接時間・面接官の姿勢）を再点検。' });
+          actions.push({
+            pri: 'high',
+            title: '面接→内定率の改善',
+            metric: { label: '面接→内定率', cur: c_int_off, prev: null, diff: null, unit: '%', target: 40 },
+            cause: '評価基準のばらつき / 面接体験の課題',
+            action: '面接評価基準の統一 / 面接官の姿勢・面接時間の点検',
+            target: '面接→内定率 40%以上'
+          });
         }
+        // 4. 内定→承諾率
         if(c_off_acc !== null && c_off_acc < 60 && stats.offered >= 2){
-          actions.push({ pri: 'mid', title: '内定→承諾率を改善（現在 ' + c_off_acc + '%）', body: '内定通知後の連絡頻度・条件提示・入社日調整を早めに。' });
+          actions.push({
+            pri: 'mid',
+            title: '内定→承諾率の改善',
+            metric: { label: '内定→承諾率', cur: c_off_acc, prev: null, diff: null, unit: '%', target: 70 },
+            cause: '条件提示・入社日調整の遅さ',
+            action: '内定通知後48h以内の条件提示 / 連絡頻度を上げる',
+            target: '承諾率 70%以上'
+          });
         }
+        // 5. 費用データ未登録
         if(cost.total === 0){
-          actions.push({ pri: 'low', title: '費用データ未登録', body: '請求書PDFまたはCSVを取り込んでください（設定 → 採用費用データ）。CPA計算が可能になります。' });
+          actions.push({
+            pri: 'mid',
+            title: '採用コストの可視化',
+            metric: { label: '採用費用', cur: '未登録', prev: null, diff: null, unit: '' },
+            cause: '請求書PDF / CSVが未取込',
+            action: '掲載費用タブで請求書を取込（PLEX / Indeed / HRドメイン）',
+            target: 'CPA算出可能に'
+          });
         }
-        if(actions.length === 0){
-          actions.push({ pri: 'low', title: '今月は特筆すべき改善ポイントなし', body: '現状の運用を継続してください。' });
+        // 優先度でソート + 最大3件
+        const priOrder = { high: 0, mid: 1, low: 2 };
+        actions.sort((a,b) => priOrder[a.pri] - priOrder[b.pri]);
+        const top = actions.slice(0, 3);
+
+        if(top.length === 0){
+          // 完全非表示：見出しも含めて要素ごと隠す
+          actEl.closest('.card-head')?.previousElementSibling;
+          const headEl = actEl.previousElementSibling;
+          if(headEl && headEl.classList.contains('card-head')) headEl.style.display = 'none';
+          actEl.style.display = 'none';
+          return;
         }
-        actEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
-          ${actions.map(a => {
+        // 復帰：表示を戻す
+        const headEl = actEl.previousElementSibling;
+        if(headEl && headEl.classList.contains('card-head')) headEl.style.display = '';
+        actEl.style.display = '';
+
+        actEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+          ${top.map(a => {
             const icon = a.pri === 'high' ? '🔴' : (a.pri === 'mid' ? '🟡' : '⚪');
-            const label = a.pri === 'high' ? '優先度：高' : (a.pri === 'mid' ? '優先度：中' : '優先度：低');
-            return `<div class="action-item pri-${a.pri}" style="padding:14px 16px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            const label = a.pri === 'high' ? '優先度 高' : (a.pri === 'mid' ? '優先度 中' : '優先度 低');
+            const diffBadge = a.metric.diff !== null && a.metric.diff !== undefined
+              ? `<span style="font-size:11px;color:${a.metric.diff < 0 ? '#b91c1c' : '#15803d'};font-weight:900;margin-left:6px;">${a.metric.diff > 0 ? '+' : ''}${a.metric.diff}%</span>`
+              : '';
+            const prevText = a.metric.prev !== null && a.metric.prev !== undefined
+              ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">前月：${a.metric.prev}${a.metric.unit}</div>`
+              : '';
+            return `<div class="action-item pri-${a.pri}" style="padding:16px 18px;display:flex;flex-direction:column;gap:0;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
                 <span style="font-size:18px;">${icon}</span>
-                <span class="a-pri" style="font-size:11px;">${label}</span>
+                <span class="a-pri" style="font-size:11px;font-weight:900;">${label}</span>
               </div>
-              <strong style="display:block;font-size:14px;color:var(--navy);margin-bottom:4px;">${escapeHTML(a.title)}</strong>
-              <p style="margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.5;">${escapeHTML(a.body)}</p>
+              <strong style="display:block;font-size:15px;color:var(--navy);margin-bottom:12px;">${escapeHTML(a.title)}</strong>
+              <!-- Metric block -->
+              <div style="padding:10px 12px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;">
+                <div style="font-size:11px;color:var(--muted);font-weight:900;">${escapeHTML(a.metric.label)}</div>
+                <div style="font-size:24px;font-weight:950;color:var(--navy);line-height:1.1;">${a.metric.cur}${a.metric.unit}${diffBadge}</div>
+                ${prevText}
+              </div>
+              <!-- Flow: cause → action → target -->
+              <div style="display:grid;grid-template-columns:1fr;gap:6px;font-size:12px;">
+                <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:var(--muted);font-weight:900;min-width:44px;">課題</span><span style="color:var(--navy);">${escapeHTML(a.cause)}</span></div>
+                <div style="text-align:center;color:var(--muted);font-size:10px;">↓</div>
+                <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:var(--muted);font-weight:900;min-width:44px;">対応</span><span style="color:var(--navy);font-weight:900;">${escapeHTML(a.action)}</span></div>
+                <div style="text-align:center;color:var(--muted);font-size:10px;">↓</div>
+                <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:var(--muted);font-weight:900;min-width:44px;">目標</span><span style="color:#15803d;font-weight:900;">${escapeHTML(a.target)}</span></div>
+              </div>
             </div>`;
           }).join('')}
         </div>`;
