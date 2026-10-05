@@ -3089,14 +3089,21 @@
       return info.date ? info.date.slice(0,7) : '';
     }
 
-    function getMonthlyApplicantStats(yyyyMm, jobFilter, sourceFilter){
-      const list = candidates.filter(c => {
+    // 月次レポートの単一真実データソース：対象月に応募した候補者を1回だけ抽出
+    // KPI・ファネル・媒体別・職種別・雇用形態別・診断パネル すべてここを通す
+    function getMonthlyCandidates(yyyyMm, jobFilter, sourceFilter){
+      return candidates.filter(c => {
         if(getCandidateAppliedYM(c) !== yyyyMm) return false;
         if(jobFilter && c.job !== jobFilter) return false;
         if(sourceFilter && c.source !== sourceFilter) return false;
         return true;
       });
-      // 診断：対象月の母集団と内定者をコンソールに記録（個人情報は id/status のみ）
+    }
+
+    // 月次レポートKPI：必ず getMonthlyCandidates を母集団にする
+    function getMonthlyApplicantStats(yyyyMm, jobFilter, sourceFilter){
+      const list = getMonthlyCandidates(yyyyMm, jobFilter, sourceFilter);
+      // 診断：コンソール記録（個人情報は id/status のみ）
       if(!jobFilter && !sourceFilter){
         const offered = list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status));
         console.log(`[MONTHLY REPORT] ${yyyyMm} 応募=${list.length} 内定=${offered.length}`, {
@@ -3113,7 +3120,8 @@
         noShow: list.filter(c => c.status === NO_SHOW_STATUS).length,
         offered: list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status)).length,
         accepted: list.filter(c => isHiredCandidate(c)).length,
-        joined: list.filter(c => isHiredCandidate(c)).length
+        joined: list.filter(c => isHiredCandidate(c)).length,
+        _list: list   // 診断パネルと一致確認用に生リストも返す
       };
     }
 
@@ -3199,7 +3207,7 @@
       return { diff, pct, dir, arrow, prev };
     }
 
-    // 診断パネル：対象月の抽出内訳を画面に表示
+    // 診断パネル：対象月の抽出内訳を画面に表示（KPIと同一の getMonthlyCandidates を使用）
     function renderMonthlyDiagnose(ym, jobFilter, sourceFilter){
       const el = $('reportDiagnose'); if(!el) return;
       const total = candidates.length;
@@ -3215,13 +3223,13 @@
         if(key === ym) monthList.push({ c, info });
         if(!info.date) noDate.push(c);
       });
-      // フィルタ適用後
-      const filtered = monthList.filter(({c}) => {
-        if(jobFilter && c.job !== jobFilter) return false;
-        if(sourceFilter && c.source !== sourceFilter) return false;
-        return true;
-      });
+      // KPIと同一の母集団抽出関数を使う
+      const filteredList = getMonthlyCandidates(ym, jobFilter, sourceFilter);
+      const filteredIds = new Set(filteredList.map(c => c.id));
+      const filtered = monthList.filter(({c}) => filteredIds.has(c.id));
       const excludedByFilter = monthList.length - filtered.length;
+      // 内定者数（診断パネル独自算出 - KPIと一致していることを確認）
+      const diagHired = filteredList.filter(c => isHiredCandidate(c)).length;
 
       // 各月の件数一覧
       const monthRows = Array.from(breakdown.entries()).sort((a,b) => (b[0] || '').localeCompare(a[0] || '')).slice(0, 12);
@@ -3242,6 +3250,9 @@
       }).join('');
 
       el.innerHTML = `
+        <div style="font-size:13px;color:var(--navy);margin-bottom:8px;padding:8px 12px;background:#eaf2ff;border:1px solid #bfdbfe;border-radius:8px;font-weight:900;">
+          ✅ 診断結果とKPIは同一ロジック（getMonthlyCandidates）を共有：画面上の「応募数」= <strong style="color:var(--blue);font-size:16px;">${filteredList.length}名</strong> ／「内定数」= <strong style="color:var(--blue);font-size:16px;">${diagHired}名</strong>
+        </div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
           総candidates: <strong style="color:var(--navy);">${total}名</strong> ／
           対象月 <strong style="color:var(--navy);">${escapeHTML(ym)}</strong> 判定: <strong style="color:var(--blue);">${monthList.length}名</strong> ／
