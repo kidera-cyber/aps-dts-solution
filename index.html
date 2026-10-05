@@ -1162,7 +1162,10 @@
         resumeUrl: c.resumeUrl || '',
         resumeFileId: c.resumeFileId || '',
         resumeUploadedAt: c.resumeUploadedAt || '',
-        appliedAt: (typeof parseJpAppliedDate === 'function' ? parseJpAppliedDate(c.appliedAt) : '') || c.appliedAt || '',
+        // ロード時正規化：canonical応募日フィールド群から1つの appliedAt (YYYY-MM-DD) に統一
+        appliedAt: (typeof parseJpAppliedDate === 'function'
+          ? (parseJpAppliedDate(c.appliedAt) || parseJpAppliedDate(c.applicationDate) || parseJpAppliedDate(c.appliedDate) || parseJpAppliedDate(c.applyDate) || parseJpAppliedDate(c['応募日']) || parseJpAppliedDate(c['応募日時']))
+          : '') || c.appliedAt || '',
         offerAt: c.offerAt || '',
         acceptedAt: c.acceptedAt || '',
         joinedAt: c.joinedAt || '',
@@ -1183,7 +1186,11 @@
         if(!c.acceptedAt) c.acceptedAt = today;
         if(!c.joinedAt) c.joinedAt = today;
       }
-      if(!c.appliedAt) c.appliedAt = (c.createdAt || nowDateTime()).slice(0,10).replace(/\//g,'-');
+      // 応募日は canonical応募日フィールド群のみ採用。createdAt は使わない（CSV取込日と混同しない）
+      if(!c.appliedAt){
+        const parsed = parseJpAppliedDate(c.applicationDate) || parseJpAppliedDate(c.appliedDate) || parseJpAppliedDate(c.applyDate) || parseJpAppliedDate(c['応募日']) || parseJpAppliedDate(c['応募日時']);
+        if(parsed) c.appliedAt = parsed;
+      }
       return c;
     }
 
@@ -3059,24 +3066,20 @@
     }
     function todayYM(){ return todayISO().slice(0,7); }
 
-    // 応募日取得（複数フィールド対応）：候補者ごとに実際に使われた日付と採用フィールドを返す
+    // 応募日取得：canonical応募日フィールドのみ（createdAt/importedAtは応募日として扱わない）
     function getCandidateApplicationDate(c){
-      const candidates_fields = [
+      const fields = [
         ['appliedAt', c.appliedAt],
         ['applicationDate', c['applicationDate']],
         ['appliedDate', c['appliedDate']],
         ['applyDate', c['applyDate']],
         ['応募日', c['応募日']],
-        ['応募日時', c['応募日時']],
-        ['createdAt', c.createdAt],
-        ['registeredAt', c['registeredAt']],
-        ['importedAt', c['importedAt']]
+        ['応募日時', c['応募日時']]
       ];
-      for(const [field, val] of candidates_fields){
+      for(const [field, val] of fields){
         if(!val) continue;
         const parsed = parseJpAppliedDate(val);
         if(parsed) return { date: parsed, field, raw: val };
-        // 保険：ymOf だけでも年月が取れる場合
         const ym = ymOf(val);
         if(ym && /^\d{4}-\d{2}$/.test(ym)) return { date: ym + '-01', field, raw: val };
       }
