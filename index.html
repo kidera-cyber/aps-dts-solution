@@ -766,6 +766,18 @@
           </div>
 
           <div class="form-section">
+            <h4>過去応募データの正規化（migration）</h4>
+            <p class="hint" style="margin-bottom:10px;">過去に取り込んだ応募者の応募日が <code>applicationDate</code> / <code>応募日</code> など旧フィールドに残っている場合、ここで一括正規化して正式な <code>appliedAt</code> へ移行します。<strong>旧フィールドは残します</strong>（削除しません）。実行前に必ずJSONバックアップを取得してください。</p>
+            <div class="action-row">
+              <button class="btn btn-soft" id="btnMigratePreview">正規化プレビュー（読取専用）</button>
+              <button class="btn btn-primary" id="btnMigrateApply" disabled>正規化を適用（ローカル）</button>
+              <button class="btn btn-ghost btn-small" id="btnMigratePush" disabled>↑ 適用後クラウドへ反映</button>
+            </div>
+            <div id="migrateMessage" style="margin-top:10px;"></div>
+            <div id="migrateResult" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
             <h4>データ復旧診断（読取専用・ローカル vs クラウド差分）</h4>
             <p class="hint" style="margin-bottom:10px;">ローカルデータとクラウドデータを <strong>上書きせずに比較</strong> し、消失候補（特にPLEX）を検出します。診断は完全に読取専用。復旧は個別承認制です。</p>
             <div class="action-row">
@@ -5606,6 +5618,172 @@
       setDataMessage('サンプルデータを再投入しました', 'success');
     }
 
+    // ===== 過去応募データの正規化 migration =====
+    let migrationState = { preview: null };
+
+    // 候補者1件に対して「どの旧フィールドから appliedAt を復元できるか」を判定（書き換えなし）
+    function detectMigrationSource(c){
+      // 既存 appliedAt が有効なISO形式ならそれ採用
+      if(c.appliedAt && /^\d{4}-\d{2}-\d{2}/.test(c.appliedAt)){
+        return { source: 'appliedAt', raw: c.appliedAt, parsed: parseJpAppliedDate(c.appliedAt), action: 'keep' };
+      }
+      // 候補となる旧フィールドを順次チェック（createdAt等は使わない）
+      const fields = [
+        ['appliedAt', c.appliedAt],
+        ['applicationDate', c.applicationDate],
+        ['appliedDate', c.appliedDate],
+        ['applyDate', c.applyDate],
+        ['応募日', c['応募日']],
+        ['応募日時', c['応募日時']]
+      ];
+      for(const [name, val] of fields){
+        if(!val) continue;
+        const parsed = parseJpAppliedDate(val);
+        if(parsed){
+          // appliedAt が空、または既存値と異なる場合は update
+          const action = (parsed === c.appliedAt) ? 'keep' : (c.appliedAt ? 'update' : 'add');
+          return { source: name, raw: val, parsed, action };
+        }
+      }
+      return { source: null, raw: '', parsed: '', action: 'none' };
+    }
+
+    async function previewMigration(){
+      const msgEl = $('migrateMessage'), resEl = $('migrateResult'), applyBtn = $('btnMigrateApply'), pushBtn = $('btnMigratePush');
+      if(applyBtn) applyBtn.disabled = true;
+      if(pushBtn) pushBtn.disabled = true;
+
+      // 統計
+      const stats = {
+        total: candidates.length,
+        bySource: { appliedAt:0, applicationDate:0, appliedDate:0, applyDate:0, '応募日':0, '応募日時':0, none:0 },
+        action: { keep:0, add:0, update:0, none:0 },
+        beforeMonthDist: new Map(),
+        afterMonthDist: new Map(),
+        affectedList: []
+      };
+
+      candidates.forEach(c => {
+        // migration前の月判定
+        const beforeYM = (c.appliedAt && /^\d{4}-\d{2}/.test(c.appliedAt)) ? c.appliedAt.slice(0,7) : '(日付なし)';
+        stats.beforeMonthDist.set(beforeYM, (stats.beforeMonthDist.get(beforeYM)||0) + 1);
+
+        const det = detectMigrationSource(c);
+        if(det.source) stats.bySource[det.source]++;
+        else stats.bySource.none++;
+        stats.action[det.action]++;
+
+        // migration後の月判定
+        const afterAppliedAt = det.parsed || c.appliedAt || '';
+        const afterYM = afterAppliedAt ? afterAppliedAt.slice(0,7) : '(日付なし)';
+        stats.afterMonthDist.set(afterYM, (stats.afterMonthDist.get(afterYM)||0) + 1);
+
+        if(det.action === 'add' || det.action === 'update'){
+          stats.affectedList.push({
+            id: c.id, name: c.name,
+            oldAppliedAt: c.appliedAt || '(空)',
+            source: det.source, raw: det.raw,
+            newAppliedAt: det.parsed,
+            action: det.action
+          });
+        }
+      });
+
+      migrationState.preview = stats;
+
+      // レンダリング
+      const monthBefore = Array.from(stats.beforeMonthDist.entries()).sort((a,b) => (b[0] || '').localeCompare(a[0] || ''));
+      const monthAfter = Array.from(stats.afterMonthDist.entries()).sort((a,b) => (b[0] || '').localeCompare(a[0] || ''));
+      const monthRows = monthBefore.map(([k, v]) => {
+        const after = stats.afterMonthDist.get(k) || 0;
+        const diff = after - v;
+        return `<tr${k==='2026-10'?' style="background:#eaf2ff;font-weight:900;"':''}><td style="padding:3px 8px;">${escapeHTML(k)}</td><td style="padding:3px 8px;text-align:right;">${v}</td><td style="padding:3px 8px;text-align:right;font-weight:900;color:${k==='2026-10'?'var(--blue)':'var(--navy)'};">${after}</td><td style="padding:3px 8px;text-align:right;color:${diff>0?'#15803d':diff<0?'#b91c1c':'var(--muted)'};">${diff>0?'+':''}${diff}</td></tr>`;
+      }).join('');
+      const addedMonths = monthAfter.filter(([k]) => !stats.beforeMonthDist.has(k)).map(([k, v]) => `<tr style="background:#f0fdf4;"><td style="padding:3px 8px;">${escapeHTML(k)}</td><td style="padding:3px 8px;text-align:right;">-</td><td style="padding:3px 8px;text-align:right;font-weight:900;color:#15803d;">${v}</td><td style="padding:3px 8px;text-align:right;color:#15803d;">+${v}</td></tr>`).join('');
+
+      const sampleRows = stats.affectedList.slice(0, 20).map(a => `<tr><td style="padding:3px 6px;">${escapeHTML(a.name || '-')}</td><td style="padding:3px 6px;color:var(--muted);">${escapeHTML(a.oldAppliedAt)}</td><td style="padding:3px 6px;"><code style="background:#f1f5f9;padding:1px 4px;border-radius:3px;">${escapeHTML(a.source)}</code></td><td style="padding:3px 6px;">${escapeHTML(a.raw)}</td><td style="padding:3px 6px;font-weight:900;color:var(--blue);">${escapeHTML(a.newAppliedAt)}</td><td style="padding:3px 6px;text-align:center;">${a.action==='add'?'➕追加':'🔄更新'}</td></tr>`).join('');
+
+      resEl.className = 'notice';
+      resEl.innerHTML = `
+        <div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:10px;">🔍 正規化プレビュー（読取専用・まだ変更していません）</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--muted);">総candidates</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${stats.total}名</td></tr>
+          <tr><td style="padding:4px 8px;">変更なし（既にappliedAt有効）</td><td style="padding:4px 8px;text-align:right;">${stats.action.keep}名</td></tr>
+          <tr><td style="padding:4px 8px;color:#15803d;font-weight:900;">appliedAt新規追加（旧フィールドから復元）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#15803d;">${stats.action.add}名</td></tr>
+          <tr><td style="padding:4px 8px;color:#2563eb;font-weight:900;">appliedAt更新（旧フィールドで上書き）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#2563eb;">${stats.action.update}名</td></tr>
+          <tr><td style="padding:4px 8px;color:#b91c1c;">日付情報なし（migration不能）</td><td style="padding:4px 8px;text-align:right;color:#b91c1c;">${stats.action.none}名</td></tr>
+        </table>
+        <div style="margin-top:12px;font-size:13px;font-weight:900;color:var(--navy);">旧フィールド内訳（どのフィールドから復元したか）</div>
+        <table style="width:100%;font-size:12px;margin-top:4px;">
+          <tr><td style="padding:3px 8px;">appliedAt既存</td><td style="padding:3px 8px;text-align:right;">${stats.bySource.appliedAt}</td></tr>
+          <tr><td style="padding:3px 8px;">applicationDate</td><td style="padding:3px 8px;text-align:right;">${stats.bySource.applicationDate}</td></tr>
+          <tr><td style="padding:3px 8px;">appliedDate</td><td style="padding:3px 8px;text-align:right;">${stats.bySource.appliedDate}</td></tr>
+          <tr><td style="padding:3px 8px;">applyDate</td><td style="padding:3px 8px;text-align:right;">${stats.bySource.applyDate}</td></tr>
+          <tr><td style="padding:3px 8px;">応募日</td><td style="padding:3px 8px;text-align:right;">${stats.bySource['応募日']}</td></tr>
+          <tr><td style="padding:3px 8px;">応募日時</td><td style="padding:3px 8px;text-align:right;">${stats.bySource['応募日時']}</td></tr>
+          <tr><td style="padding:3px 8px;color:#b91c1c;">none（復元不能）</td><td style="padding:3px 8px;text-align:right;color:#b91c1c;">${stats.bySource.none}</td></tr>
+        </table>
+        <div style="margin-top:12px;font-size:13px;font-weight:900;color:var(--navy);">月別分布（migration前 → 後）</div>
+        <table style="width:100%;font-size:12px;margin-top:4px;">
+          <thead><tr style="background:#eef2f7;"><th style="padding:4px 8px;text-align:left;">月</th><th style="padding:4px 8px;text-align:right;">前</th><th style="padding:4px 8px;text-align:right;">後</th><th style="padding:4px 8px;text-align:right;">差分</th></tr></thead>
+          <tbody>${monthRows}${addedMonths}</tbody>
+        </table>
+        ${stats.affectedList.length > 0 ? `
+          <div style="margin-top:12px;font-size:13px;font-weight:900;color:var(--navy);">変更対象サンプル（最大20件）</div>
+          <table style="width:100%;font-size:11px;margin-top:4px;">
+            <thead><tr style="background:#eef2f7;"><th style="padding:3px 6px;text-align:left;">氏名</th><th style="padding:3px 6px;text-align:left;">旧appliedAt</th><th style="padding:3px 6px;text-align:left;">復元元field</th><th style="padding:3px 6px;text-align:left;">生値</th><th style="padding:3px 6px;text-align:left;">新appliedAt</th><th style="padding:3px 6px;text-align:center;">操作</th></tr></thead>
+            <tbody>${sampleRows}</tbody>
+          </table>
+          ${stats.affectedList.length > 20 ? `<div style="margin-top:6px;font-size:11px;color:var(--muted);">※ 先頭20件のみ表示（残り${stats.affectedList.length - 20}件）</div>` : ''}
+        ` : ''}
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);">※ 旧フィールド（applicationDate等）は削除せずそのまま残します。appliedAt のみ正規化します。</div>
+      `;
+      if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = `プレビュー完了：${stats.action.add + stats.action.update}名のappliedAtが正規化されます。「正規化を適用」で実行してください。`; }
+      if(applyBtn) applyBtn.disabled = (stats.action.add + stats.action.update) === 0;
+    }
+
+    async function applyMigration(){
+      const msgEl = $('migrateMessage'), pushBtn = $('btnMigratePush');
+      if(!migrationState.preview){ showToast('先に「正規化プレビュー」を実行してください', 'warning'); return; }
+      const addCount = migrationState.preview.action.add;
+      const updCount = migrationState.preview.action.update;
+      if(addCount + updCount === 0){ showToast('変更対象がありません', 'info'); return; }
+      if(!confirm(`過去応募データの正規化を適用します。\n\n新規追加：${addCount}名\n更新：${updCount}名\n\n旧フィールド（applicationDate / 応募日 等）は削除せず残します。\nクラウドへはまだ保存しません（確認後に別ボタン）。\n\n実行しますか？`)) return;
+
+      const backup = candidates.map(c => ({ ...c }));
+      try{
+        candidates = candidates.map(c => {
+          const det = detectMigrationSource(c);
+          if(det.action === 'add' || det.action === 'update'){
+            return { ...c, appliedAt: det.parsed };
+          }
+          return c;
+        });
+        saveLocal();
+        renderAll();
+        showToast(`✅ 正規化完了：${addCount + updCount}名のappliedAtを更新しました（ローカルのみ）`, 'success', 5000);
+        if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = `ローカル適用完了。月次レポートで数値を確認してから「クラウドへ反映」を押してください。`; }
+        if(pushBtn) pushBtn.disabled = false;
+      }catch(err){
+        candidates = backup;
+        renderAll();
+        showToast(`正規化失敗：${err.message || err}／復元しました`, 'error', 6000);
+      }
+    }
+
+    async function pushMigrationToCloud(){
+      const msgEl = $('migrateMessage');
+      if(!confirm('ローカルで適用済みの正規化データをクラウドへ反映します。\n\n反映前にクラウド側のデータは古い値のままです。\n反映すると全ユーザー・全端末に適用されます。\n\n実行しますか？')) return;
+      try{
+        await persist();
+        if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = `✅ クラウドへ反映完了`; }
+        showToast('クラウド反映完了', 'success', 3000);
+      }catch(err){
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `クラウド反映エラー：${err.message || err}`; }
+        showToast(`クラウド反映エラー：${err.message || err}`, 'error', 6000);
+      }
+    }
+
     // ===== データ復旧診断（読取専用） =====
     // ローカルとクラウドを別変数で保持して比較。上書きは一切しない。
     let diagnoseState = { local: null, cloud: null, plexRecoveryList: [] };
@@ -6439,6 +6617,9 @@
       onClick('btnResetAll', resetAllData);
       onClick('btnPurgeGuidable', purgeGuidableCandidates);
       onClick('btnDiagnoseSync', runSyncDiagnosis);
+      onClick('btnMigratePreview', previewMigration);
+      onClick('btnMigrateApply', applyMigration);
+      onClick('btnMigratePush', pushMigrationToCloud);
       onClick('btnDownloadLocalBackup', downloadLocalBackup);
       onClick('btnMergePlexRecovery', mergePlexRecovery);
       // 診断中の復旧ボタンは診断完了まで有効化しない
