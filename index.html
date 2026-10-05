@@ -1918,10 +1918,13 @@
     // 掲載費用・ダッシュボード・月次レポートの3画面で同一関数を使用
     function getHalfYearMediaProgress(mediaKey, opts){
       const o = opts || {};
-      const periodStart = o.periodStart || halfYearMediaTargets.periodStart;
-      const periodEnd = o.periodEnd || halfYearMediaTargets.periodEnd;
+      // 安全化：halfYearMediaTargets が未初期化・破損していてもエラーにしない
+      const hyt = (halfYearMediaTargets && typeof halfYearMediaTargets === 'object') ? halfYearMediaTargets : {};
+      const targets = (hyt.targets && typeof hyt.targets === 'object') ? hyt.targets : {};
+      const periodStart = o.periodStart || hyt.periodStart || '2026-07-01';
+      const periodEnd = o.periodEnd || hyt.periodEnd || '2026-12-31';
       const currentYm = o.currentYm || todayYM();
-      const target = halfYearMediaTargets.targets[mediaKey] || 0;
+      const target = targets[mediaKey] || 0;
 
       // 期間内の採用実績（内定/内定承諾/入社決定）：candidate単位で重複カウント防止
       const inPeriod = (dateStr) => {
@@ -1998,7 +2001,8 @@
     }
 
     function getAllHalfYearProgress(opts){
-      return Object.keys(halfYearMediaTargets.targets).map(key => getHalfYearMediaProgress(key, opts));
+      const targets = (halfYearMediaTargets && halfYearMediaTargets.targets) || {};
+      return Object.keys(targets).map(key => getHalfYearMediaProgress(key, opts));
     }
 
     // 媒体×職種×月 の採用実績を candidates から集計（内定＝入社決定として集計）
@@ -2799,7 +2803,41 @@
     }
 
     // ===== 派生ビュー再計算：candidates/plans/mediaCosts 変更時は必ずここを通す =====
+    // 単一セクションのエラーで全体描画を止めないラッパー
+    function safeRender(name, fn){
+      try{ fn(); }
+      catch(err){ console.error(`[RENDER ERROR] ${name}:`, err); }
+    }
+
+    // 画面全体で致命的エラーが起きた場合の可視的エラー表示（真っ白を防ぐ）
+    function renderPageError(tabId, err){
+      const panel = document.getElementById(tabId);
+      if(!panel) return;
+      const msg = (err && err.message) ? err.message : String(err || '不明なエラー');
+      // 既存コンテンツを維持しつつ、画面上部にエラーカードを挿入
+      const existing = panel.querySelector('.page-error-banner');
+      if(existing) existing.remove();
+      const banner = document.createElement('div');
+      banner.className = 'page-error-banner notice error';
+      banner.style.cssText = 'margin:14px 0;padding:14px 18px;background:linear-gradient(135deg,#fef2f2,#fff5f5);border:1px solid #fecaca;border-radius:12px;';
+      banner.innerHTML = `<div style="font-weight:950;color:#b91c1c;margin-bottom:6px;">⚠ ${escapeHTML(tabId)} 画面の一部描画に失敗しました</div>
+        <div style="font-size:12px;color:#78350f;margin-bottom:8px;">${escapeHTML(msg)}</div>
+        <div style="font-size:12px;color:var(--muted);">データはローカルに保持されています。ページを再読み込みするか、F12コンソールでエラー詳細を確認してください。</div>`;
+      // 挿入位置：card-head の後 or panel の先頭
+      const firstChild = panel.firstElementChild;
+      if(firstChild) panel.insertBefore(banner, firstChild);
+      else panel.appendChild(banner);
+    }
+
     function renderAll(){
+      // データ初期化安全化：candidates等がundefinedでもエラーで止めない
+      if(!Array.isArray(candidates)) candidates = [];
+      if(!Array.isArray(plans)) plans = [];
+      if(!Array.isArray(mediaCosts)) mediaCosts = [];
+      if(!Array.isArray(mediaCommitPlans)) mediaCommitPlans = [];
+      if(!halfYearMediaTargets || typeof halfYearMediaTargets !== 'object') halfYearMediaTargets = { periodStart: '2026-07-01', periodEnd: '2026-12-31', targets: {} };
+      if(!halfYearMediaTargets.targets) halfYearMediaTargets.targets = {};
+
       // 整合性チェック（新3+1分類 vs 総応募数）
       try{
         const s = getEmploymentDisplaySummary();
@@ -2809,25 +2847,39 @@
         }
       }catch(err){ /* 整合性チェック失敗は無視 */ }
 
-      // ダッシュボード系（新ホーム画面）
-      renderMetrics(); renderJobBars(); renderSourceBars(); renderPlanSummary(); renderSyncCard();
-      renderEmploymentBars(); renderEmploymentByJob(); renderThisMonth();
+      // ダッシュボード系（旧）
+      safeRender('metrics', renderMetrics);
+      safeRender('jobBars', renderJobBars);
+      safeRender('sourceBars', renderSourceBars);
+      safeRender('planSummary', renderPlanSummary);
+      safeRender('syncCard', renderSyncCard);
+      safeRender('employmentBars', renderEmploymentBars);
+      safeRender('employmentByJob', renderEmploymentByJob);
+      safeRender('thisMonth', renderThisMonth);
       // 新ホーム画面ブロック
-      renderDashboardHero(); renderDashboardFunnel(); renderDashboardOutcome(); renderDashboardActions();
-      renderDashboardMediaCommit();
-      renderDashboardJobs(); renderDashboardSources(); renderDashboardEmployment();
-      renderDashboardCost();
-      // 応募者一覧系
-      renderTable();
-      // 選考系
-      renderKanban();
+      safeRender('dashHero', renderDashboardHero);
+      safeRender('dashFunnel', renderDashboardFunnel);
+      safeRender('dashOutcome', renderDashboardOutcome);
+      safeRender('dashActions', renderDashboardActions);
+      safeRender('dashMediaCommit', renderDashboardMediaCommit);
+      safeRender('dashJobs', renderDashboardJobs);
+      safeRender('dashSources', renderDashboardSources);
+      safeRender('dashEmployment', renderDashboardEmployment);
+      safeRender('dashCost', renderDashboardCost);
+      // 応募者一覧
+      safeRender('candidateTable', renderTable);
+      // 選考
+      safeRender('kanban', renderKanban);
       // 採用計画
-      renderPlanTable();
+      safeRender('planTable', renderPlanTable);
       // 媒体費用
-      refreshReportSourceSelect();
-      renderMediaCommitProgress(); renderMediaSummary(); renderMediaTable(); renderMediaCompareTable();
+      safeRender('reportSourceSelect', refreshReportSourceSelect);
+      safeRender('mediaCommitProgress', renderMediaCommitProgress);
+      safeRender('mediaSummary', renderMediaSummary);
+      safeRender('mediaTable', renderMediaTable);
+      safeRender('mediaCompareTable', renderMediaCompareTable);
       // 月次レポート
-      renderMonthlyReport();
+      safeRender('monthlyReport', renderMonthlyReport);
     }
 
     // candidates が変更されたとき用の公開API（将来の呼び出し統一用）
@@ -3515,12 +3567,7 @@
       // 診断パネル：対象月の候補者抽出詳細を画面に出す
       renderMonthlyDiagnose(ym, jobFilter, sourceFilter);
       // 月間活動レポート（イベント日ベース、新タブ）
-      renderMonthlyActivity(ym, jobFilter, sourceFilter);
-      // 初回：アクティブなタブの表示状態を適用
-      setTimeout(() => {
-        const activeTab = document.querySelector('[data-report-tab].active');
-        if(activeTab) activeTab.click();
-      }, 0);
+      try{ renderMonthlyActivity(ym, jobFilter, sourceFilter); }catch(err){ console.error('[RENDER ERROR] monthlyActivity:', err); }
 
       // 転換率
       const c_app_int = conv(stats.interview, stats.applied);
@@ -6831,10 +6878,15 @@
     }
 
     function switchTab(tabId){
+      // 有効なタブIDへ正規化
+      const VALID_TABS = ['dashboard','list','kanban','form','plan','media','report','settings'];
+      if(!VALID_TABS.includes(tabId)) tabId = 'dashboard';
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
       document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === tabId));
+      // 選択タブをlocalStorageに保存（リロード時に復元）
+      try{ localStorage.setItem('APS_LAST_TAB', tabId); }catch{}
       // タブ表示時は必ず最新 candidates で再計算（応募者一覧⇔ダッシュボード間のズレ防止）
-      try{ renderAll(); }catch(err){ console.error('[TAB SWITCH] renderAll failed', err); }
+      try{ renderAll(); }catch(err){ console.error('[TAB SWITCH] renderAll failed', err); renderPageError(tabId, err); }
       const titles = {
         dashboard: ['採用状況をひと目で把握','応募者・面接日時・選考ステータス・媒体別効果を確認できます。'],
         list: ['応募者を探す・確認する','検索、絞り込み、詳細確認、編集ができます。'],
@@ -7062,16 +7114,49 @@
     }
 
     async function init(){
-      initSelects();
-      loadLocal();
-      bindEvents();
-      bindResumeUpload();
-      loadApiSettingsToForm();
-      resetFormMode();
-      resetPlanForm();
-      renderAll();
+      console.log('[INIT] start');
+      // グローバルエラーハンドラ：何が起きても画面を真っ白にしない
+      window.addEventListener('error', (e) => {
+        console.error('[GLOBAL ERROR]', e.message, e.filename, e.lineno, e.error);
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        console.error('[UNHANDLED REJECTION]', e.reason);
+      });
+      try{
+        initSelects();
+        loadLocal();
+        console.log('[INIT] local loaded:', { candidates: candidates.length, plans: plans.length, mediaCosts: mediaCosts.length, mediaCommitPlans: mediaCommitPlans.length });
+        bindEvents();
+        bindResumeUpload();
+        loadApiSettingsToForm();
+        resetFormMode();
+        resetPlanForm();
+        // 前回のタブ状態を復元（存在しない場合は dashboard）
+        let initialTab = 'dashboard';
+        try{
+          const saved = localStorage.getItem('APS_LAST_TAB');
+          const VALID_TABS = ['dashboard','list','kanban','form','plan','media','report','settings'];
+          if(saved && VALID_TABS.includes(saved)) initialTab = saved;
+        }catch{}
+        // activeタブを設定
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === initialTab));
+        document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === initialTab));
+        console.log('[INIT] initial tab:', initialTab);
+        // 1回目の描画：ローカルデータで即時表示（クラウド未接続でも画面が真っ白にならない）
+        renderAll();
+        console.log('[INIT] first renderAll complete');
+      }catch(err){
+        console.error('[INIT] 初期化失敗、最低限の描画を試行:', err);
+        try{ renderAll(); }catch(e){ console.error('[INIT] renderAll も失敗:', e); renderPageError('dashboard', e); }
+      }
+      // クラウド読込は非同期・失敗しても画面を止めない
       if(isCloudConfigured()){
-        try{ await cloudReload(); }catch(err){ /* error already handled */ }
+        try{
+          await cloudReload();
+          console.log('[INIT] cloud reload complete');
+        }catch(err){
+          console.warn('[INIT] cloud reload 失敗（ローカルデータを維持）:', err && err.message);
+        }
         startAutoPolling();
       }
       // タブ復帰時に即時再読込
@@ -7080,6 +7165,7 @@
       });
       // ウィンドウフォーカス時にも
       window.addEventListener('focus', autoPoll);
+      console.log('[INIT] done');
     }
 
     window.addEventListener('DOMContentLoaded', init);
