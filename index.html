@@ -3047,19 +3047,28 @@
     }
 
     // ===== 月次レポート =====
-    // 「2026年10月5日 11時51分」「2026/10/05」「2026-10-05」などを「YYYY-MM-DD」に統一
+    // 「2026年10月5日 11時51分」「2026/10/05 14:30」「2026-10-05T14:30:00」などを統一フォーマットへ
+    // 時刻情報があれば「YYYY-MM-DD HH:mm」、無ければ「YYYY-MM-DD」で返す
     function parseJpAppliedDate(raw){
       const s = String(raw || '').normalize('NFKC').trim();
       if(!s) return '';
-      // 2026年10月5日 → 2026-10-05
-      let m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
-      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-      // 2026/10/05 or 2026-10-05 (時刻ありなし両対応)
-      m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      // 統合正規表現：日付＋オプショナル時刻（年/月/日 または 和暦両対応）
+      const m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})(?:日)?(?:[ T](\d{1,2})[:時](\d{1,2})?)?/);
+      if(m){
+        const y = m[1];
+        const mo = String(m[2]).padStart(2,'0');
+        const d = String(m[3]).padStart(2,'0');
+        const date = `${y}-${mo}-${d}`;
+        if(m[4] !== undefined){
+          const h = String(m[4]).padStart(2,'0');
+          const mi = String(m[5] || '00').padStart(2,'0');
+          return `${date} ${h}:${mi}`;
+        }
+        return date;
+      }
       // 2026年10月（日が無い場合は01日扱い）
-      m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
-      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-01`;
+      const m2 = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
+      if(m2) return `${m2[1]}-${String(m2[2]).padStart(2,'0')}-01`;
       return '';
     }
 
