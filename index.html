@@ -1158,7 +1158,7 @@
         resumeUrl: c.resumeUrl || '',
         resumeFileId: c.resumeFileId || '',
         resumeUploadedAt: c.resumeUploadedAt || '',
-        appliedAt: c.appliedAt || '',
+        appliedAt: (typeof parseJpAppliedDate === 'function' ? parseJpAppliedDate(c.appliedAt) : '') || c.appliedAt || '',
         offerAt: c.offerAt || '',
         acceptedAt: c.acceptedAt || '',
         joinedAt: c.joinedAt || '',
@@ -3024,10 +3024,43 @@
     }
 
     // ===== 月次レポート =====
-    function ymOf(value){ return String(value || '').slice(0,7).replace(/\//g,'-'); }
+    // 「2026年10月5日 11時51分」「2026/10/05」「2026-10-05」などを「YYYY-MM-DD」に統一
+    function parseJpAppliedDate(raw){
+      const s = String(raw || '').normalize('NFKC').trim();
+      if(!s) return '';
+      // 2026年10月5日 → 2026-10-05
+      let m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      // 2026/10/05 or 2026-10-05 (時刻ありなし両対応)
+      m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      // 2026年10月（日が無い場合は01日扱い）
+      m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-01`;
+      return '';
+    }
+
+    // 「2026年10月」「2026/10/XX」「2026-10-XX」すべてを「2026-10」に正規化
+    function ymOf(value){
+      const s = String(value || '').normalize('NFKC').trim();
+      if(!s) return '';
+      // 和暦系：2026年10月
+      let m = s.match(/^(\d{4})\s*年\s*(\d{1,2})/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}`;
+      // 2026/10 or 2026-10（接頭）
+      m = s.match(/^(\d{4})[\/\-](\d{1,2})/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}`;
+      // 保険：先頭7文字 + / を -
+      return s.slice(0,7).replace(/\//g,'-');
+    }
     function todayYM(){ return todayISO().slice(0,7); }
 
-    function getCandidateAppliedYM(c){ return ymOf(c.appliedAt || c.createdAt || ''); }
+    // 応募月取得：appliedAt を優先、空ならオンザフライで和暦形式も吸収
+    function getCandidateAppliedYM(c){
+      const applied = parseJpAppliedDate(c.appliedAt) || parseJpAppliedDate(c.createdAt);
+      if(applied) return applied.slice(0,7);
+      return ymOf(c.appliedAt || c.createdAt || '');
+    }
 
     function getMonthlyApplicantStats(yyyyMm, jobFilter, sourceFilter){
       const list = candidates.filter(c => {
@@ -3036,6 +3069,14 @@
         if(sourceFilter && c.source !== sourceFilter) return false;
         return true;
       });
+      // 診断：対象月の母集団と内定者をコンソールに記録（個人情報は id/status のみ）
+      if(!jobFilter && !sourceFilter){
+        const offered = list.filter(c => ['内定','内定承諾','入社決定'].includes(c.status));
+        console.log(`[MONTHLY REPORT] ${yyyyMm} 応募=${list.length} 内定=${offered.length}`, {
+          applicantIds: list.map(c => ({ id: c.id, status: c.status, appliedAt: c.appliedAt, source: c.source })),
+          offeredIds: offered.map(c => c.id)
+        });
+      }
       const isInterview = s => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(s);
       // 運用ルール：内定＝入社決定として扱う（accepted / joined も同一）
       // 面接不参加は面接実績には含めない（noShowとして別集計）
@@ -4035,7 +4076,7 @@
                   rating: o['評価'] || '',
                   nextDate: o['次回対応日'] || '', owner: o['担当者'] || '', memo: o['メモ'] || '',
                   resumeName: o['履歴書ファイル名'] || '', resumeUrl: o['履歴書URL'] || '',
-                  appliedAt: pickValue(o, ['応募日','日付','appliedAt']),
+                  appliedAt: parseJpAppliedDate(pickValue(o, ['応募日時','応募日','日付','appliedAt'])),
                   offerAt: o['内定日'] || '', acceptedAt: o['内定承諾日'] || '', joinedAt: o['入社決定日'] || '',
                   createdAt: pickValue(o, ['登録日','createdAt']) || nowDateTime(),
                   updatedAt: o['更新日'] || nowDateTime()
@@ -4075,7 +4116,7 @@
       const phone = normalizePhone(pickValue(row, ['電話番号','phone','Phone','携帯番号']));
       const email = pickValue(row, ['メールアドレス','email','Email']);
       const area = pickValue(row, ['応募者の居住地','勤務地']);
-      const appliedDate = pickValue(row, ['応募日','日付','appliedAt']);
+      const appliedDate = parseJpAppliedDate(pickValue(row, ['応募日時','応募日','日付','appliedAt','Date']));
       // 経路判定（メールドメイン優先）
       let source;
       if(email.toLowerCase().includes('indeed')) source = 'indeed';
