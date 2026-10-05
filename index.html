@@ -569,14 +569,42 @@
       <section id="report" class="panel">
         <div class="card">
           <div class="card-head"><div><h3>月次レポート</h3><p class="hint">今月どうだった？ → 何が問題？ → 来月何をする？ が30秒で分かる意思決定ダッシュボード</p></div><button class="btn btn-soft" id="btnExportReportCSV">CSV出力</button></div>
-          <div class="filters" style="margin-bottom:16px;">
+          <div class="filters" style="margin-bottom:12px;">
             <label class="field">対象年月<input id="reportMonth" type="month" /></label>
             <label class="field">対象職種<select id="reportJob"></select></label>
             <label class="field">媒体/紹介会社<select id="reportSource"></select></label>
             <label class="field">費用タイプ<select id="reportFeeType"></select></label>
           </div>
+          <div class="action-row" style="margin-bottom:14px;font-size:12px;gap:6px;">
+            <button type="button" class="btn btn-small btn-soft" data-quick-month="0">今月</button>
+            <button type="button" class="btn btn-small btn-soft" data-quick-month="1">先月</button>
+            <button type="button" class="btn btn-small btn-soft" data-quick-month="3">3か月前</button>
+            <button type="button" class="btn btn-small btn-soft" data-quick-month="6">6か月前</button>
+            <button type="button" class="btn btn-small btn-soft" data-quick-month="12">12か月前</button>
+          </div>
+          <!-- タブ：応募レポート / 面接・選考レポート -->
+          <div class="tab-list" id="reportTabs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px;background:#f8fafc;padding:4px;border-radius:12px;border:1px solid var(--line);">
+            <button type="button" class="btn btn-small tab-btn active" data-report-tab="activity" style="background:var(--navy);color:#fff;">📅 月間活動レポート（イベント日ベース）</button>
+            <button type="button" class="btn btn-small tab-btn" data-report-tab="cohort" style="background:transparent;color:var(--navy);">👥 応募コホート（応募月ベース）</button>
+          </div>
 
-          <!-- 01 今月の採用サマリー -->
+          <!-- 月間活動レポート：面接日・結果確定日ベース -->
+          <div id="reportActivityPane">
+            <div class="notice" style="margin-bottom:12px;font-size:12px;background:#eff6ff;border-color:#bfdbfe;color:var(--navy);">
+              <strong>📅 月間活動レポート：</strong> 応募は<strong>応募日</strong>、面接は<strong>面接実施日(interviewAt)</strong>、内定は<strong>結果確定日(offerAt)</strong>、入社は<strong>入社日(joinedAt)</strong>を基準に集計。「その月に何が起きたか」を示します。
+            </div>
+            <div id="reportActivitySummary" style="margin-bottom:14px;"></div>
+            <div id="reportActivityInsights" style="margin-bottom:14px;"></div>
+          </div>
+
+          <!-- 応募コホートレポート：既存のreportHeadlineを使う -->
+          <div id="reportCohortPane" style="display:none;">
+            <div class="notice" style="margin-bottom:12px;font-size:12px;background:#faf5ff;border-color:#ddd6fe;color:var(--navy);">
+              <strong>👥 応募コホートレポート：</strong> 対象月に<strong>応募した</strong>候補者のみを母集団とし、その後の進捗（面接到達・内定・入社）を追跡します。
+            </div>
+          </div>
+
+          <!-- 01 今月の採用サマリー（応募コホート） -->
           <div id="reportHeadline"></div>
           <details id="reportDiagnoseWrap" style="margin:12px 0;padding:10px 14px;background:#f8fafc;border:1px dashed var(--line);border-radius:10px;">
             <summary style="cursor:pointer;font-weight:900;color:var(--navy);font-size:13px;">🔍 月次集計の診断（対象月の応募者抽出内訳）</summary>
@@ -3245,6 +3273,81 @@
       return { diff, pct, dir, arrow, prev };
     }
 
+    // ===== 月間活動レポート（イベント日ベース集計）=====
+    // 応募は応募日、面接は面接実施日、内定は結果確定日、入社は入社日の月で集計
+    function getActivityStats(ym, jobFilter, sourceFilter){
+      const matchJob = c => isAllFilter(jobFilter) || String(c.job || '').normalize('NFKC').trim() === String(jobFilter).normalize('NFKC').trim();
+      const matchSource = c => isAllFilter(sourceFilter) || normalizeMediaName(c.source || '').toLowerCase() === normalizeMediaName(sourceFilter).toLowerCase();
+      const inMonth = (val) => {
+        if(!val) return false;
+        const parsed = parseJpAppliedDate(val);
+        return parsed && parsed.slice(0,7) === ym;
+      };
+      const scope = candidates.filter(c => matchJob(c) && matchSource(c));
+      // 応募日ベース
+      const applied = scope.filter(c => inMonth(c.appliedAt));
+      // 面接実施日ベース（面接不参加は除外）
+      const interviewed = scope.filter(c => inMonth(c.interviewAt) && c.status !== NO_SHOW_STATUS);
+      // 内定（結果確定日=offerAt）
+      const offered = scope.filter(c => inMonth(c.offerAt));
+      // 承諾
+      const accepted = scope.filter(c => inMonth(c.acceptedAt));
+      // 入社
+      const joined = scope.filter(c => inMonth(c.joinedAt));
+      // 不採用・辞退（結果確定として updatedAt を使う）
+      const rejected = scope.filter(c => c.status === '不採用' && inMonth(c.updatedAt));
+      const withdrawn = scope.filter(c => c.status === '辞退' && inMonth(c.updatedAt));
+      return { applied, interviewed, offered, accepted, joined, rejected, withdrawn };
+    }
+
+    function renderMonthlyActivity(ym, jobFilter, sourceFilter){
+      const sumEl = $('reportActivitySummary'), insEl = $('reportActivityInsights');
+      if(!sumEl || !insEl) return;
+      const s = getActivityStats(ym, jobFilter, sourceFilter);
+      // 前月比較
+      const pym = prevMonth(ym);
+      const sp = getActivityStats(pym, jobFilter, sourceFilter);
+      const diff = (cur, prev) => {
+        const d = cur - prev;
+        if(d === 0) return '<span style="color:var(--muted);">±0</span>';
+        const sign = d > 0 ? '+' : '';
+        const color = d > 0 ? '#15803d' : '#b91c1c';
+        return `<span style="color:${color};font-size:11px;font-weight:900;">${sign}${d}</span>`;
+      };
+
+      sumEl.innerHTML = `<div class="hero-grid hero-grid-6">
+        <div class="hero-card primary"><div class="h-label">応募</div><div class="h-value">${s.applied.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.applied.length} ${diff(s.applied.length, sp.applied.length)}</div></div>
+        <div class="hero-card"><div class="h-label">面接実施</div><div class="h-value">${s.interviewed.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.interviewed.length} ${diff(s.interviewed.length, sp.interviewed.length)}</div></div>
+        <div class="hero-card hero-good"><div class="h-label">内定</div><div class="h-value">${s.offered.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.offered.length} ${diff(s.offered.length, sp.offered.length)}</div></div>
+        <div class="hero-card"><div class="h-label">承諾</div><div class="h-value">${s.accepted.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.accepted.length} ${diff(s.accepted.length, sp.accepted.length)}</div></div>
+        <div class="hero-card hero-good"><div class="h-label">入社</div><div class="h-value">${s.joined.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.joined.length} ${diff(s.joined.length, sp.joined.length)}</div></div>
+        <div class="hero-card hero-reject"><div class="h-label">不採用+辞退</div><div class="h-value">${s.rejected.length + s.withdrawn.length}<span class="h-unit">名</span></div><div class="h-sub">不${s.rejected.length}/辞${s.withdrawn.length}</div></div>
+      </div>`;
+
+      // 今月のポイント（事実ベースのみ）
+      const points = [];
+      if(s.applied.length === 0 && sp.applied.length > 0) points.push(`応募：今月は応募が0件（前月${sp.applied.length}件）`);
+      else if(s.applied.length > 0 && sp.applied.length > 0){
+        const pct = Math.round((s.applied.length - sp.applied.length) / sp.applied.length * 100);
+        if(Math.abs(pct) >= 20) points.push(`応募：前月比 ${pct > 0 ? '+' : ''}${pct}%（${sp.applied.length}→${s.applied.length}名）`);
+      }
+      if(s.interviewed.length !== sp.interviewed.length){
+        const d = s.interviewed.length - sp.interviewed.length;
+        points.push(`面接：前月比 ${d > 0 ? '+' : ''}${d}件（面接実施数の変化）`);
+      }
+      if(s.offered.length > 0){
+        points.push(`内定：今月 ${s.offered.length}件 結果確定（offerAt基準）`);
+      }
+      if(s.joined.length > 0){
+        points.push(`入社：今月 ${s.joined.length}名 入社確定`);
+      }
+      if(points.length === 0) points.push('今月のポイント：主要指標の大きな変化は確認されていません。');
+      insEl.innerHTML = `<div style="padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:12px;">
+        <div style="font-weight:900;color:var(--navy);font-size:14px;margin-bottom:8px;">今月のポイント</div>
+        <ul style="margin:0;padding-left:20px;color:var(--navy);font-size:13px;line-height:1.8;">${points.map(p => `<li>${escapeHTML(p)}</li>`).join('')}</ul>
+      </div>`;
+    }
+
     // 診断パネル：対象月の抽出内訳を画面に表示（KPIと同一の getMonthlyCandidates を使用）
     function renderMonthlyDiagnose(ym, jobFilter, sourceFilter){
       const el = $('reportDiagnose'); if(!el) return;
@@ -3366,6 +3469,13 @@
 
       // 診断パネル：対象月の候補者抽出詳細を画面に出す
       renderMonthlyDiagnose(ym, jobFilter, sourceFilter);
+      // 月間活動レポート（イベント日ベース、新タブ）
+      renderMonthlyActivity(ym, jobFilter, sourceFilter);
+      // 初回：アクティブなタブの表示状態を適用
+      setTimeout(() => {
+        const activeTab = document.querySelector('[data-report-tab].active');
+        if(activeTab) activeTab.click();
+      }, 0);
 
       // 転換率
       const c_app_int = conv(stats.interview, stats.applied);
@@ -6658,6 +6768,40 @@
       onClick('btnExportReportCSV', exportMonthlyReportCSV);
       onClick('btnGoReport', () => switchTab('report'));
       ['reportMonth','reportJob','reportSource','reportFeeType'].forEach(id => { const el = $(id); if(el) el.addEventListener('change', renderMonthlyReport); });
+      // 月次レポート：タブ切替（活動レポート / 応募コホート）
+      document.addEventListener('click', e => {
+        const tab = e.target && e.target.closest ? e.target.closest('[data-report-tab]') : null;
+        if(!tab) return;
+        const mode = tab.dataset.reportTab;
+        document.querySelectorAll('[data-report-tab]').forEach(b => {
+          const active = b.dataset.reportTab === mode;
+          b.classList.toggle('active', active);
+          b.style.background = active ? 'var(--navy)' : 'transparent';
+          b.style.color = active ? '#fff' : 'var(--navy)';
+        });
+        const actPane = $('reportActivityPane'), cohPane = $('reportCohortPane');
+        // 既存の応募コホート系セクション（reportHeadline以降）の表示切替
+        const cohortIds = ['reportHeadline','reportKpiBars','reportFunnel','reportByJob','reportByEmp','reportByMedia','reportCosts','reportCommitSummary','reportCommitByJob','reportCommitTable','reportCommitAlerts','reportCommitTrend','reportCommitCumulative','reportVsPlan','reportTrend','reportDetailAccordion','reportTrendTable'];
+        if(mode === 'activity'){
+          if(actPane) actPane.style.display = '';
+          if(cohPane) cohPane.style.display = 'none';
+          cohortIds.forEach(id => { const el = $(id); if(el){ const parent = el.closest('.card-head'); if(parent) parent.style.display = 'none'; el.style.display = 'none'; } });
+        }else{
+          if(actPane) actPane.style.display = 'none';
+          if(cohPane) cohPane.style.display = '';
+          cohortIds.forEach(id => { const el = $(id); if(el){ const parent = el.closest('.card-head'); if(parent) parent.style.display = ''; el.style.display = ''; } });
+        }
+      });
+      // 月次レポート：クイック月選択
+      document.addEventListener('click', e => {
+        const btn = e.target && e.target.dataset && e.target.dataset.quickMonth !== undefined ? e.target : null;
+        if(!btn) return;
+        const back = Number(btn.dataset.quickMonth) || 0;
+        const d = new Date();
+        d.setMonth(d.getMonth() - back);
+        const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        const el = $('reportMonth'); if(el){ el.value = ym; renderMonthlyReport(); }
+      });
 
       ['searchName','filterJob','filterStatus','filterSource','filterEmployment'].forEach(id => { const el = $(id); if(el) el.addEventListener('input', renderTable); });
       // 不採用者表示切り替え（設定はlocalStorageに保存）
