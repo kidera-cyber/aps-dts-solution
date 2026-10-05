@@ -625,8 +625,17 @@
           <!-- 05 ボトルネック -->
           <div id="reportBottleneck" style="margin-top:16px;"></div>
 
+          <!-- 05b 媒体別採用コミット進捗（月次）— ボトルネック直後の最重要ブロック -->
+          <div class="card-head" style="margin-top:22px;"><div><h3>媒体別 採用コミット進捗（月次）</h3><p class="hint">媒体ごとの半年目標に対する進捗・今月実績・応募/面接・費用状況を一覧で確認します。</p></div></div>
+          <div id="reportCommitSummary" style="margin-bottom:14px;"></div>
+          <div id="reportCommitByJob" style="margin-bottom:14px;"></div>
+          <div id="reportCommitTable" style="margin-bottom:14px;"></div>
+          <div id="reportCommitAlerts" style="margin-bottom:14px;"></div>
+          <div id="reportCommitTrend" style="margin-bottom:14px;"></div>
+          <div id="reportCommitCumulative" style="margin-bottom:14px;"></div>
+
           <!-- 06 次月の重点アクション（図解型アクションボード） -->
-          <div class="card-head" style="margin-top:22px;"><div><h3>次月の重点アクション</h3><p class="hint">今月の結果 → ボトルネック → 来月の重点対応をフロー表示</p></div></div>
+          <div class="card-head" style="margin-top:22px;"><div><h3>次月の重点アクション</h3><p class="hint">進捗状況を踏まえ、翌月は以下の対応を優先してください。</p></div></div>
           <div id="reportActions"></div>
 
           <!-- 07 職種別成果 -->
@@ -644,15 +653,6 @@
           <!-- 10 採用コスト -->
           <div class="card-head" style="margin-top:22px;"><h3>採用コスト内訳</h3></div>
           <div id="reportCosts"></div>
-
-          <!-- 10b 媒体別採用コミット進捗（月次） -->
-          <div class="card-head" style="margin-top:22px;"><div><h3>媒体別 採用コミット進捗（月次）</h3><p class="hint">媒体×職種のコミット vs 実績・費用対効果・要改善媒体</p></div></div>
-          <div id="reportCommitSummary" style="margin-bottom:14px;"></div>
-          <div id="reportCommitByJob" style="margin-bottom:14px;"></div>
-          <div id="reportCommitTable" style="margin-bottom:14px;"></div>
-          <div id="reportCommitAlerts" style="margin-bottom:14px;"></div>
-          <div id="reportCommitTrend" style="margin-bottom:14px;"></div>
-          <div id="reportCommitCumulative" style="margin-bottom:14px;"></div>
 
           <!-- 11 採用計画 vs 実績 -->
           <div class="card-head" style="margin-top:22px;"><h3>採用計画 vs 実績</h3></div>
@@ -2199,14 +2199,35 @@
       const good = progressList.filter(p => p.status.label === '順調' || p.status.label === '達成').length;
       const bad = progressList.filter(p => p.status.label === '遅延' || p.status.label === '未達').length;
       const period = `${halfYearMediaTargets.periodStart} 〜 ${halfYearMediaTargets.periodEnd}`;
-      sumEl.innerHTML = `<div style="margin-bottom:10px;font-size:12px;color:var(--muted);">半年採用コミット進捗｜対象期間 <strong style="color:var(--navy);">${escapeHTML(period)}</strong>｜今月 <strong style="color:var(--navy);">${escapeHTML(ym)}</strong></div>
-      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
-        <div class="hero-card primary" style="padding:16px;min-height:auto;"><div class="h-label">半年目標</div><div class="h-value" style="font-size:30px;">${totalTarget}<span class="h-unit">名</span></div></div>
-        <div class="hero-card hero-good" style="padding:16px;min-height:auto;"><div class="h-label">半年累計実績</div><div class="h-value" style="font-size:30px;">${totalActual}<span class="h-unit">名</span></div></div>
-        <div class="hero-card ${totalRemain > 0 ? 'alert' : ''}" style="padding:16px;min-height:auto;"><div class="h-label">残り採用人数</div><div class="h-value" style="font-size:30px;">${totalRemain}<span class="h-unit">名</span></div></div>
-        <div class="hero-card" style="padding:16px;min-height:auto;"><div class="h-label">達成率</div><div class="h-value" style="font-size:30px;">${totalRate}<span class="h-unit">%</span></div></div>
-        <div class="hero-card" style="padding:16px;min-height:auto;"><div class="h-label">今月採用</div><div class="h-value" style="font-size:30px;">${currentMonthTotal}<span class="h-unit">名</span></div></div>
-        <div class="hero-card hero-reject" style="padding:16px;min-height:auto;"><div class="h-label">遅延媒体</div><div class="h-value" style="font-size:30px;">${bad}</div></div>
+      sumEl.innerHTML = `<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span style="padding:4px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;font-size:11px;color:var(--navy);font-weight:900;">対象期間 ${escapeHTML(period)}</span>
+        <span style="padding:4px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:999px;font-size:11px;color:#15803d;font-weight:900;">今月 ${escapeHTML(ym)}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:4px;">
+        <div class="summary-tile" style="background:linear-gradient(135deg,#eff6ff,#f0f9ff);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;min-height:94px;">
+          <div style="font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em;">半年累計コミット</div>
+          <div style="font-size:30px;font-weight:950;color:var(--navy);line-height:1.1;margin-top:4px;">${totalTarget}<span style="font-size:14px;color:var(--muted);margin-left:3px;">名</span></div>
+        </div>
+        <div class="summary-tile" style="background:linear-gradient(135deg,#f0fdf4,#f7fef9);border:1px solid #86efac;border-radius:14px;padding:16px 18px;min-height:94px;">
+          <div style="font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em;">半年累計実績</div>
+          <div style="font-size:30px;font-weight:950;color:#15803d;line-height:1.1;margin-top:4px;">${totalActual}<span style="font-size:14px;color:var(--muted);margin-left:3px;">名</span></div>
+        </div>
+        <div class="summary-tile" style="background:linear-gradient(135deg,#fefce8,#fffbeb);border:1px solid #fde68a;border-radius:14px;padding:16px 18px;min-height:94px;">
+          <div style="font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em;">残り採用人数</div>
+          <div style="font-size:30px;font-weight:950;color:#a16207;line-height:1.1;margin-top:4px;">${totalRemain}<span style="font-size:14px;color:var(--muted);margin-left:3px;">名</span></div>
+        </div>
+        <div class="summary-tile" style="background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-height:94px;">
+          <div style="font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em;">達成率</div>
+          <div style="font-size:30px;font-weight:950;color:var(--navy);line-height:1.1;margin-top:4px;">${totalRate}<span style="font-size:14px;color:var(--muted);margin-left:3px;">%</span></div>
+        </div>
+        <div class="summary-tile" style="background:linear-gradient(135deg,#ecfeff,#f0faff);border:1px solid #a5f3fc;border-radius:14px;padding:16px 18px;min-height:94px;">
+          <div style="font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em;">今月採用</div>
+          <div style="font-size:30px;font-weight:950;color:#0e7490;line-height:1.1;margin-top:4px;">${currentMonthTotal}<span style="font-size:14px;color:var(--muted);margin-left:3px;">名</span></div>
+        </div>
+        <div class="summary-tile" style="background:linear-gradient(135deg,#fef2f2,#fff5f5);border:1px solid #fecaca;border-radius:14px;padding:16px 18px;min-height:94px;">
+          <div style="font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.05em;">遅延媒体</div>
+          <div style="font-size:30px;font-weight:950;color:#b91c1c;line-height:1.1;margin-top:4px;">${bad}</div>
+        </div>
       </div>`;
 
       // 旧データ用変数を定義（後続の月別推移テーブルで使用）
@@ -2215,44 +2236,92 @@
       // 職種別サマリーは廃止（半年目標は媒体単位で管理）
       if(jobEl) jobEl.innerHTML = '';
 
+      // 達成率バーの色判定
+      const rateBarColor = (r) => r >= 70 ? '#15803d' : r >= 40 ? '#ca8a04' : r > 0 ? '#dc2626' : '#94a3b8';
       // 媒体別半年進捗テーブル
       const rows = progressList.map(p => {
-        return `<tr>
-          <td>${escapeHTML(p.media)}</td>
-          <td style="text-align:right;font-weight:900;">${p.target}</td>
-          <td style="text-align:right;font-weight:900;color:${p.actual>=p.target?'#15803d':'var(--navy)'};">${p.actual}</td>
-          <td style="text-align:right;color:${p.remaining>0?'#b91c1c':'#15803d'};font-weight:900;">${p.remaining}</td>
-          <td style="text-align:right;font-weight:900;">${p.achievementRate}%</td>
-          <td style="text-align:center;"><span class="js-status ${p.status.cls}" style="padding:2px 8px;border-radius:999px;font-size:10px;">${p.status.label}</span></td>
-          <td style="text-align:right;">${p.currentMonthActual}</td>
-          <td style="text-align:right;">${p.applied}</td>
-          <td style="text-align:right;">${p.interview}</td>
-          <td style="text-align:right;">${p.periodCost > 0 ? yen(p.periodCost) : '費用未登録'}</td>
-          <td style="text-align:right;font-weight:900;">${p.periodCost > 0 && p.actual > 0 ? yen(Math.round(p.periodCost / p.actual)) : '-'}</td>
+        const barColor = rateBarColor(p.achievementRate);
+        const barWidth = Math.min(100, p.achievementRate);
+        return `<tr class="commit-row" style="transition:background .15s;">
+          <td style="padding:10px 12px;font-weight:900;color:var(--navy);">${escapeHTML(p.media)}</td>
+          <td style="text-align:right;font-weight:900;padding:10px 12px;">${p.target}</td>
+          <td style="text-align:right;font-weight:900;color:${p.actual>=p.target?'#15803d':'var(--navy)'};padding:10px 12px;">${p.actual}</td>
+          <td style="text-align:right;color:${p.remaining>0?'#b91c1c':'#15803d'};font-weight:900;padding:10px 12px;">${p.remaining}</td>
+          <td style="padding:10px 12px;min-width:140px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;height:8px;background:#eaf0f7;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:999px;transition:width .3s;"></div></div>
+              <span style="font-weight:900;color:var(--navy);min-width:46px;text-align:right;">${p.achievementRate}%</span>
+            </div>
+          </td>
+          <td style="text-align:center;padding:10px 12px;"><span class="js-status ${p.status.cls}" style="padding:3px 10px;border-radius:999px;font-size:11px;font-weight:900;">${p.status.label}</span></td>
+          <td style="text-align:right;padding:10px 12px;border-left:1px dashed #eef2f7;">${p.currentMonthActual}</td>
+          <td style="text-align:right;padding:10px 12px;">${p.applied}</td>
+          <td style="text-align:right;padding:10px 12px;">${p.interview}</td>
+          <td style="text-align:right;padding:10px 12px;border-left:1px dashed #eef2f7;color:${p.periodCost > 0 ? 'var(--navy)' : 'var(--muted)'};">${p.periodCost > 0 ? yen(p.periodCost) : '費用未登録'}</td>
+          <td style="text-align:right;font-weight:900;padding:10px 12px;">${p.periodCost > 0 && p.actual > 0 ? yen(Math.round(p.periodCost / p.actual)) : '-'}</td>
         </tr>`;
       }).join('');
-      const totalRow = `<tr style="background:#f8fafc;font-weight:950;">
-        <td>合計</td>
-        <td style="text-align:right;">${totalTarget}</td>
-        <td style="text-align:right;">${totalActual}</td>
-        <td style="text-align:right;color:${totalRemain>0?'#b91c1c':'#15803d'};">${totalRemain}</td>
-        <td style="text-align:right;">${totalRate}%</td>
-        <td></td>
-        <td style="text-align:right;">${currentMonthTotal}</td>
-        <td colspan="4"></td>
+      const totalBarColor = rateBarColor(totalRate);
+      const totalRow = `<tr style="background:linear-gradient(90deg,#f8fafc,#f1f5f9);font-weight:950;">
+        <td style="padding:12px;">合計</td>
+        <td style="text-align:right;padding:12px;">${totalTarget}</td>
+        <td style="text-align:right;padding:12px;color:#15803d;">${totalActual}</td>
+        <td style="text-align:right;padding:12px;color:${totalRemain>0?'#b91c1c':'#15803d'};">${totalRemain}</td>
+        <td style="padding:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${Math.min(100,totalRate)}%;background:${totalBarColor};border-radius:999px;"></div></div>
+            <span style="font-weight:950;color:var(--navy);min-width:46px;text-align:right;">${totalRate}%</span>
+          </div>
+        </td>
+        <td style="padding:12px;"></td>
+        <td style="text-align:right;padding:12px;color:#0e7490;">${currentMonthTotal}</td>
+        <td colspan="4" style="padding:12px;"></td>
       </tr>`;
-      tblEl.innerHTML = `<div style="margin-top:14px;"><div class="table-wrap"><table>
-        <thead><tr><th>媒体</th><th style="text-align:right;">半年目標</th><th style="text-align:right;">半年実績</th><th style="text-align:right;">残り</th><th style="text-align:right;">達成率</th><th>状態</th><th style="text-align:right;">今月実績</th><th style="text-align:right;">応募</th><th style="text-align:right;">面接</th><th style="text-align:right;">期間費用</th><th style="text-align:right;">採用単価</th></tr></thead>
-        <tbody>${rows}${totalRow}</tbody>
-      </table></div></div>`;
+      tblEl.innerHTML = `<style>.commit-row:hover{background:#f8fafc;}</style>
+      <div style="margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;">
+        <div class="table-wrap"><table style="margin:0;">
+          <thead><tr style="background:linear-gradient(135deg,#f1f5f9,#f8fafc);">
+            <th style="padding:12px;text-align:left;font-size:12px;color:var(--navy);border-bottom:2px solid var(--line);">媒体</th>
+            <th colspan="4" style="padding:12px;text-align:left;font-size:12px;color:var(--navy);background:#eff6ff;border-bottom:2px solid var(--line);">半年目標進捗</th>
+            <th style="padding:12px;text-align:center;font-size:12px;color:var(--navy);background:#eff6ff;border-bottom:2px solid var(--line);">状態</th>
+            <th colspan="3" style="padding:12px;text-align:left;font-size:12px;color:var(--navy);background:#f0fdf4;border-bottom:2px solid var(--line);border-left:1px dashed #eef2f7;">今月活動</th>
+            <th colspan="2" style="padding:12px;text-align:left;font-size:12px;color:var(--navy);background:#faf5ff;border-bottom:2px solid var(--line);border-left:1px dashed #eef2f7;">費用</th>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--muted);"></th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">半年目標</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">半年実績</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">残り</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--muted);">達成率</th>
+            <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);"></th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);border-left:1px dashed #eef2f7;">今月実績</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">応募</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">面接</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);border-left:1px dashed #eef2f7;">期間費用</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">採用単価</th>
+          </tr></thead>
+          <tbody>${rows}${totalRow}</tbody>
+        </table></div>
+      </div>`;
 
-      // 媒体別の実績内訳（職種別）を各媒体ごとに表示
-      const breakdownHtml = progressList.filter(p => Object.keys(p.jobBreakdown).length > 0).map(p => {
-        const items = Object.entries(p.jobBreakdown).map(([job, n]) => `${escapeHTML(job)} ${n}名`).join(' / ');
-        return `<div style="padding:6px 0;border-bottom:1px dashed #eef2f7;font-size:12px;"><strong style="color:var(--navy);">${escapeHTML(p.media)}</strong>：${items}</div>`;
+      // 採用実績の職種別内訳をカード化
+      const breakdownCards = progressList.filter(p => Object.keys(p.jobBreakdown).length > 0).map(p => {
+        const chips = Object.entries(p.jobBreakdown).map(([job, n]) =>
+          `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#fff;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--navy);"><strong style="font-weight:950;">${escapeHTML(job)}</strong><span style="color:#15803d;font-weight:900;">${n}名</span></span>`
+        ).join('');
+        return `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
+          <div style="font-size:13px;color:var(--navy);font-weight:950;margin-bottom:8px;">${escapeHTML(p.media)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+        </div>`;
       }).join('');
-      if(breakdownHtml){
-        tblEl.innerHTML += `<div style="margin-top:12px;padding:10px 14px;background:#f8fafc;border:1px dashed var(--line);border-radius:10px;"><div style="font-weight:900;color:var(--navy);margin-bottom:6px;font-size:13px;">採用実績の職種別内訳</div>${breakdownHtml}</div>`;
+      if(breakdownCards){
+        tblEl.innerHTML += `<div style="margin-top:16px;">
+          <div style="font-weight:900;color:var(--navy);margin-bottom:10px;font-size:13px;display:flex;align-items:center;gap:6px;">
+            <span style="width:4px;height:16px;background:var(--blue);border-radius:2px;"></span>
+            採用実績の職種別内訳
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">${breakdownCards}</div>
+        </div>`;
       }
 
       // skip old monthPlans logic
@@ -3412,13 +3481,22 @@
         return `<span style="color:${color};font-size:11px;font-weight:900;">${sign}${d}</span>`;
       };
 
-      sumEl.innerHTML = `<div class="hero-grid hero-grid-6">
+      // 上部KPIは「対象月」の成果指標のみ（不採用・辞退の累計は含めない）
+      sumEl.innerHTML = `<div class="hero-grid" style="grid-template-columns:repeat(5,1fr);">
         <div class="hero-card primary"><div class="h-label">応募</div><div class="h-value">${s.applied.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.applied.length} ${diff(s.applied.length, sp.applied.length)}</div></div>
         <div class="hero-card"><div class="h-label">面接実施</div><div class="h-value">${s.interviewed.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.interviewed.length} ${diff(s.interviewed.length, sp.interviewed.length)}</div></div>
         <div class="hero-card hero-good"><div class="h-label">内定</div><div class="h-value">${s.offered.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.offered.length} ${diff(s.offered.length, sp.offered.length)}</div></div>
         <div class="hero-card"><div class="h-label">承諾</div><div class="h-value">${s.accepted.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.accepted.length} ${diff(s.accepted.length, sp.accepted.length)}</div></div>
         <div class="hero-card hero-good"><div class="h-label">入社</div><div class="h-value">${s.joined.length}<span class="h-unit">名</span></div><div class="h-sub">前月 ${sp.joined.length} ${diff(s.joined.length, sp.joined.length)}</div></div>
-        <div class="hero-card hero-reject"><div class="h-label">不採用+辞退</div><div class="h-value">${s.rejected.length + s.withdrawn.length}<span class="h-unit">名</span></div><div class="h-sub">不${s.rejected.length}/辞${s.withdrawn.length}</div></div>
+      </div>
+      <!-- 当月の選考結果内訳（累計ではなく、対象月の結果確定分のみ） -->
+      <div style="margin-top:14px;padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:12px;">
+        <div style="font-size:12px;color:var(--muted);font-weight:900;margin-bottom:8px;">当月の選考結果内訳（結果確定日 ${escapeHTML(ym)} ベース）</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:999px;font-size:13px;"><strong style="color:#b91c1c;font-weight:950;">不採用</strong><span style="font-weight:950;color:var(--navy);">${s.rejected.length}名</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:999px;font-size:13px;"><strong style="color:#64748b;font-weight:950;">辞退</strong><span style="font-weight:950;color:var(--navy);">${s.withdrawn.length}名</span></span>
+          <span style="color:var(--muted);font-size:12px;align-self:center;">※ 累計は「半年採用コミット進捗」セクションを参照してください</span>
+        </div>
       </div>`;
 
       // 今月のポイント（事実ベースのみ）
