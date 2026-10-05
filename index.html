@@ -578,6 +578,10 @@
 
           <!-- 01 今月の採用サマリー -->
           <div id="reportHeadline"></div>
+          <details id="reportDiagnoseWrap" style="margin:12px 0;padding:10px 14px;background:#f8fafc;border:1px dashed var(--line);border-radius:10px;">
+            <summary style="cursor:pointer;font-weight:900;color:var(--navy);font-size:13px;">🔍 月次集計の診断（対象月の応募者抽出内訳）</summary>
+            <div id="reportDiagnose" style="margin-top:10px;"></div>
+          </details>
 
           <!-- 02 今月の重要ポイント3つ -->
           <div id="reportKeyPoints" style="margin-top:16px;"></div>
@@ -3055,11 +3059,34 @@
     }
     function todayYM(){ return todayISO().slice(0,7); }
 
-    // 応募月取得：appliedAt を優先、空ならオンザフライで和暦形式も吸収
+    // 応募日取得（複数フィールド対応）：候補者ごとに実際に使われた日付と採用フィールドを返す
+    function getCandidateApplicationDate(c){
+      const candidates_fields = [
+        ['appliedAt', c.appliedAt],
+        ['applicationDate', c['applicationDate']],
+        ['appliedDate', c['appliedDate']],
+        ['applyDate', c['applyDate']],
+        ['応募日', c['応募日']],
+        ['応募日時', c['応募日時']],
+        ['createdAt', c.createdAt],
+        ['registeredAt', c['registeredAt']],
+        ['importedAt', c['importedAt']]
+      ];
+      for(const [field, val] of candidates_fields){
+        if(!val) continue;
+        const parsed = parseJpAppliedDate(val);
+        if(parsed) return { date: parsed, field, raw: val };
+        // 保険：ymOf だけでも年月が取れる場合
+        const ym = ymOf(val);
+        if(ym && /^\d{4}-\d{2}$/.test(ym)) return { date: ym + '-01', field, raw: val };
+      }
+      return { date: '', field: '(なし)', raw: '' };
+    }
+
+    // 応募月取得：複数フィールドをフォールバック
     function getCandidateAppliedYM(c){
-      const applied = parseJpAppliedDate(c.appliedAt) || parseJpAppliedDate(c.createdAt);
-      if(applied) return applied.slice(0,7);
-      return ymOf(c.appliedAt || c.createdAt || '');
+      const info = getCandidateApplicationDate(c);
+      return info.date ? info.date.slice(0,7) : '';
     }
 
     function getMonthlyApplicantStats(yyyyMm, jobFilter, sourceFilter){
@@ -3172,6 +3199,76 @@
       return { diff, pct, dir, arrow, prev };
     }
 
+    // 診断パネル：対象月の抽出内訳を画面に表示
+    function renderMonthlyDiagnose(ym, jobFilter, sourceFilter){
+      const el = $('reportDiagnose'); if(!el) return;
+      const total = candidates.length;
+      // 全候補者を月判定して分類
+      const breakdown = new Map();
+      const monthList = [];
+      const noDate = [];
+      candidates.forEach(c => {
+        const info = getCandidateApplicationDate(c);
+        const key = info.date ? info.date.slice(0,7) : '(日付なし)';
+        if(!breakdown.has(key)) breakdown.set(key, []);
+        breakdown.get(key).push({ c, info });
+        if(key === ym) monthList.push({ c, info });
+        if(!info.date) noDate.push(c);
+      });
+      // フィルタ適用後
+      const filtered = monthList.filter(({c}) => {
+        if(jobFilter && c.job !== jobFilter) return false;
+        if(sourceFilter && c.source !== sourceFilter) return false;
+        return true;
+      });
+      const excludedByFilter = monthList.length - filtered.length;
+
+      // 各月の件数一覧
+      const monthRows = Array.from(breakdown.entries()).sort((a,b) => (b[0] || '').localeCompare(a[0] || '')).slice(0, 12);
+      const monthTable = monthRows.map(([k, arr]) => `<tr${k===ym?' style="background:#eaf2ff;font-weight:900;"':''}><td style="padding:4px 8px;">${escapeHTML(k)}</td><td style="padding:4px 8px;text-align:right;">${arr.length}名</td></tr>`).join('');
+
+      // 対象月の候補者詳細（最大20件）
+      const detailRows = filtered.slice(0, 20).map(({c, info}) => {
+        const isHired = isHiredCandidate(c);
+        return `<tr>
+          <td style="padding:3px 6px;">${escapeHTML(c.name || '-')}</td>
+          <td style="padding:3px 6px;">${escapeHTML(info.field)}</td>
+          <td style="padding:3px 6px;">${escapeHTML(info.raw || '')}</td>
+          <td style="padding:3px 6px;">${escapeHTML(info.date)}</td>
+          <td style="padding:3px 6px;"><span class="badge ${statusClass(c.status)}">${escapeHTML(c.status || '')}</span></td>
+          <td style="padding:3px 6px;">${escapeHTML(c.source || '-')}</td>
+          <td style="padding:3px 6px;text-align:center;">${isHired ? '✓' : ''}</td>
+        </tr>`;
+      }).join('');
+
+      el.innerHTML = `
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+          総candidates: <strong style="color:var(--navy);">${total}名</strong> ／
+          対象月 <strong style="color:var(--navy);">${escapeHTML(ym)}</strong> 判定: <strong style="color:var(--blue);">${monthList.length}名</strong> ／
+          フィルタ適用後: <strong style="color:var(--blue);">${filtered.length}名</strong> ／
+          日付不明: <strong style="color:#b91c1c;">${noDate.length}名</strong>
+          ${excludedByFilter > 0 ? ` ／ フィルタで除外: <strong style="color:#a16207;">${excludedByFilter}名</strong>（職種=${escapeHTML(jobFilter||'すべて')}／経路=${escapeHTML(sourceFilter||'すべて')}）` : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;">
+          <div>
+            <div style="font-size:12px;font-weight:900;color:var(--navy);margin-bottom:4px;">月別candidates分布（直近12ヶ月）</div>
+            <table style="width:100%;font-size:12px;border-collapse:collapse;">
+              <thead><tr style="background:#eef2f7;"><th style="padding:4px 8px;text-align:left;">月</th><th style="padding:4px 8px;text-align:right;">件数</th></tr></thead>
+              <tbody>${monthTable || '<tr><td colspan=2 style="padding:6px;color:var(--muted);">データなし</td></tr>'}</tbody>
+            </table>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:900;color:var(--navy);margin-bottom:4px;">対象月${escapeHTML(ym)}の候補者詳細（最大20件）</div>
+            <table style="width:100%;font-size:11px;border-collapse:collapse;">
+              <thead><tr style="background:#eef2f7;"><th style="padding:4px 6px;text-align:left;">氏名</th><th style="padding:4px 6px;text-align:left;">採用field</th><th style="padding:4px 6px;text-align:left;">生値</th><th style="padding:4px 6px;text-align:left;">パース日</th><th style="padding:4px 6px;text-align:left;">status</th><th style="padding:4px 6px;text-align:left;">経路</th><th style="padding:4px 6px;text-align:center;">内定</th></tr></thead>
+              <tbody>${detailRows || '<tr><td colspan=7 style="padding:6px;color:var(--muted);">対象月に候補者なし</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted);">※ 月判定は appliedAt / applicationDate / 応募日 / createdAt など複数フィールドをフォールバックで評価。「採用field」列で実際に使われたフィールド名が分かります。</div>
+      `;
+    }
+
     function conv(a, b){ return b > 0 ? Math.round((a / b) * 1000) / 10 : null; }
     function convLabel(c){ return c === null ? '-' : `${c}%`; }
 
@@ -3197,6 +3294,9 @@
 
       const cost = computeMonthCosts(mediaInScope, ym);
       const stats = getMonthlyApplicantStats(ym, jobFilter, sourceFilter);
+
+      // 診断パネル：対象月の候補者抽出詳細を画面に出す
+      renderMonthlyDiagnose(ym, jobFilter, sourceFilter);
 
       // 転換率
       const c_app_int = conv(stats.interview, stats.applied);
