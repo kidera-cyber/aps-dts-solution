@@ -6294,6 +6294,16 @@
       if(dirtyLocal && !silent){
         if(!confirm('ローカルに未同期の変更があります。クラウドから再読込するとローカル変更が失われます。実行しますか？')) return;
       }
+      // 直近接続エラーからの復帰再読込は、PLEX等直近データ消失リスクのため追加確認
+      if(!silent && syncState && syncState.mode === 'ng'){
+        const localCount = candidates.length;
+        const plexCount = candidates.filter(c => {
+          const s = String(c.source || '').normalize('NFKC').toLowerCase();
+          return s.includes('plex') || s.includes('プレックス');
+        }).length;
+        const msg = `⚠ 直近クラウド接続エラー状態からの再読込です。\n\n現在ローカル：${localCount}名（うちPLEX ${plexCount}名）\n\n「クラウドから再読込」は、現在のローカルデータを古いクラウドデータで上書きする可能性があります。\n特にPLEX等の直近追加データが失われるリスクがあります。\n\n推奨：\n1. 先に「設定タブ → データ復旧診断」でローカルとクラウドの件数を比較\n2. クラウドが古い場合は「現在データをクラウドへ反映」を実行\n3. クラウドが新しい場合のみ再読込\n\nそれでも今すぐ再読込しますか？`;
+        if(!confirm(msg)) return;
+      }
       // 例外はここでは catch しない → autoPoll 側で連続失敗カウントする
       if(!silent) setDataMessage('クラウドから読込中です...', 'info');
       let res;
