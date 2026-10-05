@@ -3670,7 +3670,20 @@
         if(actions.length === 0){
           actions.push({ pri: 'low', title: '今月は特筆すべき改善ポイントなし', body: '現状の運用を継続してください。' });
         }
-        actEl.innerHTML = actions.map(a => `<div class="action-item pri-${a.pri}"><span class="a-pri">${a.pri === 'high' ? '優先度：高' : (a.pri === 'mid' ? '優先度：中' : '優先度：低')}</span><strong>${escapeHTML(a.title)}</strong><p>${escapeHTML(a.body)}</p></div>`).join('');
+        actEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+          ${actions.map(a => {
+            const icon = a.pri === 'high' ? '🔴' : (a.pri === 'mid' ? '🟡' : '⚪');
+            const label = a.pri === 'high' ? '優先度：高' : (a.pri === 'mid' ? '優先度：中' : '優先度：低');
+            return `<div class="action-item pri-${a.pri}" style="padding:14px 16px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="font-size:18px;">${icon}</span>
+                <span class="a-pri" style="font-size:11px;">${label}</span>
+              </div>
+              <strong style="display:block;font-size:14px;color:var(--navy);margin-bottom:4px;">${escapeHTML(a.title)}</strong>
+              <p style="margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.5;">${escapeHTML(a.body)}</p>
+            </div>`;
+          }).join('')}
+        </div>`;
       }
 
       // 07 職種別成果
@@ -3702,7 +3715,10 @@
             <div class="mrc-row"><span>入社</span><div class="mrc-bar"><span style="width:${s.applied>0?s.joined/s.applied*100:0}%"></span></div><strong>${s.joined}</strong></div>
           </div>`;
         }).filter(Boolean).join('');
-        jobEl.innerHTML = cards || '<div class="empty">対象月のデータがありません</div>';
+        jobEl.innerHTML = cards || `<div class="notice" style="padding:16px;background:#f8fafc;border-color:var(--line);">
+          <div style="font-weight:900;color:var(--navy);margin-bottom:4px;">対象月（${escapeHTML(ym)}）の職種別データがありません</div>
+          <div style="font-size:12px;color:var(--muted);">この月に応募者が登録されていないか、職種が未設定です。応募者一覧で応募日・職種を確認してください。</div>
+        </div>`;
       }
 
       // 08 雇用形態別成果
@@ -3734,7 +3750,10 @@
             <div class="mrc-row"><span>承諾</span><div class="mrc-bar"><span style="width:${s.accepted/s.applied*100}%"></span></div><strong>${s.accepted}</strong></div>
             <div class="mrc-row"><span>入社</span><div class="mrc-bar"><span style="width:${s.joined/s.applied*100}%"></span></div><strong>${s.joined}</strong></div>
           </div>`;
-        }).filter(Boolean).join('') || '<div class="empty">対象月のデータがありません</div>';
+        }).filter(Boolean).join('') || `<div class="notice" style="padding:16px;background:#f8fafc;border-color:var(--line);">
+          <div style="font-weight:900;color:var(--navy);margin-bottom:4px;">対象月（${escapeHTML(ym)}）の雇用形態別データがありません</div>
+          <div style="font-size:12px;color:var(--muted);">応募者の雇用形態（正社員/アルバイト等）が未設定の可能性があります。応募者一覧で「雇用形態」列をご確認ください。</div>
+        </div>`;
       }
 
       // 09 媒体別成果（重複排除：source基準で1カード）
@@ -3753,7 +3772,10 @@
         // 応募者側も source 単位で集約（媒体費行数に依存しない）
         const sources = Array.from(bySrc.keys());
         if(sources.length === 0){
-          mediaEl.innerHTML = '<div class="empty">対象月に費用計上された媒体がありません</div>';
+          mediaEl.innerHTML = `<div class="notice" style="padding:16px;background:#f8fafc;border-color:var(--line);">
+            <div style="font-weight:900;color:var(--navy);margin-bottom:4px;">対象月（${escapeHTML(ym)}）の媒体別データがありません</div>
+            <div style="font-size:12px;color:var(--muted);">この月に費用計上された媒体がありません。掲載費用タブで請求書PDFまたはCSVを取り込んでください。</div>
+          </div>`;
         }else{
           mediaEl.innerHTML = sources.map(src => {
             const m = bySrc.get(src);
@@ -3776,21 +3798,47 @@
       if(costEl){
         const costLabel = v => v === 0 ? '未登録' : yen(v);
         const costSub = (v, base) => (base > 0 && v === 0) ? '' : (base > 0 ? `${Math.round(v/base*100)}% of 総費用` : '');
-        costEl.innerHTML = `<div class="cost-block">
-          <div class="cost-item"><div class="c-label">総採用費</div><div class="c-value">${cost.total === 0 ? '未登録' : yen(cost.total)}</div><div class="c-sub">${ym}</div></div>
-          <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value">${costLabel(cost.ad)}</div><div class="c-sub">${escapeHTML(costSub(cost.ad, cost.total))}</div></div>
-          <div class="cost-item"><div class="c-label">人材紹介手数料</div><div class="c-value">${costLabel(cost.fee)}</div><div class="c-sub">${escapeHTML(costSub(cost.fee, cost.total))}</div></div>
-          <div class="cost-item"><div class="c-label">広告CPA(応募)</div><div class="c-value">${cost.ad > 0 && stats.applied > 0 ? yen(Math.round(cost.ad/stats.applied)) : '-'}</div><div class="c-sub">広告費÷応募</div></div>
-          <div class="cost-item"><div class="c-label">広告CPA(承諾)</div><div class="c-value">${cost.ad > 0 && stats.accepted > 0 ? yen(Math.round(cost.ad/stats.accepted)) : '-'}</div><div class="c-sub">広告費÷承諾</div></div>
-          <div class="cost-item"><div class="c-label">総採用CPA(入社)</div><div class="c-value">${cost.total > 0 && stats.joined > 0 ? yen(Math.round(cost.total/stats.joined)) : '-'}</div><div class="c-sub">総費用÷入社</div></div>
-        </div>`;
+        if(cost.total === 0){
+          costEl.innerHTML = `<div class="notice" style="padding:16px;background:#f8fafc;border-color:var(--line);">
+            <div style="font-weight:900;color:var(--navy);margin-bottom:6px;">対象月（${escapeHTML(ym)}）の採用コスト未登録</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.7;">掲載費用タブで以下いずれかを実行してください：<br>• 請求書PDFを取込（Indeed/PLEX/HRドメイン 等）<br>• 掲載費用を手動登録</div>
+          </div>`;
+        }else{
+          // 構成比チャート（横棒・積み上げ）
+          const other = Math.max(0, cost.total - cost.ad - cost.fee);
+          const pct = v => cost.total > 0 ? v / cost.total * 100 : 0;
+          costEl.innerHTML = `<div style="margin-bottom:14px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;">
+            <div style="font-size:12px;color:var(--muted);font-weight:900;margin-bottom:6px;">費用構成比</div>
+            <div style="display:flex;height:22px;border-radius:11px;overflow:hidden;background:#eaf0f7;margin-bottom:10px;">
+              ${cost.ad > 0 ? `<div style="width:${pct(cost.ad)}%;background:#2563eb;" title="求人広告費 ${yen(cost.ad)} (${Math.round(pct(cost.ad))}%)"></div>` : ''}
+              ${cost.fee > 0 ? `<div style="width:${pct(cost.fee)}%;background:#7c3aed;" title="紹介手数料 ${yen(cost.fee)} (${Math.round(pct(cost.fee))}%)"></div>` : ''}
+              ${other > 0 ? `<div style="width:${pct(other)}%;background:#94a3b8;" title="その他 ${yen(other)} (${Math.round(pct(other))}%)"></div>` : ''}
+            </div>
+            <div style="display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap;">
+              <span><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px;margin-right:4px;"></span>求人広告費 <strong style="color:var(--navy);">${yen(cost.ad)}</strong>（${Math.round(pct(cost.ad))}%）</span>
+              <span><span style="display:inline-block;width:10px;height:10px;background:#7c3aed;border-radius:2px;margin-right:4px;"></span>紹介手数料 <strong style="color:var(--navy);">${yen(cost.fee)}</strong>（${Math.round(pct(cost.fee))}%）</span>
+              ${other > 0 ? `<span><span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:2px;margin-right:4px;"></span>その他 <strong style="color:var(--navy);">${yen(other)}</strong>（${Math.round(pct(other))}%）</span>` : ''}
+            </div>
+          </div>
+          <div class="cost-block">
+            <div class="cost-item highlight"><div class="c-label">総採用費</div><div class="c-value">${yen(cost.total)}</div><div class="c-sub">${ym}</div></div>
+            <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value">${costLabel(cost.ad)}</div><div class="c-sub">${escapeHTML(costSub(cost.ad, cost.total))}</div></div>
+            <div class="cost-item"><div class="c-label">人材紹介手数料</div><div class="c-value">${costLabel(cost.fee)}</div><div class="c-sub">${escapeHTML(costSub(cost.fee, cost.total))}</div></div>
+            <div class="cost-item"><div class="c-label">広告CPA(応募)</div><div class="c-value">${cost.ad > 0 && stats.applied > 0 ? yen(Math.round(cost.ad/stats.applied)) : '-'}</div><div class="c-sub">広告費÷応募</div></div>
+            <div class="cost-item"><div class="c-label">広告CPA(承諾)</div><div class="c-value">${cost.ad > 0 && stats.accepted > 0 ? yen(Math.round(cost.ad/stats.accepted)) : '-'}</div><div class="c-sub">広告費÷承諾</div></div>
+            <div class="cost-item"><div class="c-label">総採用CPA(入社)</div><div class="c-value">${cost.total > 0 && stats.joined > 0 ? yen(Math.round(cost.total/stats.joined)) : '-'}</div><div class="c-sub">総費用÷入社</div></div>
+          </div>`;
+        }
       }
 
       // 11 採用計画 vs 実績
       const planEl = $('reportVsPlan');
       if(planEl){
         if(!plans.length){
-          planEl.innerHTML = '<div class="empty">採用計画が未登録です</div>';
+          planEl.innerHTML = `<div class="notice" style="padding:16px;background:#f8fafc;border-color:var(--line);">
+            <div style="font-weight:900;color:var(--navy);margin-bottom:4px;">採用計画が未登録です</div>
+            <div style="font-size:12px;color:var(--muted);">「採用計画」タブから職種別の目標人数を登録してください。</div>
+          </div>`;
         }else{
           const accepted = candidates.filter(c => isHiredCandidate(c)).reduce((a, c) => { a[c.job] = (a[c.job] || 0) + 1; return a; }, {});
           planEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
