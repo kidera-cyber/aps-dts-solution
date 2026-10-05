@@ -3809,6 +3809,9 @@
         </div>`;
       }
 
+      // ===== Section wrappers: 各セクションを独立try/catchで囲んで、1つ失敗しても他は描画 =====
+      const sectionSafe = (name, fn) => { try{ fn(); }catch(err){ console.error(`[REPORT SECTION ERROR] ${name}:`, err); } };
+      sectionSafe('07_byJob', () => {
       // 07 職種別成果
       const jobEl = $('reportByJob');
       if(jobEl){
@@ -3844,6 +3847,8 @@
         </div>`;
       }
 
+      }); // end 07
+      sectionSafe('08_byEmp', () => {
       // 08 雇用形態別成果
       const empEl = $('reportByEmp');
       if(empEl){
@@ -3879,6 +3884,8 @@
         </div>`;
       }
 
+      }); // end 08
+      sectionSafe('09_byMedia', () => {
       // 09 媒体別成果（重複排除：source基準で1カード）
       const mediaEl = $('reportByMedia');
       if(mediaEl){
@@ -3916,6 +3923,8 @@
         }
       }
 
+      }); // end 09
+      sectionSafe('10_costs', () => {
       // 10 採用コスト内訳
       const costEl = $('reportCosts');
       if(costEl){
@@ -3954,6 +3963,8 @@
         }
       }
 
+      }); // end 10
+      sectionSafe('11_planVsActual', () => {
       // 11 採用計画 vs 実績
       const planEl = $('reportVsPlan');
       if(planEl){
@@ -3980,6 +3991,8 @@
         }
       }
 
+      }); // end 11
+      sectionSafe('12_sixMonthTrend', () => {
       // 12 過去6か月推移
       const trendData = [];
       const [yy, mm] = ym.split('-').map(Number);
@@ -4012,6 +4025,8 @@
         </div>`;
       }
 
+      }); // end 12
+      sectionSafe('13_detail', () => {
       // 13 詳細データ：集約済み媒体別月次表
       const mTbody = $('reportMediaTable');
       if(mTbody){
@@ -4040,8 +4055,9 @@
         trendTbody.innerHTML = trendData.map(r => `<tr><td><strong>${r.ym}</strong></td><td>${r.total === 0 ? '-' : yen(r.total)}</td><td>${r.ad === 0 ? '-' : yen(r.ad)}</td><td>${r.fee === 0 ? '-' : yen(r.fee)}</td><td>${r.applied}</td><td>${r.interview}</td><td>${r.offered}</td><td>${r.accepted}</td><td>${r.joined}</td><td>${r.total > 0 && r.applied > 0 ? yen(Math.round(r.total/r.applied)) : '-'}</td><td>${r.total > 0 && r.joined > 0 ? yen(Math.round(r.total/r.joined)) : '-'}</td></tr>`).join('');
       }
 
+      }); // end 13
       // 媒体別採用コミット進捗（同じ集計関数を再利用）
-      renderReportMediaCommit();
+      sectionSafe('14_mediaCommit', () => renderReportMediaCommit());
     }
 
     function exportMonthlyReportCSV(){
