@@ -507,7 +507,7 @@
               <div class="form-grid" style="grid-template-columns:repeat(4,1fr);gap:10px;">
                 <label class="field">対象月<input id="commitFormMonth" type="month" /></label>
                 <label class="field">職種<select id="commitFormJob"><option value="中型ドライバー">中型ドライバー</option><option value="大型ドライバー">大型ドライバー</option><option value="運行管理者">運行管理者</option><option value="事務スタッフ">事務スタッフ</option></select></label>
-                <label class="field">媒体<select id="commitFormMedia"><option value="リファラル">リファラル</option><option value="indeed_社員">indeed_社員</option><option value="indeed_AP">indeed_AP</option><option value="PLEX">PLEX</option><option value="ドラピタ">ドラピタ</option><option value="GOジョブ">GOジョブ</option><option value="ガイダブル">ガイダブル</option><option value="Goドライバー">Goドライバー</option><option value="XMile">XMile</option><option value="派遣_ランスタ">派遣_ランスタ</option><option value="派遣_エクスプレス">派遣_エクスプレス</option><option value="紹介">紹介</option></select></label>
+                <label class="field">媒体<select id="commitFormMedia"><option value="リファラル">リファラル</option><option value="indeed_社員">indeed_社員</option><option value="indeed_AP">indeed_AP</option><option value="PLEX">PLEX</option><option value="ドラピタ">ドラピタ</option><option value="GOジョブ">GOジョブ</option><option value="ライトミル">ライトミル</option><option value="ガイダブル">ガイダブル</option><option value="Goドライバー">Goドライバー</option><option value="XMile">XMile</option><option value="派遣_ランスタ">派遣_ランスタ</option><option value="派遣_エクスプレス">派遣_エクスプレス</option><option value="紹介">紹介</option></select></label>
                 <label class="field">コミット人数<input id="commitFormTarget" type="number" min="0" value="0" /></label>
               </div>
               <div class="action-row" style="margin-top:10px;">
@@ -930,7 +930,7 @@
     }
 
     const jobs = ['中型ドライバー', '運行管理者', '事務スタッフ'];
-    const sources = ['indeed', 'PLEX', 'XMile', 'Guidable', 'ドラピタ', 'GOジョブ', 'リファラル', '紹介'];
+    const sources = ['indeed', 'PLEX', 'XMile', 'Guidable', 'ドラピタ', 'GOジョブ', 'ライトミル', 'リファラル', '紹介'];
     const statuses = ['応募受付','書類選考中','一次面接','面接不参加','職場見学','二次面接','最終面接','内定','内定承諾','入社決定','辞退','不採用','保留'];
     // 共通集計ルール：「内定」以降を採用・入社決定として扱う（実データのステータスは書き換えない）
     // 運用上、内定＝入社決定 と見なす。承諾/入社決定 も含む。
@@ -1907,6 +1907,7 @@
       if(v.includes('goジョブ') || v.includes('go job') || v.includes('gojob') || v.replace(/\s/g,'').includes('goジョブ')) return 'GOジョブ';
       // Goドライバー は GOジョブ として統合（データ互換性維持しつつ正規化）
       if((v.includes('go') && v.includes('ドライバー')) || v.includes('goドライバー')) return 'GOジョブ';
+      if(v.includes('ライトミル') || v.includes('lightmill') || v.includes('light mill') || v.includes('light-mill')) return 'ライトミル';
       if(v.includes('リファラル') || v.includes('referral')) return 'リファラル';
       if(v.includes('ランスタ')) return '派遣_ランスタ';
       if(v.includes('エクスプレス') || v.includes('express')) return '派遣_エクスプレス';
@@ -4718,6 +4719,7 @@
         else if(/guidable|ガイダブル/i.test(rawSrc)) source = 'Guidable';
         else if(/ドラピタ|dorapita|dora-pita/i.test(rawSrc)) source = 'ドラピタ';
         else if(/goジョブ|go\s*job|gojob/i.test(rawSrc)) source = 'GOジョブ';
+        else if(/ライトミル|lightmill|light\s*mill|light-mill/i.test(rawSrc)) source = 'ライトミル';
         else if(/リファラル/.test(rawSrc)) source = 'リファラル';
         else if(/紹介/.test(rawSrc)) source = '紹介';
         else source = rawSrc || 'indeed';
@@ -4817,6 +4819,7 @@
       if(/guidable|ガイダブル/.test(s)) return 'Guidable';
       if(/ドラピタ|dorapita|dora-pita/.test(s)) return 'ドラピタ';
       if(/goジョブ|go\s*job|gojob/.test(s)) return 'GOジョブ';
+      if(/ライトミル|lightmill|light\s*mill|light-mill/.test(s)) return 'ライトミル';
       if(/リファラル|referral/.test(s)) return 'リファラル';
       if(/紹介|agent|エージェント/.test(s)) return '紹介';
       return String(text || '').trim();
@@ -5346,7 +5349,7 @@
       const typeLabel = isFee ? '人材紹介手数料' : (parsed.costType === 'media' ? '求人広告費' : 'その他');
       const jobOptions = jobs.map(j => `<option value="${escapeHTML(j)}">${escapeHTML(j)}</option>`).join('');
       const empOptions = ['','正社員','アルバイト','パート','契約社員','派遣'].map(e => `<option value="${escapeHTML(e)}">${escapeHTML(e || '(未設定)')}</option>`).join('');
-      const mediaOptions = ['Indeed','PLEX','XMile','Guidable','ドラピタ','GOジョブ','リファラル','紹介'].map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
+      const mediaOptions = ['Indeed','PLEX','XMile','Guidable','ドラピタ','GOジョブ','ライトミル','リファラル','紹介'].map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
 
       let rowsHtml = '';
       if(isFee){
