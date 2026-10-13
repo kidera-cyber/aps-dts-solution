@@ -424,6 +424,8 @@
               <label class="field">電話番号<input id="phone" placeholder="090-0000-0000" /></label>
               <label class="field">メールアドレス<input id="email" type="email" placeholder="example@example.com" /></label>
               <label class="field">応募経路<select id="source"></select></label>
+              <label class="field">生年月日<input id="birthDate" type="date" max="2026-10-09" /></label>
+              <label class="field">年齢<input id="age" type="number" min="15" max="100" step="1" placeholder="例）35" /><small id="ageAutoHint" style="color:var(--muted);font-size:11px;margin-top:2px;display:none;">生年月日から自動計算</small></label>
             </div></div>
             <div class="form-section"><h4>職種・資格</h4><div class="form-grid">
               <label class="field">希望職種 ※<select id="job" required></select></label>
@@ -791,6 +793,20 @@
             </div>
             <p class="hint">取込時、現在の応募者・採用計画・媒体費用データは全てバックアップ内容で上書きされます。</p>
             <div id="jsonBackupImportMessage" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="form-section">
+            <h4>過去CSVから生年月日を補完</h4>
+            <p class="hint" style="margin-bottom:10px;">過去の媒体CSVから<strong>生年月日のみ</strong>を抽出し、現在の応募者データへ安全に補完します。氏名・メール・電話で照合し、既にbirthDate登録済みの応募者は変更しません。<strong>応募者の新規作成・削除は行いません</strong>。</p>
+            <div class="action-row">
+              <label class="btn btn-soft btn-file">CSVを選択（複数可）<input type="file" id="inputBirthdayCSV" accept=".csv,text/csv" multiple /></label>
+              <button class="btn btn-soft" id="btnBirthdayAnalyze" disabled>照合を実行（DRY RUN）</button>
+              <button class="btn btn-primary" id="btnBirthdayApply" disabled>生年月日を補完</button>
+              <button class="btn btn-ghost btn-small" id="btnBirthdayPush" disabled>↑ 適用後クラウドへ反映</button>
+            </div>
+            <div id="birthdayFileName" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+            <div id="birthdayMessage" style="margin-top:10px;"></div>
+            <div id="birthdayResult" style="margin-top:10px;"></div>
           </div>
 
           <div class="form-section">
@@ -1199,6 +1215,29 @@
       }
     }
 
+    // 年齢計算：生年月日(YYYY-MM-DD) + 基準日 → 満年齢
+    function calculateAge(birthDate, baseDate){
+      if(!birthDate) return null;
+      const m = String(birthDate).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if(!m) return null;
+      const by = +m[1], bm = +m[2], bd = +m[3];
+      const base = baseDate || new Date();
+      let age = base.getFullYear() - by;
+      const nowM = base.getMonth() + 1, nowD = base.getDate();
+      if(nowM < bm || (nowM === bm && nowD < bd)) age--;
+      if(age < 0 || age > 150) return null;
+      return age;
+    }
+
+    // 応募者の表示年齢：生年月日優先、空なら手入力age
+    function displayAge(c){
+      if(c && c.birthDate){
+        const a = calculateAge(c.birthDate);
+        if(a !== null) return a;
+      }
+      return (c && c.age !== '' && c.age != null) ? c.age : '';
+    }
+
     function normalizeCandidate(c={}){
       return {
         id: c.id || uid(),
@@ -1220,6 +1259,14 @@
         resumeUrl: c.resumeUrl || '',
         resumeFileId: c.resumeFileId || '',
         resumeUploadedAt: c.resumeUploadedAt || '',
+        // 年齢・生年月日：生年月日優先。生年月日なしなら手入力年齢を保持
+        birthDate: (c.birthDate && /^\d{4}-\d{2}-\d{2}$/.test(String(c.birthDate))) ? String(c.birthDate) : '',
+        age: (() => {
+          // 生年月日がある場合は手入力ageを無視し、空（表示時に再計算）にする
+          if(c.birthDate) return '';
+          const n = parseInt(c.age, 10);
+          return (Number.isFinite(n) && n >= 15 && n <= 100) ? n : '';
+        })(),
         // ロード時正規化：canonical応募日フィールド群から1つの appliedAt (YYYY-MM-DD) に統一
         appliedAt: (typeof parseJpAppliedDate === 'function'
           ? (parseJpAppliedDate(c.appliedAt) || parseJpAppliedDate(c.applicationDate) || parseJpAppliedDate(c.appliedDate) || parseJpAppliedDate(c.applyDate) || parseJpAppliedDate(c['応募日']) || parseJpAppliedDate(c['応募日時']))
@@ -1677,7 +1724,7 @@
         const isRejected = c.status === '不採用';
         return `<tr class="${isRejected ? 'row-rejected' : ''}">
         <td><input type="checkbox" class="row-check" data-id="${c.id}" /></td>
-        <td><div class="person"><div class="avatar">${escapeHTML((c.name || '?').slice(0,1))}</div><div><strong>${escapeHTML(c.name)}</strong><small>${escapeHTML(c.phone || '-')}<br>${escapeHTML(c.email || '-')}</small></div></div></td>
+        <td><div class="person"><div class="avatar">${escapeHTML((c.name || '?').slice(0,1))}</div><div><strong>${escapeHTML(c.name)}</strong>${(() => { const a = displayAge(c); return a === '' ? '' : ` <span style="color:var(--muted);font-size:11px;font-weight:700;">${a}歳</span>`; })()}<small>${escapeHTML(c.phone || '-')}<br>${escapeHTML(c.email || '-')}</small></div></div></td>
         <td>${escapeHTML(c.job)}</td>
         <td><span class="badge ${badgeCls}" style="margin-right:4px;">${escapeHTML(cat)}</span><br>${empSelectHtml}</td>
         <td><span class="badge badge-gray">${escapeHTML(c.source || '-')}</span></td>
@@ -2080,12 +2127,34 @@
         <div class="hero-card"><div class="h-label">採用単価</div><div class="h-value" style="font-size:24px;">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">総費用÷実績</div></div>
       </div>`;
 
-      // 媒体別カード（半年進捗 + 職種別実績内訳）
+      // 媒体別カード（半年進捗 + 職種別実績内訳 + PLEX成功報酬型は請求書件数バッジ）
       const cardsEl = $('commitCards');
       cardsEl.innerHTML = progressList.map(p => {
         const jobRows = Object.entries(p.jobBreakdown).map(([job, n]) => `<span>${escapeHTML(job)} <strong>${n}</strong></span>`).join('　');
+        // 成功報酬型判定：当該媒体に成功報酬型費用タイプの登録が1件以上あれば表示
+        const perfInvoices = mediaCosts.filter(m => normalizeMediaKey(m.source || m.name, '') === p.media && ['成功報酬型','掲載＋成功報酬型'].includes(m.feeType));
+        const isPerformanceFee = perfInvoices.length > 0;
+        // 期間内の請求書件数
+        const [sy, sm] = halfYearMediaTargets.periodStart.split('-').map(Number);
+        const [ey, em] = halfYearMediaTargets.periodEnd.split('-').map(Number);
+        const invoicesInPeriod = perfInvoices.filter(m => {
+          if(!m.costMonth) return false;
+          const [cy, cm] = m.costMonth.split('-').map(Number);
+          const cursor = cy * 12 + cm;
+          return cursor >= sy * 12 + sm && cursor <= ey * 12 + em;
+        });
+        const invoiceCount = invoicesInPeriod.length;
+        const invoicePersons = new Set(invoicesInPeriod.map(m => (m.applicantName || m.jobTitle || '').trim()).filter(Boolean)).size;
+        // 整合性判定（PLEX等成功報酬型のみ）
+        let integrityBadge = '';
+        if(isPerformanceFee && invoiceCount > 0){
+          if(invoiceCount === p.actual) integrityBadge = `<span style="font-size:11px;color:#15803d;font-weight:900;">✓ 整合</span>`;
+          else if(invoiceCount < p.actual) integrityBadge = `<span style="font-size:11px;color:#b91c1c;font-weight:900;">⚠ 請求書未登録 ${p.actual - invoiceCount}件</span>`;
+          else integrityBadge = `<span style="font-size:11px;color:#a16207;font-weight:900;">⚠ 請求書超過 ${invoiceCount - p.actual}件</span>`;
+        }
+        const perfBadge = isPerformanceFee ? `<span style="padding:2px 8px;background:#faf5ff;border:1px solid #ddd6fe;border-radius:999px;font-size:10px;color:#7c3aed;font-weight:900;margin-left:6px;">成功報酬型</span>` : '';
         return `<div class="segment-card seg-regular">
-          <div class="seg-head"><h5>${escapeHTML(p.media)}</h5><span class="js-status ${p.status.cls}">${p.status.label}</span></div>
+          <div class="seg-head"><h5>${escapeHTML(p.media)}${perfBadge}</h5><span class="js-status ${p.status.cls}">${p.status.label}</span></div>
           <div class="seg-hero">
             <div class="seg-hero-label">採用実績</div>
             <div class="seg-hero-value">${p.actual}<span class="seg-hero-target"> / 半年目標 ${p.target}</span></div>
@@ -2100,6 +2169,7 @@
             <div class="seg-metric"><div class="sm-label">採用単価</div><div class="sm-value" style="font-size:15px;">${p.periodCost > 0 && p.actual > 0 ? yen(Math.round(p.periodCost / p.actual)) : '-'}</div></div>
           </div>
           <div class="seg-funnel"><span>期間費用：<strong>${p.periodCost > 0 ? yen(p.periodCost) : '未登録'}</strong>${jobRows ? ' ／ 実績内訳：' + jobRows : ''}</span></div>
+          ${isPerformanceFee ? `<div style="margin-top:8px;padding:6px 10px;background:#faf5ff;border:1px dashed #ddd6fe;border-radius:8px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;"><span>請求書 <strong style="color:var(--navy);">${invoiceCount}件</strong> ／ 対象者 <strong style="color:var(--navy);">${invoicePersons}名</strong> ／ 採用実績 <strong style="color:var(--navy);">${p.actual}名</strong></span>${integrityBadge}</div>` : ''}
         </div>`;
       }).join('');
 
@@ -2985,6 +3055,8 @@
         offerAt: $('offerAt') ? $('offerAt').value : '',
         acceptedAt: $('acceptedAt') ? $('acceptedAt').value : '',
         joinedAt: $('joinedAt') ? $('joinedAt').value : '',
+        birthDate: $('birthDate') ? $('birthDate').value : '',
+        age: $('age') ? (parseInt($('age').value, 10) || '') : '',
         createdAt: (existing && existing.createdAt) || nowDateTime(),
         updatedAt: nowDateTime()
       });
@@ -3036,7 +3108,14 @@
     function editCandidate(id){
       const c = candidates.find(x => x.id === id); if(!c) return;
       if($('candidateId')) $('candidateId').value = c.id;
-      ['name','phone','email','source','job','workType','license','area','status','rating','interviewAt','nextDate','owner','memo','resumeName','resumeUrl','appliedAt','offerAt','acceptedAt','joinedAt'].forEach(k => { if($(k)) $(k).value = c[k] || ''; });
+      ['name','phone','email','source','job','workType','license','area','status','rating','interviewAt','nextDate','owner','memo','resumeName','resumeUrl','appliedAt','offerAt','acceptedAt','joinedAt','birthDate'].forEach(k => { if($(k)) $(k).value = c[k] || ''; });
+      // 年齢欄：生年月日優先（表示用に再計算値をセット）
+      if($('age')){
+        const a = displayAge(c);
+        $('age').value = (a === '' || a == null) ? '' : a;
+        const hint = $('ageAutoHint');
+        if(hint) hint.style.display = c.birthDate ? '' : 'none';
+      }
       pendingResumeFile = null;
       const inp = $('resumeFileInput'); if(inp) inp.value = '';
       if($('formTitle')) $('formTitle').textContent = '応募者編集';
@@ -3102,6 +3181,8 @@
         ${detailItem('電話番号', escapeHTML(c.phone || '-'))}
         ${detailItem('メールアドレス', escapeHTML(c.email || '-'))}
         ${detailItem('応募経路', escapeHTML(c.source || '-'))}
+        ${detailItem('生年月日', escapeHTML(c.birthDate || '-'))}
+        ${detailItem('年齢', (() => { const a = displayAge(c); return a === '' ? '-' : `${a}歳${c.birthDate ? '<small style="color:var(--muted);margin-left:4px;">(自動計算)</small>' : ''}`; })())}
         ${detailItem('雇用形態', escapeHTML(c.workType || '-'))}
         ${detailItem('免許区分', escapeHTML(c.license || '-'))}
         ${detailItem('希望勤務地', escapeHTML(c.area || '-'))}
@@ -3389,12 +3470,23 @@
       let successFee = 0;
       if(['成功報酬型','掲載＋成功報酬型','その他'].includes(m.feeType)){
         const perHire = calcSuccessFeePerHire(m);
-        if(m.feeTriggerStatus === '手動'){
+        // 優先ルール1：請求書に対象人数+請求月が設定されていれば、その月の請求として直接計上
+        //   PLEXの「1名ずつの請求書」のような実運用に対応
+        if((m.manualBillableCount || 0) >= 1 && m.costMonth === yyyyMm){
+          // 請求書金額（fixedListingCost 相当）を優先、無ければ perHire × 人数
+          const invoiceAmount = (m.fixedListingCost && m.fixedListingCost > 0) ? m.fixedListingCost : (perHire * m.manualBillableCount);
+          successFee = invoiceAmount;
+        }else if(m.feeTriggerStatus === '手動'){
           if(m.costMonth === yyyyMm) successFee = perHire * (m.manualBillableCount || 0);
         }else{
+          // 優先ルール2：候補者ベースで判定（source は媒体正規化キーで大小文字無視）
           const dateField = m.feeTriggerStatus === '内定' ? 'offerAt' : (m.feeTriggerStatus === '入社決定' ? 'joinedAt' : 'acceptedAt');
+          const mkInvoice = normalizeMediaKey(m.source || m.name || '', '');
           const isBillable = c => {
-            if(m.source && c.source !== m.source) return false;
+            if(m.source){
+              const mkCand = normalizeMediaKey(c.source || '', c.workType || '');
+              if(mkCand !== mkInvoice) return false;
+            }
             switch(m.feeTriggerStatus){
               case '内定': return ['内定','内定承諾','入社決定'].includes(c.status);
               case '内定承諾': case '採用': return ['内定承諾','入社決定'].includes(c.status);
@@ -4725,6 +4817,11 @@
         else source = rawSrc || 'indeed';
       }
       const memo = buildMediaMemo(row);
+      // 生年月日と年齢（Indeed CSVの「生年月日」「年齢」に対応）
+      const rawBirth = pickValue(row, ['生年月日','birthDate','birthday','DOB']);
+      const birthDate = parseJpAppliedDate(rawBirth); // YYYY-MM-DD形式へ正規化
+      const rawAge = pickValue(row, ['年齢','age']);
+      const ageNum = (() => { const n = parseInt(String(rawAge).replace(/[^\d]/g,''), 10); return (Number.isFinite(n) && n >= 15 && n <= 100) ? n : ''; })();
       return {
         name, phone, email,
         job: jobInfo.job,
@@ -4735,6 +4832,8 @@
         owner: '', memo,
         resumeName: '', resumeUrl: '',
         appliedAt: appliedDate,
+        birthDate,
+        age: birthDate ? '' : ageNum, // birthDateがあればageは不要（表示時に再計算）
         _appliedDate: appliedDate,
         _jobOriginal: jobInfo.original,
         _jobFallback: jobInfo.fallback
@@ -6050,6 +6149,253 @@
       setDataMessage('サンプルデータを再投入しました', 'success');
     }
 
+    // ===== 過去CSVから生年月日補完（既存応募者を書き換えない安全モード） =====
+    let birthdayState = { files: [], records: [], analysis: null };
+
+    // 生年月日の多形式パース（和暦・西暦・区切り各種に対応）→ YYYY-MM-DD
+    function parseBirthDate(raw){
+      let s = String(raw || '').normalize('NFKC').trim();
+      if(!s || /不明|未確認|不詳|-$/.test(s)) return '';
+      // 平成/令和/昭和/大正/明治
+      const eraMap = { '令和': 2018, '平成': 1988, '昭和': 1925, '大正': 1911, '明治': 1867 };
+      let em = s.match(/^(令和|平成|昭和|大正|明治|R|H|S|T|M)\s*(\d{1,2})[年.\/\-](\d{1,2})[月.\/\-](\d{1,2})/);
+      if(em){
+        const eraKey = { 'R':'令和','H':'平成','S':'昭和','T':'大正','M':'明治' }[em[1]] || em[1];
+        const base = eraMap[eraKey];
+        if(base){
+          const y = base + parseInt(em[2],10);
+          return `${y}-${String(em[3]).padStart(2,'0')}-${String(em[4]).padStart(2,'0')}`;
+        }
+      }
+      // 西暦の各種フォーマット
+      let m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+      if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+      if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+      return '';
+    }
+
+    // 生年月日の妥当性チェック（未来日・年の妥当範囲）
+    function isValidBirthDate(iso){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+      const d = new Date(iso + 'T00:00:00');
+      if(isNaN(d.getTime())) return false;
+      const y = parseInt(iso.slice(0,4),10);
+      if(y < 1920 || y > new Date().getFullYear()) return false;
+      if(d > new Date()) return false;
+      return true;
+    }
+
+    function handleBirthdayCsvSelect(e){
+      const files = Array.from(e.target.files || []);
+      const nameEl = $('birthdayFileName'), msgEl = $('birthdayMessage'), resEl = $('birthdayResult');
+      const btnAnalyze = $('btnBirthdayAnalyze'), btnApply = $('btnBirthdayApply'), btnPush = $('btnBirthdayPush');
+      birthdayState = { files, records: [], analysis: null };
+      if(resEl) resEl.innerHTML = '';
+      if(files.length === 0){
+        if(nameEl) nameEl.textContent = '';
+        if(btnAnalyze) btnAnalyze.disabled = true;
+        if(btnApply) btnApply.disabled = true;
+        if(btnPush) btnPush.disabled = true;
+        return;
+      }
+      if(nameEl) nameEl.textContent = `選択中：${files.length}ファイル（${files.map(f => f.name).join(' / ')}）`;
+      if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = 'CSVを選択しました。「照合を実行」を押してください。'; }
+      if(btnAnalyze) btnAnalyze.disabled = false;
+      if(btnApply) btnApply.disabled = true;
+      if(btnPush) btnPush.disabled = true;
+    }
+
+    async function analyzeBirthdayCsv(){
+      const msgEl = $('birthdayMessage'), resEl = $('birthdayResult'), btnApply = $('btnBirthdayApply');
+      if(btnApply) btnApply.disabled = true;
+      if(birthdayState.files.length === 0){ if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = 'CSVファイルを選択してください。'; } return; }
+
+      // 全ファイル読込
+      const allRecords = [];
+      try{
+        for(const file of birthdayState.files){
+          const text = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result);
+            r.onerror = () => reject(r.error);
+            r.readAsText(file, 'UTF-8');
+          });
+          const rows = parseCsv(text);
+          const objs = rowsToObjects(rows);
+          objs.forEach(o => {
+            const pick = (keys) => { for(const k of keys){ if(o[k]) return o[k]; } return ''; };
+            const birthRaw = pick(['生年月日','生年月日（西暦）','誕生日','birthday','birthDate','birth_date','dateOfBirth','date_of_birth','DOB','dob']);
+            allRecords.push({
+              file: file.name,
+              name: pick(['応募者名','氏名','名前','name','Name']),
+              email: pick(['メールアドレス','email','Email','E-mail','mail']),
+              phone: pick(['電話番号','phone','Phone','tel','TEL','携帯番号']),
+              birthRaw,
+              birth: parseBirthDate(birthRaw)
+            });
+          });
+        }
+      }catch(err){
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `CSV解析エラー：${err.message || err}`; }
+        return;
+      }
+
+      const totalRecords = allRecords.length;
+      const withBirth = allRecords.filter(r => isValidBirthDate(r.birth));
+
+      // APS候補者インデックス（email/phone）
+      const byEmail = new Map(), byPhone = new Map(), byName = new Map();
+      candidates.forEach(c => {
+        const e = normalizeEmailForMatch(c.email);
+        const p = normalizePhoneForMatch(c.phone);
+        const n = normalizeNameForMatch(c.name);
+        if(e){ if(!byEmail.has(e)) byEmail.set(e, []); byEmail.get(e).push(c); }
+        if(p){ if(!byPhone.has(p)) byPhone.set(p, []); byPhone.get(p).push(c); }
+        if(n){ if(!byName.has(n)) byName.set(n, []); byName.get(n).push(c); }
+      });
+
+      // 1. candidate.id ごとに「CSVで見つかった生年月日」を集約
+      const perCandidate = new Map(); // id → { candidate, csvBirths: [{birth, match}], methods: Set }
+      let nameOnlyCount = 0, notFoundCount = 0;
+      withBirth.forEach(rec => {
+        const e = normalizeEmailForMatch(rec.email);
+        const p = normalizePhoneForMatch(rec.phone);
+        const n = normalizeNameForMatch(rec.name);
+        const hits = new Map();
+        let method = '';
+        if(e && byEmail.has(e)){ byEmail.get(e).forEach(c => hits.set(c.id, c)); method = 'メール'; }
+        if(p && byPhone.has(p)){ byPhone.get(p).forEach(c => { if(!hits.has(c.id)) hits.set(c.id, c); }); method = method ? 'メール＋電話' : '電話'; }
+        if(hits.size === 0){
+          // 氏名のみ一致：要確認扱い
+          if(n && byName.has(n)){
+            byName.get(n).forEach(c => hits.set(c.id, c));
+            method = '氏名のみ';
+            nameOnlyCount++;
+          }else{
+            notFoundCount++;
+            return;
+          }
+        }
+        hits.forEach(c => {
+          if(!perCandidate.has(c.id)) perCandidate.set(c.id, { candidate: c, csvBirths: [], methods: new Set() });
+          perCandidate.get(c.id).csvBirths.push({ birth: rec.birth, method, file: rec.file });
+          perCandidate.get(c.id).methods.add(method);
+        });
+      });
+
+      // 2. 候補者ごとに判定
+      const toFill = [];      // 補完可能（既存空 + CSV一致）
+      const alreadySet = [];  // 既に登録済み（CSVと同じ）
+      const mismatch = [];    // 既存値不一致
+      const csvConflict = []; // CSV間で異なる生年月日
+      const nameOnlyPending = []; // 氏名のみ一致（自動補完不可）
+      perCandidate.forEach((info, id) => {
+        const c = info.candidate;
+        // CSV間不一致チェック
+        const uniqueBirths = Array.from(new Set(info.csvBirths.map(b => b.birth)));
+        const confidentMethod = Array.from(info.methods).some(m => m === 'メール' || m === '電話' || m === 'メール＋電話');
+        if(uniqueBirths.length > 1){ csvConflict.push({ c, uniqueBirths, methods: Array.from(info.methods) }); return; }
+        const csvBirth = uniqueBirths[0];
+        if(!confidentMethod){
+          nameOnlyPending.push({ c, csvBirth, methods: Array.from(info.methods) });
+          return;
+        }
+        if(c.birthDate){
+          if(c.birthDate === csvBirth) alreadySet.push({ c, csvBirth });
+          else mismatch.push({ c, csvBirth, existing: c.birthDate });
+        }else{
+          toFill.push({ c, csvBirth, methods: Array.from(info.methods) });
+        }
+      });
+
+      birthdayState.analysis = { toFill, alreadySet, mismatch, csvConflict, nameOnlyPending, totalRecords, withBirthCount: withBirth.length, notFoundCount };
+
+      // UI
+      const beforeHasBirth = candidates.filter(c => c.birthDate).length;
+      resEl.className = 'notice';
+      resEl.innerHTML = `
+        <div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:10px;">🔍 生年月日補完プレビュー（読取専用）</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--muted);">読み込みファイル数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${birthdayState.files.length}件</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--muted);">総CSVレコード数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${totalRecords}件</td></tr>
+          <tr><td style="padding:4px 8px;">　生年月日あり（有効）</td><td style="padding:4px 8px;text-align:right;">${withBirth.length}件</td></tr>
+          <tr><td style="padding:4px 8px;">　生年月日なし / 不正</td><td style="padding:4px 8px;text-align:right;color:var(--muted);">${totalRecords - withBirth.length}件</td></tr>
+          <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;font-weight:900;color:var(--navy);">照合結果</td></tr>
+          <tr><td style="padding:4px 8px;color:#15803d;font-weight:900;">補完可能（既存空＋メール/電話一致）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#15803d;font-size:16px;">${toFill.length}名</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--muted);">既に登録済み（同一値）</td><td style="padding:4px 8px;text-align:right;">${alreadySet.length}名</td></tr>
+          <tr><td style="padding:4px 8px;color:#b91c1c;">既存値と不一致（自動更新しない）</td><td style="padding:4px 8px;text-align:right;color:#b91c1c;">${mismatch.length}名</td></tr>
+          <tr><td style="padding:4px 8px;color:#b91c1c;">CSV間で生年月日が異なる</td><td style="padding:4px 8px;text-align:right;color:#b91c1c;">${csvConflict.length}名</td></tr>
+          <tr><td style="padding:4px 8px;color:#a16207;">氏名のみ一致（要確認・自動補完しない）</td><td style="padding:4px 8px;text-align:right;color:#a16207;">${nameOnlyPending.length}名</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--muted);">APS未照合</td><td style="padding:4px 8px;text-align:right;color:var(--muted);">${notFoundCount}件</td></tr>
+          <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;"></td></tr>
+          <tr><td style="padding:4px 8px;">更新前 birthDate登録済み</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${beforeHasBirth} / ${candidates.length}名（${candidates.length > 0 ? Math.round(beforeHasBirth/candidates.length*1000)/10 : 0}%）</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">更新後 予定 birthDate登録済み</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${beforeHasBirth + toFill.length} / ${candidates.length}名</td></tr>
+        </table>
+        ${toFill.length > 0 ? `
+          <div style="margin-top:12px;font-size:13px;font-weight:900;color:#15803d;">補完対象（最大20名表示）</div>
+          <table style="width:100%;font-size:11px;margin-top:4px;">
+            <thead><tr style="background:#eef2f7;"><th style="padding:3px 6px;text-align:left;">氏名</th><th style="padding:3px 6px;text-align:left;">CSV生年月日</th><th style="padding:3px 6px;text-align:left;">現在</th><th style="padding:3px 6px;text-align:left;">照合</th></tr></thead>
+            <tbody>${toFill.slice(0,20).map(x => `<tr><td style="padding:3px 6px;">${escapeHTML(x.c.name)}</td><td style="padding:3px 6px;font-weight:900;color:#15803d;">${x.csvBirth}</td><td style="padding:3px 6px;color:var(--muted);">未登録</td><td style="padding:3px 6px;">${escapeHTML(x.methods.join(','))}</td></tr>`).join('')}</tbody>
+          </table>
+          ${toFill.length > 20 ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;">※ 先頭20件のみ表示（残り${toFill.length-20}件）</div>` : ''}
+        ` : ''}
+        ${mismatch.length > 0 ? `
+          <div style="margin-top:12px;font-size:13px;font-weight:900;color:#b91c1c;">既存値と不一致（要確認）</div>
+          <table style="width:100%;font-size:11px;margin-top:4px;">
+            <thead><tr style="background:#fef2f2;"><th style="padding:3px 6px;text-align:left;">氏名</th><th style="padding:3px 6px;text-align:left;">既存</th><th style="padding:3px 6px;text-align:left;">CSV</th></tr></thead>
+            <tbody>${mismatch.slice(0,10).map(x => `<tr><td style="padding:3px 6px;">${escapeHTML(x.c.name)}</td><td style="padding:3px 6px;">${escapeHTML(x.existing)}</td><td style="padding:3px 6px;">${escapeHTML(x.csvBirth)}</td></tr>`).join('')}</tbody>
+          </table>
+        ` : ''}
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);">※ 既にbirthDate登録済みの応募者と氏名のみ一致の応募者は自動補完しません。</div>
+      `;
+      if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = `プレビュー完了：${toFill.length}名が補完可能です。「生年月日を補完」で適用してください。`; }
+      if(btnApply) btnApply.disabled = toFill.length === 0;
+    }
+
+    async function applyBirthdayFill(){
+      const msgEl = $('birthdayMessage'), pushBtn = $('btnBirthdayPush');
+      if(!birthdayState.analysis || birthdayState.analysis.toFill.length === 0){ showToast('補完対象がありません', 'warning'); return; }
+      const toFill = birthdayState.analysis.toFill;
+      if(!confirm(`生年月日補完を実行します。\n\n対象：${toFill.length}名（既存birthDateが空の応募者のみ）\n\n更新内容：birthDate のみ（他フィールドは変更なし）\nクラウドへはまだ保存しません（確認後に別ボタン）。\n\n実行しますか？`)) return;
+
+      const backup = candidates.map(c => ({ ...c }));
+      try{
+        const fillMap = new Map(toFill.map(x => [x.c.id, x.csvBirth]));
+        candidates = candidates.map(c => {
+          if(fillMap.has(c.id) && !c.birthDate){
+            return { ...c, birthDate: fillMap.get(c.id), updatedAt: nowDateTime() };
+          }
+          return c;
+        });
+        saveLocal();
+        renderAll();
+        const afterHasBirth = candidates.filter(c => c.birthDate).length;
+        showToast(`✅ 生年月日補完完了：${toFill.length}名を更新（現在 ${afterHasBirth}/${candidates.length}名）`, 'success', 5000);
+        if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = `ローカル適用完了：${toFill.length}名のbirthDateを補完しました。クラウドへ反映する場合は「クラウドへ反映」を押してください。`; }
+        if(pushBtn) pushBtn.disabled = false;
+      }catch(err){
+        candidates = backup;
+        renderAll();
+        showToast(`補完失敗：${err.message || err}／復元しました`, 'error', 6000);
+      }
+    }
+
+    async function pushBirthdayToCloud(){
+      const msgEl = $('birthdayMessage');
+      if(!confirm('ローカル適用済みの生年月日補完をクラウドへ反映します。\n\n実行しますか？')) return;
+      try{
+        await persist();
+        if(msgEl){ msgEl.className = 'notice success'; msgEl.textContent = '✅ クラウドへ反映完了'; }
+        showToast('クラウド反映完了', 'success', 3000);
+      }catch(err){
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `クラウド反映エラー：${err.message || err}`; }
+        showToast(`クラウド反映エラー：${err.message || err}`, 'error', 6000);
+      }
+    }
+
     // ===== 過去応募データの正規化 migration =====
     let migrationState = { preview: null };
 
@@ -7002,6 +7348,21 @@
 
     function bindEvents(){
       document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+      // 生年月日入力時：年齢を自動計算してage欄に反映
+      const birthEl = $('birthDate'), ageEl = $('age'), ageHint = $('ageAutoHint');
+      if(birthEl){
+        birthEl.addEventListener('change', () => {
+          const v = birthEl.value;
+          if(v){
+            const a = calculateAge(v);
+            if(a !== null && ageEl){ ageEl.value = a; ageEl.readOnly = true; }
+            if(ageHint) ageHint.style.display = '';
+          }else{
+            if(ageEl){ ageEl.readOnly = false; }
+            if(ageHint) ageHint.style.display = 'none';
+          }
+        });
+      }
       const onClick = (id, fn) => { const el = $(id); if(el) el.addEventListener('click', fn); };
       onClick('btnQuickForm', () => switchTab('form'));
       onClick('btnListForm', () => switchTab('form'));
@@ -7055,6 +7416,11 @@
       onClick('btnPurgeGuidable', purgeGuidableCandidates);
       onClick('btnDiagnoseSync', runSyncDiagnosis);
       onClick('btnMigratePreview', previewMigration);
+      // 生年月日CSV補完
+      const bdInp = $('inputBirthdayCSV'); if(bdInp) bdInp.addEventListener('change', handleBirthdayCsvSelect);
+      onClick('btnBirthdayAnalyze', analyzeBirthdayCsv);
+      onClick('btnBirthdayApply', applyBirthdayFill);
+      onClick('btnBirthdayPush', pushBirthdayToCloud);
       onClick('btnMigrateApply', applyMigration);
       onClick('btnMigratePush', pushMigrationToCloud);
       onClick('btnDownloadLocalBackup', downloadLocalBackup);
