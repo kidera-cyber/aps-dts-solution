@@ -1428,8 +1428,7 @@
         { label: '面接予定', value: candidates.filter(c => c.interviewAt).length, sub: '日時設定済み' },
         { label: '選考中', value: candidates.filter(c => !isHiredCandidate(c) && !['辞退','不採用'].includes(c.status)).length, sub: '対応対象' },
         { label: '採用・入社決定', value: candidates.filter(c => isHiredCandidate(c)).length, sub: '内定＋承諾＋入社決定' },
-        { label: '履歴書あり', value: candidates.filter(c => c.resumeUrl).length, sub: 'URL登録済み' },
-        { label: '未評価', value: candidates.filter(c => c.rating === '未評価').length, sub: '評価待ち' }
+        { label: '履歴書あり', value: candidates.filter(c => c.resumeUrl).length, sub: 'URL登録済み' }
       ];
       target.innerHTML = groups.map(g => `<div class="card metric"><div class="label">${escapeHTML(g.label)}</div><div class="value">${escapeHTML(g.value)}</div><div class="sub">${escapeHTML(g.sub)}</div>${g.extra ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #edf2f7;">${g.extra}</div>` : ''}</div>`).join('');
     }
@@ -2640,25 +2639,19 @@
         return `<div class="funnel-step"><div class="fs-label">${escapeHTML(s.label)}</div><div class="fs-value">${s.val}</div><div class="fs-unit">名</div></div>`;
       }).join('')}</div>`;
 
-      // ボトルネック
+      // ボトルネック：採用ファネルの転換率のみで判定（未評価は使わない）
       const bnEl = $('dashBottleneck'); if(!bnEl) return;
-      const unrated = candidates.filter(c => c.rating === '未評価').length;
-      // 最優先ボトルネック：未評価が過半なら未評価、それ以外は最低転換率
-      if(total > 0 && unrated > total * 0.5){
-        bnEl.innerHTML = `<div class="notice error"><strong>🎯 ボトルネック：未評価応募者が ${unrated}名（${Math.round(unrated/total*100)}%）</strong><br>まず未評価応募者の評価・選考ステータスを更新することが最優先です。</div>`;
+      const stages = [
+        { name: '応募→面接', rate: c1 },
+        { name: '面接→内定', rate: c2 },
+        { name: '内定→入社決定', rate: c3 }
+      ].filter(s => s.rate !== null);
+      if(stages.length){
+        const bn = stages.reduce((min, s) => s.rate < min.rate ? s : min, stages[0]);
+        const noticeCls = bn.rate < 20 ? 'error' : (bn.rate < 40 ? '' : 'success');
+        bnEl.innerHTML = `<div class="notice ${noticeCls}"><strong>🎯 ボトルネック：${escapeHTML(bn.name)}（${bn.rate}%）</strong>${bn.rate < 40 ? '<br>この工程の転換率改善が最優先です。' : '<br>各工程の転換率は健全です。'}</div>`;
       }else{
-        const stages = [
-          { name: '応募→面接', rate: c1 },
-          { name: '面接→内定', rate: c2 },
-          { name: '内定→入社決定', rate: c3 }
-        ].filter(s => s.rate !== null);
-        if(stages.length){
-          const bn = stages.reduce((min, s) => s.rate < min.rate ? s : min, stages[0]);
-          const noticeCls = bn.rate < 20 ? 'error' : (bn.rate < 40 ? '' : 'success');
-          bnEl.innerHTML = `<div class="notice ${noticeCls}"><strong>🎯 ボトルネック：${escapeHTML(bn.name)}（${bn.rate}%）</strong>${bn.rate < 40 ? '<br>この工程の転換率改善が最優先です。' : '<br>各工程の転換率は健全です。'}</div>`;
-        }else{
-          bnEl.innerHTML = `<div class="notice">選考データが不足しています。応募者を登録してください。</div>`;
-        }
+        bnEl.innerHTML = `<div class="notice">選考データが不足しています。応募者を登録してください。</div>`;
       }
     }
 
@@ -2694,9 +2687,14 @@
 
     function renderDashboardActions(){
       const el = $('dashActions'); if(!el) return;
-      const total = candidates.length;
-      const unrated = candidates.filter(c => c.rating === '未評価').length;
       const upcomingInterview = candidates.filter(c => c.interviewAt).length;
+      // 内定ステータス（内定/内定承諾/入社決定）→ 承諾待ち判定用
+      const offeredPending = candidates.filter(c => c.status === '内定').length;
+      // 媒体費未登録チェック
+      const ym = todayYM();
+      const monthCost = computeMonthCosts(mediaCosts, ym);
+      const costUnregistered = monthCost.total === 0;
+      // 採用目標未達
       const jobShortage = [];
       plans.forEach(p => {
         const cur = candidates.filter(c => c.job === p.job && isHiredCandidate(c)).length;
@@ -2704,15 +2702,19 @@
         if(sh > 0) jobShortage.push({ job: p.job, shortage: sh, target: p.total });
       });
       const actions = [];
-      if(unrated > 0){
-        actions.push({ pri: unrated > total * 0.3 ? 'high' : 'mid', num: 1, title: `未評価 ${unrated}名を確認`, sub: '評価と選考ステータスを更新', tab: 'list' });
-      }
+      // 優先順位：採用目標未達 > 面接予定 > 承諾待ち > 応募不足 > 採用費未登録
+      jobShortage.slice(0, 2).forEach(s => {
+        actions.push({ pri: 'high', num: actions.length + 1, title: `${s.job} 目標${s.target}名に対し${s.target - s.shortage}名`, sub: `不足 ${s.shortage}名`, tab: 'plan' });
+      });
       if(upcomingInterview > 0){
         actions.push({ pri: 'mid', num: actions.length + 1, title: `面接予定 ${upcomingInterview}名の日程確認`, sub: '選考状況カンバンで確認', tab: 'kanban' });
       }
-      jobShortage.slice(0, 2).forEach(s => {
-        actions.push({ pri: 'mid', num: actions.length + 1, title: `${s.job} 目標${s.target}名に対し${s.target - s.shortage}名`, sub: `不足 ${s.shortage}名`, tab: 'plan' });
-      });
+      if(offeredPending > 0){
+        actions.push({ pri: 'mid', num: actions.length + 1, title: `内定承諾待ち ${offeredPending}名`, sub: '条件提示・入社日調整を進める', tab: 'kanban' });
+      }
+      if(costUnregistered){
+        actions.push({ pri: 'low', num: actions.length + 1, title: '今月の採用費が未登録', sub: '請求書PDF / CSVを取り込みCPA算出を可能に', tab: 'media' });
+      }
       if(actions.length === 0){
         actions.push({ pri: 'low', num: 1, title: '特筆すべき優先アクションなし', sub: '現状の運用を継続してください', tab: 'list' });
       }
