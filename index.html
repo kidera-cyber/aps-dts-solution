@@ -232,6 +232,15 @@
     .outcome-tile .ot-value{font-size:30px;font-weight:950;margin-top:6px;letter-spacing:-.03em;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
     .outcome-tile .ot-unit{font-size:14px;color:var(--muted);margin-left:4px;font-weight:900}
     .outcome-tile .ot-pct{font-size:12px;color:var(--muted);margin-top:4px;font-weight:800}
+    /* ダッシュボードのセクション見出し：強弱のある情報階層 */
+    .dash-section-head{margin:0 0 14px;display:flex;align-items:baseline;gap:12px;padding-bottom:10px;border-bottom:2px solid #e2e8f0;position:relative}
+    .dash-section-head::before{content:'';position:absolute;left:0;bottom:-2px;width:60px;height:2px;background:linear-gradient(90deg,var(--blue),#22d3ee);border-radius:2px}
+    .dash-section-head h2{margin:0;font-size:18px;font-weight:950;color:var(--navy);letter-spacing:-.01em}
+    .dash-section-head p{margin:0;font-size:12px;color:var(--muted);font-weight:700}
+    /* ダッシュボードカードの統一見た目 */
+    #dashboard .card{box-shadow:0 1px 3px rgba(15,23,42,.04);border:1px solid #e2e8f0;border-radius:14px}
+    #dashboard .card:hover{box-shadow:0 2px 6px rgba(15,23,42,.06)}
+    #dashboard .card.wide{box-shadow:0 1px 3px rgba(15,23,42,.04)}
     tr.row-rejected{background:#f8fafc;color:#64748b}
     tr.row-rejected td{opacity:.85}
     tr.row-rejected .person strong{color:#64748b}
@@ -280,11 +289,19 @@
       </div>
 
       <section id="dashboard" class="panel active">
-        <!-- BLOCK 1: 今日の採用状況（Hero KPI） -->
+        <!-- 説明文：画面冒頭に目的を明示 -->
+        <div style="margin-bottom:20px;padding:12px 16px;background:linear-gradient(90deg,#eff6ff,#f0f9ff);border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:var(--navy);display:flex;align-items:center;gap:10px;">
+          <span style="font-size:16px;">📊</span>
+          <span>応募・選考・採用・媒体進捗・採用費を <strong>1画面で確認</strong>。30秒で状況・課題・次アクションが分かります。</span>
+        </div>
+
+        <!-- BLOCK 1: 主要KPI -->
+        <div class="dash-section-head"><h2>主要KPI</h2><p>今月の採用成果と費用</p></div>
         <div id="dashHero"></div>
 
         <!-- BLOCK 2 + 3: ファネル + 今日やること -->
-        <div class="grid" style="margin-top:22px;gap:18px;">
+        <div class="dash-section-head" style="margin-top:28px;"><h2>選考ファネル・今日のアクション</h2><p>どこで詰まっているか／今日優先すべきことを確認</p></div>
+        <div class="grid" style="gap:20px;">
           <div class="card wide">
             <div class="card-head"><div><h3>採用ファネル</h3><p class="hint">応募 → 面接 → 内定 → 承諾 → 入社 の流れと転換率</p></div></div>
             <div id="dashFunnel"></div>
@@ -297,29 +314,31 @@
           </div>
 
           <!-- BLOCK 3b: 媒体別採用コミット進捗（要対応 Top5 のみ） -->
-          <div class="card full">
+          <div class="card full" style="grid-column:1/-1;margin-top:12px;">
+            <div class="dash-section-head"><h2>媒体別 採用コミット進捗</h2><p>半年目標に対する媒体ごとの進捗。要対応は上位から優先表示</p></div>
             <div class="card-head">
-              <div><h3>媒体別 採用コミット進捗</h3><p class="hint">今月の媒体×職種の進捗。日々の判断用に「要対応」上位のみ表示。</p></div>
-              <button type="button" class="btn btn-small btn-soft" data-goto="media">詳細を見る</button>
+              <div><h3 style="font-size:15px;color:var(--muted);">サマリーと要対応媒体</h3></div>
+              <button type="button" class="btn btn-small btn-soft" data-goto="media">詳細を見る →</button>
             </div>
             <div id="dashCommitSummary" style="margin-bottom:12px;"></div>
             <div id="dashCommitAlerts"></div>
           </div>
 
-          <!-- BLOCK 4: 採用枠別 採用状況（4枠：中型正社員 / 大型正社員 / ドライバーAL / 事務AL） -->
-          <div class="card full">
-            <div class="card-head"><div><h3>採用枠別 採用状況</h3><p class="hint">中型ドライバー正社員 / 大型ドライバー正社員 / ドライバーアルバイト / 事務アルバイト を1画面で比較</p></div></div>
+          <!-- BLOCK 4: 採用枠別 採用状況 -->
+          <div class="card full" style="grid-column:1/-1;margin-top:12px;">
+            <div class="dash-section-head"><h2>採用枠別 採用状況</h2><p>中型正社員・大型正社員・ドライバーAL・事務AL の4枠比較</p></div>
             <div id="dashJobs" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;"></div>
           </div>
 
-          <!-- BLOCK 5: 応募経路（横長・full幅） -->
-          <div class="card full">
-            <div class="card-head"><div><h3>応募経路</h3><p class="hint">媒体別の応募件数と構成比。数字を主役に表示します。</p></div></div>
+          <!-- BLOCK 5: 応募経路 -->
+          <div class="card full" style="grid-column:1/-1;margin-top:12px;">
+            <div class="dash-section-head"><h2>応募経路</h2><p>媒体別の応募件数と構成比（数字を主役に表示）</p></div>
             <div id="dashSources"></div>
           </div>
-          <!-- BLOCK 5b: 雇用形態（横長・full幅） -->
-          <div class="card full">
-            <div class="card-head"><div><h3>雇用形態</h3><p class="hint">正社員 / アルバイト / 事務の件数と構成比。</p></div></div>
+
+          <!-- BLOCK 5b: 雇用形態 -->
+          <div class="card full" style="grid-column:1/-1;margin-top:12px;">
+            <div class="dash-section-head"><h2>雇用形態</h2><p>正社員・アルバイト・事務の件数と構成比</p></div>
             <div id="dashEmployment"></div>
             <details style="margin-top:14px;">
               <summary style="cursor:pointer;font-size:13px;color:var(--muted);font-weight:800;">職種×雇用形態の詳細を見る</summary>
@@ -327,9 +346,10 @@
             </details>
           </div>
 
-          <!-- BLOCK 6: 今月の採用費用 -->
-          <div class="card full">
-            <div class="card-head"><div><h3>今月の採用費用</h3><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く</button></div>
+          <!-- BLOCK 6: 採用費用 -->
+          <div class="card full" style="grid-column:1/-1;margin-top:12px;">
+            <div class="dash-section-head"><h2>採用コスト</h2><p>今月の採用費用と内訳</p></div>
+            <div class="card-head"><div><p class="hint" id="thisMonthLabel">-</p></div><button class="btn btn-soft btn-small" id="btnGoReport">月次レポートを開く →</button></div>
             <div id="dashCost"></div>
           </div>
 
