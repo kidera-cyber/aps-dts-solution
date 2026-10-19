@@ -875,6 +875,32 @@
             <div id="deleteCsvResult" style="margin-top:10px;"></div>
           </div>
 
+          <div class="form-section" style="border:2px solid #fde68a;background:#fffbeb;">
+            <h4 style="color:#92400e;">⚠ 誤取込CSV ロールバック（差分復元）</h4>
+            <p class="hint" style="margin-bottom:10px;">誤って取込んでしまったCSVを選択し、<strong>その取込で発生した差分だけ</strong>を取り消します。CSV全件を単純削除する機能ではありません。</p>
+            <ul class="hint" style="margin:4px 0 10px 20px;padding:0;list-style:disc;">
+              <li>取込で<strong>新規追加された応募者のみ</strong>削除候補とします（memoに本CSVの取込情報があり、かつ取込前の既存痕跡がない人）。</li>
+              <li>以前から存在した応募者がCSVで上書きされた場合は<strong>取込前snapshotがない限り触りません</strong>（「復元不能」として報告）。</li>
+              <li><strong>PLEX請求書に名前が登録済みの応募者は、取込前から存在していた扱い</strong>とし絶対に削除しません。</li>
+              <li>削除候補を1件ずつ画面で確認してから実行できます（DRY RUN必須）。</li>
+            </ul>
+            <div class="action-row" style="margin-bottom:10px;">
+              <label class="btn btn-soft btn-file">誤取込CSVを選択<input type="file" id="inputRollbackCSV" accept=".csv,text/csv" /></label>
+              <span id="rollbackCsvFileName" style="color:var(--muted);font-size:12px;">未選択</span>
+            </div>
+            <div class="radio-row" style="margin-bottom:8px;font-size:12px;">取込日時 絞り込み（本CSVの取込日時として扱う範囲）：
+              <label style="font-weight:700;">起点日 <input type="date" id="rollbackWindowStart" style="margin-left:4px;" /></label>
+              <label style="font-weight:700;margin-left:12px;">終点日 <input type="date" id="rollbackWindowEnd" style="margin-left:4px;" /></label>
+              <span style="color:var(--muted);">空欄なら「本日から7日前〜本日」を既定とします。</span>
+            </div>
+            <div class="action-row">
+              <button class="btn btn-soft" id="btnAnalyzeRollback" disabled>差分を解析（DRY RUN）</button>
+              <button class="btn btn-danger" id="btnExecuteRollback" disabled>ロールバックを実行</button>
+            </div>
+            <div id="rollbackMessage" style="margin-top:10px;"></div>
+            <div id="rollbackResult" style="margin-top:10px;"></div>
+          </div>
+
           <div class="form-section">
             <h4>その他</h4>
             <div class="action-row">
@@ -7105,6 +7131,520 @@
       }
     }
 
+    // ===== 誤取込CSV ロールバック（差分復元） =====
+    // 設計方針：
+    //  - 取込直前snapshotは存在しない。従って「推測による復元」は行わず、
+    //    確実に「本CSVの取込で新規追加された」応募者だけを削除候補とする。
+    //  - 以前から存在した応募者がCSVで上書きされた場合は、snapshotがなければ
+    //    触らない（UI上で「復元不能」として表示）。
+    //  - PLEX請求書(mediaCosts)にapplicantName登録がある応募者は、取込より前から
+    //    存在していた強い証拠。絶対に削除しない。
+    //  - mediaCosts / plans / mediaCommitPlans / halfYearMediaTargets / PLEX請求書は
+    //    一切変更しない。
+
+    let rollbackCsvState = { file:null, csvRecords:null, analysis:null };
+
+    // 「取込日時：YYYY/MM/DD HH:MM:SS」をmemoから抽出
+    function extractImportTimestamps(memo){
+      const text = String(memo || '');
+      const re = /取込日時[：:]\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/g;
+      const stamps = [];
+      let m;
+      while((m = re.exec(text)) !== null){
+        const y = +m[1], mo = +m[2], d = +m[3];
+        const h = m[4] ? +m[4] : 0;
+        const mi = m[5] ? +m[5] : 0;
+        const se = m[6] ? +m[6] : 0;
+        const dt = new Date(y, mo - 1, d, h, mi, se);
+        if(!isNaN(dt.getTime())) stamps.push({ raw: m[0], date: dt, iso: `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}` });
+      }
+      return stamps;
+    }
+
+    // memoが「取込情報のみ」で始まっているか（＝本CSV取込で新規作成された形跡）
+    function memoStartsWithImportMarker(memo){
+      const text = String(memo || '').trim();
+      return text.startsWith('【求人媒体CSV取込情報】');
+    }
+
+    // 候補者名がPLEX請求書に登録済みか（既存証拠）
+    function isCandidateInPlexInvoices(name){
+      const target = normalizeCandidateNameForPlex(name);
+      if(!target) return false;
+      return mediaCosts.some(m => {
+        const med = String(m.media || m.source || m.name || '').toLowerCase();
+        if(!(med.includes('plex') || med.includes('プレックス'))) return false;
+        const aName = normalizeCandidateNameForPlex(m.applicantName || '');
+        return aName && aName === target;
+      });
+    }
+
+    function handleRollbackCsvSelect(e){
+      const f = e.target.files && e.target.files[0];
+      const nameEl = $('rollbackCsvFileName'), msgEl = $('rollbackMessage'), resEl = $('rollbackResult');
+      const btnAnalyze = $('btnAnalyzeRollback'), btnExec = $('btnExecuteRollback');
+      if(!f){
+        rollbackCsvState = { file:null, csvRecords:null, analysis:null };
+        if(nameEl) nameEl.textContent = '未選択';
+        if(btnAnalyze) btnAnalyze.disabled = true;
+        if(btnExec) btnExec.disabled = true;
+        return;
+      }
+      rollbackCsvState = { file:f, csvRecords:null, analysis:null };
+      if(nameEl) nameEl.textContent = `選択中：${f.name}（${(f.size/1024).toFixed(1)} KB）`;
+      if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = 'CSVを選択しました。「差分を解析（DRY RUN）」を押してください。'; }
+      if(resEl) resEl.innerHTML = '';
+      if(btnAnalyze) btnAnalyze.disabled = false;
+      if(btnExec) btnExec.disabled = true;
+    }
+
+    // CSV1行 → ロールバック用の軽量レコード
+    function parseRollbackCsvRecords(objs){
+      const pick = (o, keys) => { for(const k of keys){ if(o[k]) return o[k]; } return ''; };
+      return objs.map((o, i) => {
+        const name = String(pick(o, ['名前','氏名','応募者名','name','Name']) || '').trim();
+        const email = String(pick(o, ['メールアドレス','email','Email','E-mail','mail']) || '').trim();
+        const phoneRaw = String(pick(o, ['電話番号','phone','Phone','tel','TEL','携帯番号']) || '').trim();
+        const applicationId = String(pick(o, ['応募ID','applicationId','plexId','ID','id']) || '').trim();
+        const appliedAt = parseJpAppliedDate(pick(o, ['応募日','応募日時','日付','appliedAt'])) || '';
+        const status = String(pick(o, ['選考状況','ステータス','status']) || '').trim();
+        return { row: i + 2, applicationId, name, email, phone: phoneRaw, appliedAt, status };
+      }).filter(r => r.name || r.email || r.phone || r.applicationId);
+    }
+
+    function getRollbackWindow(){
+      const sEl = $('rollbackWindowStart'), eEl = $('rollbackWindowEnd');
+      let start = sEl && sEl.value ? new Date(sEl.value + 'T00:00:00') : null;
+      let end = eEl && eEl.value ? new Date(eEl.value + 'T23:59:59') : null;
+      if(!start && !end){
+        const now = new Date();
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+        start = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+      }else if(!start){
+        start = new Date(end.getTime() - 7 * 24 * 3600 * 1000);
+      }else if(!end){
+        end = new Date(start.getTime() + 7 * 24 * 3600 * 1000);
+      }
+      return { start, end };
+    }
+
+    async function analyzeRollbackDiff(){
+      const f = rollbackCsvState.file;
+      const msgEl = $('rollbackMessage'), resEl = $('rollbackResult'), btnExec = $('btnExecuteRollback');
+      if(!f){ if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = 'CSVファイルを選択してください。'; } return; }
+      try{
+        const text = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+          r.readAsText(f, 'UTF-8');
+        });
+        const rows = parseCsv(text);
+        const objs = rowsToObjects(rows);
+        if(objs.length === 0){ if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = 'CSVにデータ行がありません。'; } return; }
+
+        const csvRecords = parseRollbackCsvRecords(objs);
+        const win = getRollbackWindow();
+
+        // candidate 側インデックス
+        const byEmail = new Map(), byPhone = new Map(), byNameAppliedAt = new Map();
+        candidates.forEach(c => {
+          const e = normalizeEmailForMatch(c.email);
+          const p = normalizePhoneForMatch(c.phone);
+          const n = normalizeNameForMatch(c.name);
+          if(e){ if(!byEmail.has(e)) byEmail.set(e, []); byEmail.get(e).push(c); }
+          if(p){ if(!byPhone.has(p)) byPhone.set(p, []); byPhone.get(p).push(c); }
+          if(n){
+            const key = n + '|' + (c.appliedAt || '').slice(0,10);
+            if(!byNameAppliedAt.has(key)) byNameAppliedAt.set(key, []);
+            byNameAppliedAt.get(key).push(c);
+          }
+        });
+
+        // 分類結果
+        const toDelete = [];          // A: 新規追加 → 削除
+        const needSnapshot = [];      // B: 既存上書き → 復元不能（snapshotなし）
+        const unchanged = [];         // C: 変更なし／取込痕跡なし
+        const notFound = [];          // D: CSVに該当なし
+        const seenCandidateIds = new Set();
+
+        csvRecords.forEach(rec => {
+          const e = normalizeEmailForMatch(rec.email);
+          const p = normalizePhoneForMatch(rec.phone);
+          const n = normalizeNameForMatch(rec.name);
+          let hits = [];
+          let matchMethod = '';
+          if(e && byEmail.has(e)){ hits = hits.concat(byEmail.get(e)); matchMethod = 'メール'; }
+          if(hits.length === 0 && p && byPhone.has(p)){ hits = byPhone.get(p); matchMethod = '電話番号'; }
+          if(hits.length === 0 && n && rec.appliedAt){
+            const key = n + '|' + rec.appliedAt;
+            if(byNameAppliedAt.has(key)){ hits = byNameAppliedAt.get(key); matchMethod = '氏名+応募日'; }
+          }
+          const uniq = Array.from(new Set(hits.map(c => c.id))).map(id => hits.find(c => c.id === id));
+
+          if(uniq.length === 0){
+            notFound.push({ ...rec });
+            return;
+          }
+
+          uniq.forEach(c => {
+            if(seenCandidateIds.has(c.id)) return;
+            seenCandidateIds.add(c.id);
+
+            const stamps = extractImportTimestamps(c.memo);
+            const stampsInWindow = stamps.filter(s => s.date >= win.start && s.date <= win.end);
+            const hasRecentImport = stampsInWindow.length > 0;
+            const memoStartsImport = memoStartsWithImportMarker(c.memo);
+            const inPlexInvoice = isCandidateInPlexInvoices(c.name);
+
+            // 既存証拠（取込前から存在した証拠）
+            const existedBefore =
+              inPlexInvoice ||                                     // PLEX請求書に名前登録済み
+              (stamps.length > 1) ||                               // 過去にも別取込履歴がある
+              (!memoStartsImport && (c.memo || '').trim().length > 0); // 取込前のmemoが残っている
+
+            // 本CSVによる差分の痕跡
+            const touchedByThisImport = hasRecentImport || memoStartsImport;
+
+            if(touchedByThisImport && !existedBefore && memoStartsImport){
+              // A：新規追加 → 削除候補
+              toDelete.push({
+                csvRecord: rec,
+                candidateId: c.id,
+                name: c.name, email: c.email, phone: c.phone,
+                source: c.source, status: c.status,
+                appliedAt: c.appliedAt, createdAt: c.createdAt,
+                matchMethod,
+                stamps: stampsInWindow.map(s => s.raw).join(' / '),
+                reason: '新規追加（memo全体が本CSV取込情報・既存証拠なし）'
+              });
+            }else if(existedBefore && touchedByThisImport){
+              // B：既存上書き → 復元不能
+              needSnapshot.push({
+                csvRecord: rec,
+                candidateId: c.id,
+                name: c.name, email: c.email, phone: c.phone,
+                source: c.source, status: c.status,
+                appliedAt: c.appliedAt, createdAt: c.createdAt,
+                matchMethod,
+                existedEvidence: [
+                  inPlexInvoice ? 'PLEX請求書に登録済み' : '',
+                  (stamps.length > 1) ? `過去取込履歴 ${stamps.length}件` : '',
+                  (!memoStartsImport && (c.memo || '').trim().length > 0) ? '取込前memo残存' : ''
+                ].filter(Boolean).join(' / '),
+                reason: '既存応募者を本CSVが上書き（snapshotなしのため値復元不能）'
+              });
+            }else if(existedBefore && !touchedByThisImport){
+              // C：既存、本CSV取込の痕跡なし（既にCSVと別で管理されている）
+              unchanged.push({
+                csvRecord: rec, candidateId: c.id, name: c.name,
+                reason: '既存応募者、本CSV取込日時の痕跡なし'
+              });
+            }else{
+              // 取込痕跡がない or 判定困難 → 安全側（触らない）
+              unchanged.push({
+                csvRecord: rec, candidateId: c.id, name: c.name,
+                reason: '判定困難（安全側で保持）'
+              });
+            }
+          });
+        });
+
+        rollbackCsvState.csvRecords = csvRecords;
+        rollbackCsvState.analysis = {
+          window: { start: win.start.toISOString(), end: win.end.toISOString() },
+          toDelete, needSnapshot, unchanged, notFound,
+          totalCandidatesBefore: candidates.length
+        };
+
+        // CSV対象外candidate（絶対に触らない集合）
+        const affectedIds = new Set([
+          ...toDelete.map(x => x.candidateId),
+          ...needSnapshot.map(x => x.candidateId),
+          ...unchanged.map(x => x.candidateId)
+        ]);
+        const untouchedCount = candidates.filter(c => !affectedIds.has(c.id)).length;
+
+        const fmt = n => Number(n).toLocaleString();
+        const total = candidates.length;
+        const delCount = toDelete.length;
+        const after = total - delCount;
+
+        // 詳細一覧（削除候補）
+        const deleteListHtml = toDelete.length === 0
+          ? '<div style="color:var(--muted);font-size:12px;">削除候補はありません。</div>'
+          : toDelete.map((x, i) => `
+              <tr>
+                <td style="padding:4px 6px;font-size:11px;">${i + 1}</td>
+                <td style="padding:4px 6px;font-size:11px;font-family:monospace;">${escapeHTML(x.csvRecord.applicationId || '-')}</td>
+                <td style="padding:4px 6px;font-size:12px;font-weight:900;color:var(--navy);">${escapeHTML(x.name || '(名前なし)')}</td>
+                <td style="padding:4px 6px;font-size:11px;">${escapeHTML(x.status || '-')}</td>
+                <td style="padding:4px 6px;font-size:11px;">${escapeHTML(x.appliedAt || '-')}</td>
+                <td style="padding:4px 6px;font-size:11px;">${escapeHTML(x.matchMethod)}</td>
+                <td style="padding:4px 6px;font-size:11px;color:var(--muted);">${escapeHTML(x.stamps || '-')}</td>
+              </tr>`).join('');
+
+        const snapshotListHtml = needSnapshot.length === 0
+          ? '<div style="color:var(--muted);font-size:12px;">対象なし</div>'
+          : needSnapshot.map((x, i) => `
+              <tr>
+                <td style="padding:4px 6px;font-size:11px;">${i + 1}</td>
+                <td style="padding:4px 6px;font-size:11px;font-family:monospace;">${escapeHTML(x.csvRecord.applicationId || '-')}</td>
+                <td style="padding:4px 6px;font-size:12px;font-weight:900;color:#a16207;">${escapeHTML(x.name || '(名前なし)')}</td>
+                <td style="padding:4px 6px;font-size:11px;">${escapeHTML(x.status || '-')}</td>
+                <td style="padding:4px 6px;font-size:11px;">${escapeHTML(x.matchMethod)}</td>
+                <td style="padding:4px 6px;font-size:11px;color:#a16207;">${escapeHTML(x.existedEvidence || '-')}</td>
+              </tr>`).join('');
+
+        const notFoundHtml = notFound.length === 0
+          ? '<div style="color:var(--muted);font-size:12px;">対象なし</div>'
+          : notFound.slice(0, 50).map(x => `<div style="font-size:11px;padding:2px 6px;">#${x.row} ${escapeHTML(x.applicationId || '-')} / ${escapeHTML(x.name || '')} / ${escapeHTML(x.email || '')} / ${escapeHTML(x.phone || '')}</div>`).join('') + (notFound.length > 50 ? `<div style="font-size:11px;color:var(--muted);">※ 先頭50件のみ表示（残り${notFound.length - 50}件）</div>` : '');
+
+        resEl.className = 'notice';
+        resEl.innerHTML = `
+          <div style="font-size:14px;font-weight:900;color:var(--navy);margin-bottom:8px;">📊 ロールバック解析結果（DRY RUN）</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">取込日時 絞り込み窓：${escapeHTML(win.start.toLocaleString('ja-JP'))} 〜 ${escapeHTML(win.end.toLocaleString('ja-JP'))}</div>
+          <table style="width:100%;font-size:13px;border-collapse:collapse;">
+            <tr><td style="padding:4px 8px;color:var(--muted);">CSV行数（有効データ）</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${fmt(csvRecords.length)}件</td></tr>
+            <tr><td style="padding:4px 8px;color:#b91c1c;font-weight:900;">新規追加→削除予定（A）</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#b91c1c;font-size:16px;">${fmt(delCount)}名</td></tr>
+            <tr><td style="padding:4px 8px;color:#a16207;font-weight:900;">既存→上書き復元不能（B・snapshotなし）</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:#a16207;">${fmt(needSnapshot.length)}名</td></tr>
+            <tr><td style="padding:4px 8px;color:#15803d;">変更なし／痕跡なし（C）</td><td style="padding:4px 8px;text-align:right;color:#15803d;">${fmt(unchanged.length)}名</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--muted);">CSVに記載だがAPSに該当なし（D）</td><td style="padding:4px 8px;text-align:right;">${fmt(notFound.length)}件</td></tr>
+            <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;"></td></tr>
+            <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">処理前 総応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${fmt(total)}名</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--navy);font-weight:900;">削除後 予定応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${fmt(after)}名</td></tr>
+            <tr><td style="padding:4px 8px;color:var(--muted);">CSV対象外の応募者（絶対に触らない）</td><td style="padding:4px 8px;text-align:right;">${fmt(untouchedCount)}名</td></tr>
+          </table>
+
+          <div style="margin-top:16px;">
+            <div style="font-size:13px;font-weight:900;color:#b91c1c;margin-bottom:4px;">🗑 削除予定（A）${delCount}名</div>
+            <div style="max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;">
+              ${delCount === 0 ? '<div style="padding:10px;color:var(--muted);font-size:12px;">削除候補はありません。</div>' : `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#fef2f2;position:sticky;top:0;"><th style="padding:4px 6px;font-size:11px;text-align:left;">#</th><th style="padding:4px 6px;font-size:11px;text-align:left;">応募ID</th><th style="padding:4px 6px;font-size:11px;text-align:left;">氏名</th><th style="padding:4px 6px;font-size:11px;text-align:left;">現在ステータス</th><th style="padding:4px 6px;font-size:11px;text-align:left;">応募日</th><th style="padding:4px 6px;font-size:11px;text-align:left;">照合</th><th style="padding:4px 6px;font-size:11px;text-align:left;">memo取込日時</th></tr></thead><tbody>${deleteListHtml}</tbody></table>`}
+            </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div style="font-size:13px;font-weight:900;color:#a16207;margin-bottom:4px;">⚠ 既存→上書き、復元不能（B）${needSnapshot.length}名</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">取込直前snapshotが存在しないため、これらは安全のため<strong>一切変更しません</strong>。削除も復元もされません。</div>
+            <div style="max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;">
+              ${needSnapshot.length === 0 ? '<div style="padding:10px;color:var(--muted);font-size:12px;">対象なし</div>' : `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#fffbeb;position:sticky;top:0;"><th style="padding:4px 6px;font-size:11px;text-align:left;">#</th><th style="padding:4px 6px;font-size:11px;text-align:left;">応募ID</th><th style="padding:4px 6px;font-size:11px;text-align:left;">氏名</th><th style="padding:4px 6px;font-size:11px;text-align:left;">現在ステータス</th><th style="padding:4px 6px;font-size:11px;text-align:left;">照合</th><th style="padding:4px 6px;font-size:11px;text-align:left;">既存証拠</th></tr></thead><tbody>${snapshotListHtml}</tbody></table>`}
+            </div>
+          </div>
+
+          <details style="margin-top:16px;"><summary style="cursor:pointer;font-size:12px;color:var(--muted);">変更なし（C）${unchanged.length}名 / 未照合（D）${notFound.length}件を表示</summary>
+            <div style="margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-height:200px;overflow-y:auto;">
+              <div style="font-weight:900;font-size:12px;margin-bottom:4px;">変更なし（C）</div>
+              ${unchanged.length === 0 ? '<div style="color:var(--muted);font-size:11px;">対象なし</div>' : unchanged.slice(0, 50).map(x => `<div style="font-size:11px;padding:1px 4px;">${escapeHTML(x.name || '')} — ${escapeHTML(x.reason)}</div>`).join('') + (unchanged.length > 50 ? `<div style="font-size:11px;color:var(--muted);">※ 先頭50件のみ表示</div>` : '')}
+              <div style="font-weight:900;font-size:12px;margin:8px 0 4px;">未照合（D）</div>
+              ${notFoundHtml}
+            </div>
+          </details>
+
+          <div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-left:3px solid var(--navy);font-size:12px;">
+            <strong>保護対象（変更しないデータ）:</strong> plans / mediaCosts（PLEX請求書含む） / mediaCommitPlans / halfYearMediaTargets / API設定 / CSV対象外の応募者
+          </div>
+        `;
+
+        if(btnExec){
+          btnExec.disabled = delCount === 0;
+          btnExec.textContent = delCount > 0 ? `A ${delCount}名のみロールバック実行（削除）` : 'ロールバック対象なし';
+        }
+        if(msgEl){
+          msgEl.className = 'notice info';
+          msgEl.innerHTML = delCount > 0
+            ? `解析完了。A ${delCount}名が削除候補、B ${needSnapshot.length}名は復元不能（触りません）、C ${unchanged.length}名は変更なし。内容を確認してから実行してください。`
+            : `解析完了。本CSVの取込で新規追加された明確な応募者は見つかりませんでした（削除候補0件）。B ${needSnapshot.length}名 / C ${unchanged.length}名 / D ${notFound.length}件。`;
+        }
+        console.log('[ROLLBACK DRY RUN]', { toDelete: toDelete.length, needSnapshot: needSnapshot.length, unchanged: unchanged.length, notFound: notFound.length, window: win });
+      }catch(err){
+        console.error('[ROLLBACK] 解析エラー:', err);
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `CSV解析エラー：${err.message || err}`; }
+      }
+    }
+
+    async function executeRollback(){
+      const a = rollbackCsvState.analysis;
+      const msgEl = $('rollbackMessage'), resEl = $('rollbackResult');
+      if(!a || !a.toDelete || a.toDelete.length === 0){
+        if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = '削除候補がありません。先に「差分を解析」を実行してください。'; }
+        return;
+      }
+
+      const targetIds = new Set(a.toDelete.map(x => x.candidateId));
+      const beforeTotal = candidates.length;
+      const beforeNonTargets = candidates.filter(c => !targetIds.has(c.id)).map(c => c.id);
+      const existingTargets = candidates.filter(c => targetIds.has(c.id));
+
+      if(existingTargets.length === 0){
+        if(msgEl){ msgEl.className = 'notice warning'; msgEl.textContent = '削除対象が現在データに見つかりません（既に削除済みの可能性）。'; }
+        return;
+      }
+
+      // 二重安全：対象の中にPLEX請求書登録済みの名前がいないか最終確認
+      const invoiceConflict = existingTargets.filter(c => isCandidateInPlexInvoices(c.name));
+      if(invoiceConflict.length > 0){
+        const names = invoiceConflict.slice(0, 5).map(c => c.name).join('、');
+        if(msgEl){ msgEl.className = 'notice error'; msgEl.textContent = `安全チェック失敗：削除対象 ${invoiceConflict.length}名 がPLEX請求書に登録されています（${escapeHTML(names)}...）。処理を中止しました。`; }
+        return;
+      }
+
+      const confirmLines = [
+        '誤取込CSVロールバック（差分復元）を実行します。',
+        '',
+        `対象CSV：${rollbackCsvState.file ? rollbackCsvState.file.name : '-'}`,
+        `CSV行数：${(rollbackCsvState.csvRecords || []).length}件`,
+        '',
+        `削除対象（A・新規追加分のみ）：${existingTargets.length}名`,
+        `触らない（B・既存上書き復元不能）：${a.needSnapshot.length}名`,
+        `触らない（C・変更なし）：${a.unchanged.length}名`,
+        `触らない（D・未照合）：${a.notFound.length}件`,
+        '',
+        `処理前 ${beforeTotal}名 → 削除後 ${beforeTotal - existingTargets.length}名`,
+        '',
+        '保護対象（変更しない）：plans / mediaCosts（PLEX請求書含む） / mediaCommitPlans / halfYearMediaTargets',
+        '',
+        'この操作はクラウド保存まで実行されます。本当に実行しますか？'
+      ].join('\n');
+      if(!confirm(confirmLines)){ if(msgEl){ msgEl.className = 'notice info'; msgEl.textContent = 'キャンセルしました。データは変更されていません。'; } return; }
+
+      const btnExec = $('btnExecuteRollback'), btnAnalyze = $('btnAnalyzeRollback');
+      if(btnExec){ btnExec.disabled = true; btnExec.textContent = '処理中...'; }
+      if(btnAnalyze) btnAnalyze.disabled = true;
+
+      // 自動更新を一時停止（30秒ポーリングで古いクラウドが戻るのを防ぐ）
+      const wasPollingEnabled = pollingEnabled;
+      stopAutoPolling();
+      pollingEnabled = false;
+      console.log('[ROLLBACK] 自動更新を一時停止しました');
+
+      // バックアップ：candidate / plans / mediaCosts / mediaCommitPlans / halfYearMediaTargets
+      const backupCandidates = candidates.map(c => ({ ...c }));
+      const backupPlans = plans.map(p => ({ ...p }));
+      const backupMediaCosts = mediaCosts.map(m => ({ ...m }));
+      const backupMediaCommits = mediaCommitPlans.map(x => ({ ...x }));
+      const backupHalfYear = JSON.parse(JSON.stringify(halfYearMediaTargets));
+
+      try{
+        console.group('[ROLLBACK] 差分削除処理');
+        console.log('before:', { candidates: beforeTotal, plans: plans.length, mediaCosts: mediaCosts.length, mediaCommits: mediaCommitPlans.length });
+        console.log('target ids:', Array.from(targetIds));
+
+        // Step1: ローカル削除
+        candidates = candidates.filter(c => !targetIds.has(c.id));
+        console.log('after local delete:', candidates.length);
+
+        // Step2: 対象外candidateが欠落していないか検証
+        const afterNonTargets = new Set(candidates.map(c => c.id));
+        const missing = beforeNonTargets.filter(id => !afterNonTargets.has(id));
+        if(missing.length > 0){
+          candidates = backupCandidates;
+          throw new Error(`対象外応募者が削除される異常検出（${missing.length}件）：処理を中止し復元しました。`);
+        }
+
+        // Step3: 他データ（plans / mediaCosts / mediaCommits / halfYearMediaTargets）が改変されていないか
+        const plansUnchanged = plans.length === backupPlans.length;
+        const mediaUnchanged = mediaCosts.length === backupMediaCosts.length;
+        const commitsUnchanged = mediaCommitPlans.length === backupMediaCommits.length;
+        if(!plansUnchanged || !mediaUnchanged || !commitsUnchanged){
+          candidates = backupCandidates;
+          plans = backupPlans; mediaCosts = backupMediaCosts; mediaCommitPlans = backupMediaCommits;
+          throw new Error('保護対象データに差分検出：処理を中止し全復元しました。');
+        }
+
+        // Step4: persist（ローカル保存 + クラウド保存 + renderAll）
+        await persist();
+        console.log('persist done, candidates:', candidates.length);
+
+        // Step5: クラウド再読込で永続化を確認
+        let cloudVerifyOk = false, cloudVerifyMsg = '', cloudCount = -1;
+        if(isCloudConfigured()){
+          try{
+            await new Promise(r => setTimeout(r, 500));
+            const reloadRes = await callCloud('load', {});
+            const cloudData = reloadRes && reloadRes.data ? reloadRes.data : null;
+            if(cloudData && Array.isArray(cloudData.candidates)){
+              cloudCount = cloudData.candidates.length;
+              const stillInCloud = cloudData.candidates.filter(c => targetIds.has(c.id));
+              if(stillInCloud.length === 0){
+                cloudVerifyOk = true;
+                cloudVerifyMsg = `✓ ${cloudCount}名（対象0件残存）`;
+                candidates = cloudData.candidates.map(normalizeCandidate);
+                saveLocal();
+                renderAll();
+              }else{
+                cloudVerifyMsg = `⚠ クラウドに削除対象が ${stillInCloud.length}件 残存`;
+              }
+            }else{
+              cloudVerifyMsg = '⚠ クラウド応答形式エラー';
+            }
+          }catch(err){
+            cloudVerifyMsg = `⚠ 再照合エラー：${err.message || err}`;
+            console.error('[ROLLBACK] cloud reload失敗:', err);
+          }
+        }else{
+          cloudVerifyOk = true;
+          cloudVerifyMsg = '（ローカルモード）';
+        }
+
+        const afterTotal = candidates.length;
+        const stillMatched = candidates.filter(c => targetIds.has(c.id)).length;
+        console.log('after:', { candidates: afterTotal, stillMatched, cloudVerifyOk, cloudCount });
+        console.groupEnd();
+
+        if(resEl){
+          const allOk = cloudVerifyOk && stillMatched === 0 && missing.length === 0;
+          resEl.className = allOk ? 'notice success' : 'notice warning';
+          resEl.innerHTML = `
+            <div style="font-size:15px;font-weight:900;color:${allOk ? '#15803d' : '#a16207'};margin-bottom:8px;">${allOk ? '✅ ロールバック完了' : '⚠ ロールバック完了（要確認）'}</div>
+            <table style="width:100%;font-size:13px;">
+              <tr><td style="padding:4px 8px;">対象CSV</td><td style="padding:4px 8px;text-align:right;font-family:monospace;font-size:12px;">${escapeHTML(rollbackCsvState.file ? rollbackCsvState.file.name : '-')}</td></tr>
+              <tr><td style="padding:4px 8px;">CSV行数</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${(rollbackCsvState.csvRecords || []).length}件</td></tr>
+              <tr><td style="padding:4px 8px;">A・削除予定</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${a.toDelete.length}名</td></tr>
+              <tr><td style="padding:4px 8px;">A・実際に削除</td><td style="padding:4px 8px;text-align:right;font-weight:950;color:#b91c1c;">${existingTargets.length}名</td></tr>
+              <tr><td style="padding:4px 8px;">B・復元不能（触らず）</td><td style="padding:4px 8px;text-align:right;color:#a16207;">${a.needSnapshot.length}名</td></tr>
+              <tr><td style="padding:4px 8px;">C・変更なし</td><td style="padding:4px 8px;text-align:right;color:#15803d;">${a.unchanged.length}名</td></tr>
+              <tr><td style="padding:4px 8px;">D・未照合</td><td style="padding:4px 8px;text-align:right;">${a.notFound.length}件</td></tr>
+              <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;"></td></tr>
+              <tr><td style="padding:4px 8px;">処理前 応募者数</td><td style="padding:4px 8px;text-align:right;">${beforeTotal}名</td></tr>
+              <tr><td style="padding:4px 8px;">処理後 応募者数</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:var(--blue);">${afterTotal}名</td></tr>
+              <tr><td style="padding:4px 8px;">クラウド再読込後</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${cloudCount >= 0 ? cloudCount + '名' : '未確認'}</td></tr>
+              <tr><td style="padding:4px 8px;">クラウド検証</td><td style="padding:4px 8px;text-align:right;font-weight:900;color:${cloudVerifyOk ? '#15803d' : '#b91c1c'};">${escapeHTML(cloudVerifyMsg)}</td></tr>
+              <tr><td style="padding:4px 8px;">対象外応募者の消失</td><td style="padding:4px 8px;text-align:right;font-weight:900;">${missing.length === 0 ? '✓ なし' : `⚠ ${missing.length}件消失`}</td></tr>
+              <tr><td colspan="2" style="border-top:1px solid var(--line);padding-top:6px;font-weight:900;color:var(--navy);">保護対象データ:</td></tr>
+              <tr><td style="padding:4px 8px;">plans</td><td style="padding:4px 8px;text-align:right;">${plans.length === backupPlans.length ? '✓ 無変更' : '⚠ 変化'}（${plans.length}件）</td></tr>
+              <tr><td style="padding:4px 8px;">mediaCosts（PLEX請求書含む）</td><td style="padding:4px 8px;text-align:right;">${mediaCosts.length === backupMediaCosts.length ? '✓ 無変更' : '⚠ 変化'}（${mediaCosts.length}件）</td></tr>
+              <tr><td style="padding:4px 8px;">mediaCommitPlans</td><td style="padding:4px 8px;text-align:right;">${mediaCommitPlans.length === backupMediaCommits.length ? '✓ 無変更' : '⚠ 変化'}（${mediaCommitPlans.length}件）</td></tr>
+            </table>
+            <div style="margin-top:8px;font-size:12px;color:var(--muted);">${allOk ? 'ダッシュボード・応募者一覧・月次レポートは自動再計算されました。' : 'F12コンソールで詳細ログを確認してください。'}</div>
+          `;
+        }
+        showToast(`ロールバック：${existingTargets.length}名を削除、現在${candidates.length}名`, cloudVerifyOk && stillMatched === 0 ? 'success' : 'warning', 6000);
+        rollbackCsvState = { file:null, csvRecords:null, analysis:null };
+        const inp = $('inputRollbackCSV'); if(inp) inp.value = '';
+        const nameEl = $('rollbackCsvFileName'); if(nameEl) nameEl.textContent = '未選択';
+        if(msgEl){ msgEl.className = 'notice ' + (cloudVerifyOk && stillMatched === 0 ? 'success' : 'warning'); msgEl.textContent = cloudVerifyOk && stillMatched === 0 ? 'ロールバック完了。' : 'ロールバック処理は実行しましたが検証で警告があります。'; }
+      }catch(err){
+        // 失敗 → 完全ロールバック
+        candidates = backupCandidates;
+        plans = backupPlans; mediaCosts = backupMediaCosts; mediaCommitPlans = backupMediaCommits;
+        halfYearMediaTargets = backupHalfYear;
+        saveLocal();
+        renderAll();
+        console.error('[ROLLBACK] 失敗、ロールバック:', err);
+        if(resEl){ resEl.className = 'notice error'; resEl.innerHTML = `❌ ロールバック失敗：${escapeHTML(err.message || String(err))}<br>データは変更前の状態に完全復元されました。`; }
+        showToast(`ロールバック失敗：${err.message || err}／復元しました`, 'error', 6000);
+      }finally{
+        pollingEnabled = wasPollingEnabled;
+        pollingFailCount = 0;
+        if(pollingEnabled && isCloudConfigured()){
+          startAutoPolling();
+          console.log('[ROLLBACK] 自動更新を再開しました');
+        }
+        if(btnExec){ btnExec.disabled = rollbackCsvState.analysis ? rollbackCsvState.analysis.toDelete.length === 0 : true; btnExec.textContent = 'ロールバックを実行'; }
+        if(btnAnalyze){ btnAnalyze.disabled = !rollbackCsvState.file; }
+      }
+    }
+
     // ===== 応募経路別 一括削除：Guidable =====
     function isGuidableCandidate(c){
       const s = String(c && c.source || '').normalize('NFKC').trim().toLowerCase();
@@ -7466,6 +8006,10 @@
       const delCsvInp = $('inputDeleteCSV'); if(delCsvInp) delCsvInp.addEventListener('change', handleDeleteCsvFileSelect);
       onClick('btnAnalyzeDeleteCSV', analyzeDeleteCsv);
       onClick('btnExecuteDeleteCSV', executeDeleteCsv);
+      // 誤取込CSV ロールバック（差分復元）
+      const rollbackInp = $('inputRollbackCSV'); if(rollbackInp) rollbackInp.addEventListener('change', handleRollbackCsvSelect);
+      onClick('btnAnalyzeRollback', analyzeRollbackDiff);
+      onClick('btnExecuteRollback', executeRollback);
 
       const candidateForm = $('candidateForm'); if(candidateForm) candidateForm.addEventListener('submit', handleCandidateSubmit);
       const planForm = $('planForm'); if(planForm) planForm.addEventListener('submit', handlePlanSubmit);
