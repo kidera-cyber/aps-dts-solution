@@ -2007,6 +2007,145 @@
       return String(source || '(未設定)').trim() || '(未設定)';
     }
 
+    // ===== 期間費用集計：共通ロジック（実績 vs 予定、重複除外、費用タイプ分離） =====
+    // mediaCosts 1行 → 請求ユニークキー群（複数キーを返し、いずれか一致で重複と判定）
+    //   優先順位（CLAUDE仕様）:
+    //     1. 請求書番号
+    //     2. 媒体 + 対象者 + 請求月 + 金額
+    //     3. 媒体 + 対象者 + 金額
+    //     4. （掲載系）媒体 + 求人タイトル + 月 + 金額
+    function getInvoiceSignatureKeys(m){
+      const keys = [];
+      const media = normalizeMediaKey(m.source || m.name || '', '');
+      const amount = Number(m.fixedListingCost || m.amount || 0);
+      if(m.invoiceId) keys.push(`inv:${String(m.invoiceId).trim().toLowerCase()}`);
+      const isPerf = ['成功報酬型','掲載＋成功報酬型','その他'].includes(m.feeType) && (m.applicantName || (m.manualBillableCount || 0) >= 1);
+      if(isPerf){
+        const nm = normalizeCandidateNameForPlex(m.applicantName || '');
+        if(nm){
+          keys.push(`perfA:${media}|${nm}|${m.costMonth || ''}|${amount}`);
+          keys.push(`perfB:${media}|${nm}|${amount}`);
+        }
+      }
+      // 月額掲載系：契約ユニークキー
+      keys.push(`rec:${media}|${m.jobTitle || ''}|${m.feeType || ''}|${m.startDate || ''}|${m.endDate || ''}|${m.costMonth || ''}|${amount}`);
+      return keys;
+    }
+    // 後方互換：代表キー1本（最優先）を返す
+    function getInvoiceSignatureKey(m){
+      const keys = getInvoiceSignatureKeys(m);
+      return keys[0] || `rec:fallback:${m.id || ''}`;
+    }
+
+    // 月yyyyMm が「実績扱い」か（≤ asOfYm）
+    function isActualYm(yyyyMm, asOfYm){
+      if(!yyyyMm) return false;
+      const [y, m] = String(yyyyMm).split('-').map(Number);
+      const [ay, am] = String(asOfYm).split('-').map(Number);
+      if(!y || !m || !ay || !am) return false;
+      return (y < ay) || (y === ay && m <= am);
+    }
+
+    // 媒体費用レコードの分類
+    function classifyCostRecord(m){
+      const feeType = m.feeType || '';
+      // 成功報酬系：PLEX等
+      if(['成功報酬型','掲載＋成功報酬型'].includes(feeType) && (m.applicantName || (m.manualBillableCount || 0) >= 1 || (m.fixedListingCost || 0) > 0 && (m.applicantName || /PLEX|プレックス/i.test(m.media || m.source || '')))){
+        return 'performance';
+      }
+      if(feeType === '成功報酬型') return 'performance';
+      if(feeType === '掲載課金型') return 'recurring';
+      if(feeType === '掲載＋成功報酬型') return 'recurring_with_perf';
+      return 'other';
+    }
+
+    // 期間費用の構造化集計：mediaKeyフィルタ可、重複除外、実績/予定分離
+    //   opts: { mediaKey?, asOfDate?, includeZero? }
+    //   戻り値: { actual:{plex,recurring,other,total}, forecast:{plex,recurring,other,total}, items:[...], duplicates:[...], zeroExcluded:[...] }
+    function getPeriodCostBreakdown(periodStart, periodEnd, opts){
+      const o = opts || {};
+      const asOfDate = o.asOfDate || (new Date()).toISOString().slice(0,10);
+      const asOfYm = asOfDate.slice(0, 7);
+      const mediaKeyFilter = o.mediaKey || null;
+      const includeZero = !!o.includeZero;
+
+      const [sy, sm] = String(periodStart).split('-').map(Number);
+      const [ey, em] = String(periodEnd).split('-').map(Number);
+
+      const actual = { plex: 0, recurring: 0, other: 0, total: 0 };
+      const forecast = { plex: 0, recurring: 0, other: 0, total: 0 };
+      const items = [];
+      const duplicates = [];
+      const zeroExcluded = [];
+      const seenSignatures = new Map(); // signature → first-seen itemIndex
+
+      // 期間内の各月について、mediaCosts を1件ずつ扱う（重複は signature で除外）
+      mediaCosts.forEach(m => {
+        const mk = normalizeMediaKey(m.source || m.name || '', '');
+        if(mediaKeyFilter && mk !== mediaKeyFilter) return;
+        const sigKeys = getInvoiceSignatureKeys(m);
+        const isPlex = mk === 'PLEX' || /PLEX|プレックス/i.test(m.media || m.source || '');
+        const isPerfRecord = classifyCostRecord(m) === 'performance' || !!m.applicantName;
+
+        // 期間内の各月について getMediaMonthlyCost を呼び、各月の計上を1レコード単位で記録
+        let cursor = new Date(sy, sm - 1, 1);
+        const endD = new Date(ey, em - 1, 1);
+        while(cursor <= endD){
+          const ym = `${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`;
+          const c = getMediaMonthlyCost(m, ym);
+          const monthTotal = (c.listing || 0) + (c.successFee || 0) + (c.other || 0);
+          if(monthTotal === 0){
+            cursor.setMonth(cursor.getMonth() + 1);
+            continue;
+          }
+          // 月+レコードで一意：複数キーのいずれかが既出なら重複扱い
+          const monthSigs = sigKeys.map(k => k + '@' + ym);
+          const hit = monthSigs.find(ms => seenSignatures.has(ms));
+          if(hit){
+            duplicates.push({ month: ym, mediaKey: mk, invoiceId: m.invoiceId || '', applicantName: m.applicantName || '', jobTitle: m.jobTitle || '', amount: monthTotal, reason: `請求ユニークキー重複（${hit.split('@')[0].split(':')[0]}）` });
+            cursor.setMonth(cursor.getMonth() + 1);
+            continue;
+          }
+          monthSigs.forEach(ms => seenSignatures.set(ms, items.length));
+          const isActual = isActualYm(ym, asOfYm);
+          const bucket = isActual ? actual : forecast;
+          const classification = isPlex || isPerfRecord ? 'plex' : (classifyCostRecord(m) === 'other' ? 'other' : 'recurring');
+          const listingPart = (c.listing || 0);
+          const successPart = (c.successFee || 0);
+          const otherPart = (c.other || 0);
+          // バケット内訳
+          if(classification === 'plex'){ bucket.plex += successPart + listingPart; bucket.other += otherPart; }
+          else if(classification === 'other'){ bucket.other += monthTotal; }
+          else { bucket.recurring += listingPart + successPart; bucket.other += otherPart; }
+          bucket.total += monthTotal;
+          items.push({
+            month: ym, isActual, classification,
+            mediaKey: mk, feeType: m.feeType || '', invoiceId: m.invoiceId || '',
+            applicantName: m.applicantName || '',
+            jobTitle: m.jobTitle || '',
+            costMonth: m.costMonth || '',
+            listing: listingPart, successFee: successPart, other: otherPart, total: monthTotal,
+            source: m.source || m.name || '',
+            allocationType: m.allocationType || '',
+            recordId: m.id || ''
+          });
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+
+        // 0円レコードの検出（登録はされているが期間内で何も計上されない）
+        if(!includeZero && (Number(m.fixedListingCost || 0) === 0) && (Number(m.otherCost || 0) === 0) && (Number(m.manualBillableCount || 0) === 0)){
+          zeroExcluded.push({ mediaKey: mk, applicantName: m.applicantName || '', jobTitle: m.jobTitle || '', feeType: m.feeType || '', recordId: m.id || '' });
+        }
+      });
+
+      return {
+        periodStart, periodEnd, asOfDate, asOfYm,
+        mediaKey: mediaKeyFilter,
+        actual, forecast, items, duplicates, zeroExcluded,
+        combined: { total: actual.total + forecast.total }
+      };
+    }
+
     // ===== 半年採用コミット進捗（期間ベース・媒体単位）=====
     // 掲載費用・ダッシュボード・月次レポートの3画面で同一関数を使用
     function getHalfYearMediaProgress(mediaKey, opts){
@@ -2046,23 +2185,11 @@
       const applied = periodScope.length;
       const interview = periodScope.filter(c => ['一次面接','職場見学','二次面接','最終面接','内定','内定承諾','入社決定'].includes(c.status)).length;
 
-      // 期間費用
-      const periodCost = mediaCosts.reduce((sum, m) => {
-        const mk = normalizeMediaKey(m.source || m.name, '');
-        if(mk !== mediaKey) return sum;
-        // 期間内の各月費用を合算
-        const [sy, sm] = periodStart.split('-').map(Number);
-        const [ey, em] = periodEnd.split('-').map(Number);
-        let cursor = new Date(sy, sm - 1, 1), total = 0;
-        const endD = new Date(ey, em - 1, 1);
-        while(cursor <= endD){
-          const ym = `${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`;
-          const c = getMediaMonthlyCost(m, ym);
-          total += (c.listing || 0) + (c.successFee || 0) + (c.other || 0);
-          cursor.setMonth(cursor.getMonth() + 1);
-        }
-        return sum + total;
-      }, 0);
+      // 期間費用（実績 vs 予定を分離、重複除外）
+      const costBreakdown = getPeriodCostBreakdown(periodStart, periodEnd, { mediaKey });
+      const periodCost = costBreakdown.actual.total;              // 実績のみ（既存カード互換）
+      const periodCostForecast = costBreakdown.forecast.total;    // 予定（未来月）
+      const periodCostCombined = periodCost + periodCostForecast; // 期間見込
 
       const actual = periodHired.length;
       const remaining = Math.max(0, target - actual);
@@ -2088,7 +2215,8 @@
       return {
         media: mediaKey, target, actual, remaining, achievementRate,
         currentMonthActual: currentHired, applied, interview,
-        periodCost, cpa: actual > 0 ? Math.round(periodCost / actual) : 0,
+        periodCost, periodCostForecast, periodCostCombined, costBreakdown,
+        cpa: actual > 0 ? Math.round(periodCost / actual) : 0,
         jobBreakdown, elapsedRate, status, periodStart, periodEnd
       };
     }
@@ -2159,18 +2287,72 @@
       const totalActual = progressList.reduce((s,p) => s + p.actual, 0);
       const totalRemain = Math.max(0, totalTarget - totalActual);
       const totalRate = totalTarget > 0 ? Math.round(totalActual / totalTarget * 1000) / 10 : 0;
-      const totalCost = progressList.reduce((s,p) => s + p.periodCost, 0);
+      const totalCost = progressList.reduce((s,p) => s + p.periodCost, 0);                 // 実績のみ
+      const totalCostForecast = progressList.reduce((s,p) => s + (p.periodCostForecast || 0), 0); // 未来月予定
+      const totalCostCombined = totalCost + totalCostForecast;
       const period = `${halfYearMediaTargets.periodStart} 〜 ${halfYearMediaTargets.periodEnd}`;
 
-      wrap.innerHTML = `<div style="margin-bottom:10px;font-size:12px;color:var(--muted);">対象期間：<strong style="color:var(--navy);">${escapeHTML(period)}</strong>｜今月：<strong style="color:var(--navy);">${escapeHTML(ym)}</strong></div>
+      // 期間全体の集計診断（全媒体まとめて1回：重複・0円・内訳をここで集計）
+      const overallBreakdown = getPeriodCostBreakdown(halfYearMediaTargets.periodStart, halfYearMediaTargets.periodEnd, {});
+      const todayStr = (new Date()).toISOString().slice(0,10);
+
+      wrap.innerHTML = `<div style="margin-bottom:10px;font-size:12px;color:var(--muted);">対象期間：<strong style="color:var(--navy);">${escapeHTML(period)}</strong>｜今月：<strong style="color:var(--navy);">${escapeHTML(ym)}</strong>｜基準日：<strong style="color:var(--navy);">${escapeHTML(todayStr)}</strong></div>
       <div class="hero-grid hero-grid-6">
         <div class="hero-card primary"><div class="h-label">半年採用目標</div><div class="h-value">${totalTarget}<span class="h-unit">名</span></div><div class="h-sub">${escapeHTML(period)}</div></div>
         <div class="hero-card hero-good"><div class="h-label">半年累計実績</div><div class="h-value">${totalActual}<span class="h-unit">名</span></div><div class="h-sub">内定＝入社決定として集計</div></div>
         <div class="hero-card ${totalRemain > 0 ? 'alert' : ''}"><div class="h-label">残り採用人数</div><div class="h-value">${totalRemain}<span class="h-unit">名</span></div><div class="h-sub">${totalRemain > 0 ? '目標までの不足' : '目標達成'}</div></div>
         <div class="hero-card"><div class="h-label">半年達成率</div><div class="h-value">${totalRate}<span class="h-unit">%</span></div><div class="h-sub">実績÷目標</div></div>
-        <div class="hero-card"><div class="h-label">期間総費用</div><div class="h-value" style="font-size:24px;">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(period)}</div></div>
-        <div class="hero-card"><div class="h-label">採用単価</div><div class="h-value" style="font-size:24px;">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">総費用÷実績</div></div>
+        <div class="hero-card"><div class="h-label">期間累計費用（実績）</div><div class="h-value" style="font-size:24px;">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(halfYearMediaTargets.periodStart)} 〜 ${escapeHTML(todayStr)}時点</div></div>
+        <div class="hero-card"><div class="h-label">採用単価</div><div class="h-value" style="font-size:24px;">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">実績費用÷実績採用</div></div>
+      </div>
+      <div style="margin-top:12px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 16px;">
+        <div style="font-size:12px;color:var(--muted);font-weight:900;margin-bottom:6px;">費用内訳（実績：${escapeHTML(halfYearMediaTargets.periodStart)}〜${escapeHTML(todayStr)}）</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+          <div><div style="font-size:11px;color:var(--muted);">PLEX成功報酬</div><div style="font-size:18px;font-weight:900;color:#7c3aed;">${yen(overallBreakdown.actual.plex)}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);">月額掲載費</div><div style="font-size:18px;font-weight:900;color:var(--navy);">${yen(overallBreakdown.actual.recurring)}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);">その他費用</div><div style="font-size:18px;font-weight:900;color:var(--muted);">${yen(overallBreakdown.actual.other)}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);">実績合計</div><div style="font-size:18px;font-weight:900;color:#15803d;">${yen(overallBreakdown.actual.total)}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);">未来月予定（Nov/Dec等）</div><div style="font-size:18px;font-weight:900;color:#a16207;">${yen(overallBreakdown.forecast.total)}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);">期間見込（実績＋予定）</div><div style="font-size:18px;font-weight:900;color:var(--navy);">${yen(overallBreakdown.combined.total)}</div></div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted);">重複除外：${overallBreakdown.duplicates.length}件 ／ 0円レコード：${overallBreakdown.zeroExcluded.length}件 ／ 計上行：${overallBreakdown.items.length}件</div>
+        <details style="margin-top:8px;">
+          <summary style="cursor:pointer;font-size:12px;color:var(--navy);font-weight:900;">🔍 費用集計診断を開く（¥${totalCostCombined.toLocaleString()}の内訳を全行表示）</summary>
+          <div id="costDiagnosticPanel" style="margin-top:10px;"></div>
+        </details>
       </div>`;
+
+      // 診断パネル中身を遅延描画（開いた瞬間に見えるようにテンプレートはすぐ入れる）
+      const diagEl = $('costDiagnosticPanel');
+      if(diagEl){
+        const b = overallBreakdown;
+        const fmtItemRow = (it, i) => `<tr><td style="padding:4px 6px;font-size:11px;">${i + 1}</td>
+          <td style="padding:4px 6px;font-size:11px;">${escapeHTML(it.month)}</td>
+          <td style="padding:4px 6px;font-size:11px;color:${it.isActual ? '#15803d' : '#a16207'};font-weight:900;">${it.isActual ? '実績' : '予定'}</td>
+          <td style="padding:4px 6px;font-size:11px;">${escapeHTML(it.mediaKey)}</td>
+          <td style="padding:4px 6px;font-size:11px;">${escapeHTML(it.feeType)}</td>
+          <td style="padding:4px 6px;font-size:11px;">${escapeHTML(it.applicantName || it.jobTitle || '-')}</td>
+          <td style="padding:4px 6px;font-size:11px;text-align:right;">${it.listing > 0 ? yen(it.listing) : '-'}</td>
+          <td style="padding:4px 6px;font-size:11px;text-align:right;">${it.successFee > 0 ? yen(it.successFee) : '-'}</td>
+          <td style="padding:4px 6px;font-size:11px;text-align:right;">${it.other > 0 ? yen(it.other) : '-'}</td>
+          <td style="padding:4px 6px;font-size:11px;text-align:right;font-weight:900;color:var(--navy);">${yen(it.total)}</td>
+          <td style="padding:4px 6px;font-size:10px;color:var(--muted);">${escapeHTML(it.invoiceId || '-')}</td></tr>`;
+        const actualItems = b.items.filter(it => it.isActual).sort((a,c) => (a.month+a.mediaKey).localeCompare(c.month+c.mediaKey));
+        const forecastItems = b.items.filter(it => !it.isActual).sort((a,c) => (a.month+a.mediaKey).localeCompare(c.month+c.mediaKey));
+        diagEl.innerHTML = `
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">期間 ${escapeHTML(b.periodStart)} 〜 ${escapeHTML(b.periodEnd)}（基準日 ${escapeHTML(b.asOfDate)}）／ 計上行 ${b.items.length}件・重複除外 ${b.duplicates.length}件・0円 ${b.zeroExcluded.length}件</div>
+          <div style="margin-top:4px;font-weight:900;font-size:12px;color:#15803d;">実績 ${actualItems.length}件（${yen(b.actual.total)}）</div>
+          <div style="max-height:260px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:4px;">
+            ${actualItems.length === 0 ? '<div style="padding:10px;color:var(--muted);font-size:12px;">0件</div>' : `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f0fdf4;position:sticky;top:0;"><th style="padding:4px 6px;font-size:11px;text-align:left;">#</th><th style="padding:4px 6px;font-size:11px;text-align:left;">月</th><th style="padding:4px 6px;font-size:11px;text-align:left;">区分</th><th style="padding:4px 6px;font-size:11px;text-align:left;">媒体</th><th style="padding:4px 6px;font-size:11px;text-align:left;">費用タイプ</th><th style="padding:4px 6px;font-size:11px;text-align:left;">対象者/求人</th><th style="padding:4px 6px;font-size:11px;text-align:right;">掲載</th><th style="padding:4px 6px;font-size:11px;text-align:right;">成功報酬</th><th style="padding:4px 6px;font-size:11px;text-align:right;">その他</th><th style="padding:4px 6px;font-size:11px;text-align:right;">月合計</th><th style="padding:4px 6px;font-size:11px;text-align:left;">請求番号</th></tr></thead><tbody>${actualItems.map(fmtItemRow).join('')}</tbody></table>`}
+          </div>
+          <div style="margin-top:10px;font-weight:900;font-size:12px;color:#a16207;">予定（未来月） ${forecastItems.length}件（${yen(b.forecast.total)}）</div>
+          <div style="max-height:220px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:4px;">
+            ${forecastItems.length === 0 ? '<div style="padding:10px;color:var(--muted);font-size:12px;">0件</div>' : `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#fffbeb;position:sticky;top:0;"><th style="padding:4px 6px;font-size:11px;text-align:left;">#</th><th style="padding:4px 6px;font-size:11px;text-align:left;">月</th><th style="padding:4px 6px;font-size:11px;text-align:left;">区分</th><th style="padding:4px 6px;font-size:11px;text-align:left;">媒体</th><th style="padding:4px 6px;font-size:11px;text-align:left;">費用タイプ</th><th style="padding:4px 6px;font-size:11px;text-align:left;">対象者/求人</th><th style="padding:4px 6px;font-size:11px;text-align:right;">掲載</th><th style="padding:4px 6px;font-size:11px;text-align:right;">成功報酬</th><th style="padding:4px 6px;font-size:11px;text-align:right;">その他</th><th style="padding:4px 6px;font-size:11px;text-align:right;">月合計</th><th style="padding:4px 6px;font-size:11px;text-align:left;">請求番号</th></tr></thead><tbody>${forecastItems.map(fmtItemRow).join('')}</tbody></table>`}
+          </div>
+          ${b.duplicates.length > 0 ? `<div style="margin-top:10px;font-weight:900;font-size:12px;color:#b91c1c;">重複除外 ${b.duplicates.length}件</div><div style="max-height:160px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:4px;padding:4px 8px;">${b.duplicates.map(d => `<div style="font-size:11px;padding:2px 0;">${escapeHTML(d.month)} / ${escapeHTML(d.mediaKey)} / ${escapeHTML(d.applicantName || d.jobTitle || '-')} / ${yen(d.amount)} — ${escapeHTML(d.reason)}</div>`).join('')}</div>` : ''}
+          ${b.zeroExcluded.length > 0 ? `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:var(--muted);">0円レコード ${b.zeroExcluded.length}件</summary><div style="max-height:160px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:4px;padding:4px 8px;">${b.zeroExcluded.map(z => `<div style="font-size:11px;padding:2px 0;">${escapeHTML(z.mediaKey)} / ${escapeHTML(z.feeType)} / ${escapeHTML(z.applicantName || z.jobTitle || '-')}</div>`).join('')}</div></details>` : ''}
+        `;
+      }
 
       // 媒体別カード（半年進捗 + 職種別実績内訳 + PLEX成功報酬型は請求書件数バッジ）
       const cardsEl = $('commitCards');
@@ -2975,9 +3157,9 @@
       const target = $('thisMonthCards'); if(!target) return;
       const ym = todayYM();
       const labelEl = $('thisMonthLabel'); if(labelEl) labelEl.textContent = `対象月：${ym}`;
-      let listing = 0, success = 0, other = 0;
-      mediaCosts.forEach(m => { const c = getMediaMonthlyCost(m, ym); listing += c.listing; success += c.successFee; other += c.other; });
-      const total = listing + success + other;
+      const c = computeMonthCosts(mediaCosts, ym); // 重複除外済み共通ロジック
+      const listing = c.listing, success = c.success, other = c.other;
+      const total = c.total;
       const stats = getMonthlyApplicantStats(ym, '', '');
       const groups = [
         ['今月の総費用', yen(total), '掲載+成功報酬+その他'],
@@ -3554,14 +3736,22 @@
     }
 
     // ===== 月次レポート：意思決定ダッシュボード =====
+    // 単一月の費用集計（重複除外・費用タイプ別）
+    //   mediaList: 既定は mediaCosts。呼び出し元で絞り込み済みのリストが来る場合も重複除外は維持。
     function computeMonthCosts(mediaList, ym){
       let listing = 0, success = 0, other = 0, ad = 0, fee = 0;
+      const seen = new Set();
       mediaList.forEach(m => {
+        const sigs = getInvoiceSignatureKeys(m).map(k => k + '@' + ym);
+        if(sigs.some(s => seen.has(s))) return; // 重複請求行は1回のみ計上
+        sigs.forEach(s => seen.add(s));
         const c = getMediaMonthlyCost(m, ym);
+        if((c.listing + c.successFee + c.other) === 0) return;
         listing += c.listing; success += c.successFee; other += c.other;
         const rowTotal = c.listing + c.successFee + c.other;
-        if(m.costType === 'recruitment_fee') fee += rowTotal;
-        else ad += rowTotal;
+        // PLEX等成功報酬系は「紹介手数料」として分類（costType未指定でもfeeType基準に判定）
+        const isFee = m.costType === 'recruitment_fee' || ['成功報酬型','掲載＋成功報酬型'].includes(m.feeType) || normalizeMediaKey(m.source || m.name || '', '') === 'PLEX';
+        if(isFee) fee += rowTotal; else ad += rowTotal;
       });
       return { listing, success, other, ad, fee, total: listing + success + other };
     }
