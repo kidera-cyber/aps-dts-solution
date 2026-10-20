@@ -124,19 +124,25 @@
     .mini-report-card .mrc-row strong{color:var(--navy);font-weight:900}
     .mini-report-card .mrc-bar{height:6px;border-radius:999px;background:#eaf0f7;overflow:hidden}
     .mini-report-card .mrc-bar>span{display:block;height:100%;background:var(--blue);border-radius:999px}
-    .cost-block{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-    .cost-item{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:14px;padding:18px 18px;min-width:0;overflow:hidden}
+    .cost-block{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+    .cost-item{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0;overflow:visible}
     .cost-item .c-label{font-size:13px;color:var(--muted);font-weight:900;letter-spacing:.05em}
-    .cost-item .c-value{font-size:clamp(18px,2.2vw,26px);font-weight:950;color:var(--navy);margin-top:6px;letter-spacing:-.02em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    /* 金額は省略禁止：font-sizeで自動縮小、折返しなし、ellipsisなし */
+    .cost-item .c-value{font-size:clamp(18px,2vw,26px);font-weight:950;color:var(--navy);margin-top:6px;letter-spacing:-.02em;line-height:1.1;white-space:nowrap;overflow:visible}
     .cost-item .c-sub{font-size:12px;color:var(--muted);margin-top:4px}
-    .cost-item.highlight{background:linear-gradient(135deg,#eaf2ff,#fff);border-color:#bfdbfe;min-width:260px}
-    .cost-item.highlight .c-value{color:var(--blue);font-size:clamp(20px,2.4vw,30px)}
+    .cost-item.highlight{background:linear-gradient(135deg,#eaf2ff,#fff);border-color:#bfdbfe;min-width:280px}
+    .cost-item.highlight .c-value{color:var(--blue);font-size:clamp(20px,2.3vw,30px)}
     .hero-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
-    .hero-grid.hero-grid-6{grid-template-columns:repeat(6,1fr)}
-    @media(max-width:1400px){.hero-grid.hero-grid-6{grid-template-columns:repeat(3,1fr)}}
+    /* 6枚構成：金額系2枚（期間累計費用・採用単価）を2列ぶん使って全額表示する */
+    .hero-grid.hero-grid-6{grid-template-columns:repeat(8,1fr)}
+    .hero-grid.hero-grid-6 > .hero-card{grid-column:span 1}
+    .hero-grid.hero-grid-6 > .hero-card.wide{grid-column:span 2}
+    @media(max-width:1400px){.hero-grid.hero-grid-6{grid-template-columns:repeat(3,1fr)}.hero-grid.hero-grid-6 > .hero-card.wide{grid-column:span 1}}
     @media(max-width:1180px){.hero-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:720px){.hero-grid,.hero-grid.hero-grid-6{grid-template-columns:repeat(2,1fr)}}
     .hero-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px 20px;position:relative;overflow:hidden;min-height:140px;display:flex;flex-direction:column;justify-content:flex-start}
+    /* 金額系KPIの値：省略禁止・フル表示。font-sizeは幅に合わせて自動縮小。 */
+    .hero-card .h-value.h-value-money{font-size:clamp(18px,2.1vw,32px);line-height:1.05;white-space:nowrap;overflow:visible;letter-spacing:-.02em}
     .hero-card.alert{background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d;box-shadow:0 2px 8px rgba(251,191,36,.12)}
     .hero-card.primary{background:linear-gradient(135deg,#eaf2ff,#f6faff);border-color:#bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,.10)}
     .hero-card .h-label{font-size:14px;color:var(--muted);font-weight:900;letter-spacing:.08em}
@@ -2353,10 +2359,7 @@
         ? `<div style="margin-top:8px;padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#b91c1c;font-weight:900;">⚠ PLEX実績費用（${yen(overallBreakdown.actual.plex)}≒${plexImpliedCount}名分）が確定請求対象${plexInvoicePersons}名と大きく乖離しています。診断パネルで内訳を確認してください。</div>`
         : '';
 
-      wrap.innerHTML = `<style>
-        .h-value-money{font-size:clamp(16px,1.6vw,24px);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-      </style>
-      <div style="margin-bottom:10px;font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;">
+      wrap.innerHTML = `<div style="margin-bottom:10px;font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;">
         <div><strong style="color:var(--navy);">半年目標期間：</strong>${escapeHTML(period)}</div>
         <div><strong style="color:#15803d;">実績集計期間：</strong>${escapeHTML(halfYearMediaTargets.periodStart)} 〜 ${escapeHTML(todayStr)}</div>
         <div><strong style="color:#a16207;">未来費用：</strong>${escapeHTML(todayStr)}の翌日 〜 ${escapeHTML(halfYearMediaTargets.periodEnd)}</div>
@@ -2367,8 +2370,8 @@
         <div class="hero-card hero-good"><div class="h-label">半年累計実績</div><div class="h-value">${totalActual}<span class="h-unit">名</span></div><div class="h-sub">内定＝入社決定として集計</div></div>
         <div class="hero-card ${totalRemain > 0 ? 'alert' : ''}"><div class="h-label">残り採用人数</div><div class="h-value">${totalRemain}<span class="h-unit">名</span></div><div class="h-sub">${totalRemain > 0 ? '目標までの不足' : '目標達成'}</div></div>
         <div class="hero-card"><div class="h-label">半年達成率</div><div class="h-value">${totalRate}<span class="h-unit">%</span></div><div class="h-sub">実績÷目標</div></div>
-        <div class="hero-card"><div class="h-label">期間累計費用（実績）</div><div class="h-value h-value-money" title="${yen(totalCost)}">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(halfYearMediaTargets.periodStart)} 〜 ${escapeHTML(todayStr)}（確定請求のみ）</div></div>
-        <div class="hero-card"><div class="h-label">採用単価</div><div class="h-value h-value-money" title="${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">実績費用÷実績採用</div></div>
+        <div class="hero-card wide"><div class="h-label">期間累計費用（実績）</div><div class="h-value h-value-money" title="${yen(totalCost)}">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(halfYearMediaTargets.periodStart)} 〜 ${escapeHTML(todayStr)}（確定請求のみ）</div></div>
+        <div class="hero-card wide"><div class="h-label">採用単価</div><div class="h-value h-value-money" title="${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">実績費用÷実績採用</div></div>
       </div>
       ${divergeWarning}
       <div style="margin-top:12px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 16px;">
