@@ -32,7 +32,41 @@
     .btn-file{position:relative;overflow:hidden}.btn-file input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
     .panel{display:none}.panel.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
     .card{background:rgba(255,255,255,.92);border:1px solid rgba(226,232,240,.9);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;backdrop-filter:blur(10px)}
-    .metric{grid-column:span 2;padding:18px;position:relative;overflow:hidden}.metric .label{color:var(--muted);font-size:12px;font-weight:900;margin-bottom:8px}.metric .value{color:var(--navy);font-size:34px;font-weight:950;letter-spacing:-.04em}.metric .sub{color:var(--muted);font-size:12px;margin-top:6px}
+    .metric{grid-column:span 2;padding:18px;position:relative;overflow:visible}.metric .label{color:var(--muted);font-size:12px;font-weight:900;margin-bottom:8px}.metric .value{color:var(--navy);font-size:clamp(22px,2vw,34px);font-weight:950;letter-spacing:-.04em;white-space:nowrap;overflow:visible;text-overflow:clip;font-variant-numeric:tabular-nums}.metric .sub{color:var(--muted);font-size:12px;margin-top:6px}
+    /* ============================================================
+       共通 金額表示コンポーネント（全画面横断ルール）
+       - 省略(ellipsis)禁止・1行表示・桁揃え(tabular-nums)
+       - 親要素のoverflow:hidden/flex縮小で切れないよう overflow:visible
+       - フォントサイズは幅に応じて clamp で自動縮小、ただし最小は読める大きさを確保
+       - 使い分け：
+           .money-value : 一般的なインライン金額
+           .money-kpi   : KPIカード内の大きな金額（カード幅に合わせて縮小）
+           .money-cell  : テーブルセル内の金額（右寄せ・桁揃え）
+           .money-safe  : flexアイテム内で縮まないように保護
+       ============================================================ */
+    .money-value, .money-kpi, .money-cell{
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: visible;
+      text-overflow: clip;
+      letter-spacing: -.02em;
+    }
+    .money-value{display:inline-block;max-width:100%}
+    .money-kpi{font-size:clamp(22px,2vw,34px);line-height:1.05;font-weight:950;display:inline-block;max-width:100%}
+    .money-cell{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding-right:12px}
+    .money-safe{flex-shrink:0;min-width:0}
+    /* 既存の「値」クラスも金額が入り得るため横断的に金額安全化 */
+    .hero-card .h-value,
+    .cost-item .c-value,
+    .segment-card .seg-hero-value,
+    .segment-card .sm-value{
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: visible;
+      text-overflow: clip;
+    }
+    /* テーブル右寄せの金額列（.money-cell と等価、短縮用） */
+    td.money, th.money{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
     .wide{grid-column:span 8}.side{grid-column:span 4}.full{grid-column:1/-1}
     .card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.card h3{margin:0;color:var(--navy);font-size:19px;letter-spacing:-.02em}.hint{color:var(--muted);font-size:12px;font-weight:700;line-height:1.7;margin:4px 0 0}
     .filters,.form-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px}.form-grid-2{display:grid;grid-template-columns:repeat(2,minmax(200px,1fr));gap:14px}
@@ -141,8 +175,9 @@
     @media(max-width:1180px){.hero-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:720px){.hero-grid,.hero-grid.hero-grid-6{grid-template-columns:repeat(2,1fr)}}
     .hero-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px 20px;position:relative;overflow:hidden;min-height:140px;display:flex;flex-direction:column;justify-content:flex-start}
-    /* 金額系KPIの値：省略禁止・フル表示。font-sizeは幅に合わせて自動縮小。 */
-    .hero-card .h-value.h-value-money{font-size:clamp(18px,2.1vw,32px);line-height:1.05;white-space:nowrap;overflow:visible;letter-spacing:-.02em}
+    /* 金額系KPIの値：共通 .money-kpi クラスで管理。省略禁止・フル表示。 */
+    .hero-card .h-value.money-kpi{font-size:clamp(20px,2vw,34px);line-height:1.05;white-space:nowrap;overflow:visible;letter-spacing:-.02em}
+    .hero-card .h-value.h-value-money{font-size:clamp(20px,2vw,34px);line-height:1.05;white-space:nowrap;overflow:visible;letter-spacing:-.02em}
     .hero-card.alert{background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d;box-shadow:0 2px 8px rgba(251,191,36,.12)}
     .hero-card.primary{background:linear-gradient(135deg,#eaf2ff,#f6faff);border-color:#bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,.10)}
     .hero-card .h-label{font-size:14px;color:var(--muted);font-weight:900;letter-spacing:.08em}
@@ -1986,7 +2021,19 @@
       return { applied, interview, offered, accepted, joined, billable, perHire, successFeeTotal, total };
     }
 
-    const yen = n => `¥${Number(n||0).toLocaleString()}`;
+    // 金額表示の共通フォーマッタ。
+    //   yen(n)       : 文字列（title属性やalert等でも使えるプレーン表記）
+    //   yenHtml(n)   : <span class="money-value">...</span> でラップ（innerHTML用）
+    //   yenKpi(n)    : KPIカード用 <span class="money-kpi">...</span>
+    //   yenCell(n)   : テーブルセル用 <span class="money-cell">...</span>
+    //   いずれも 0は "¥0"、null/undefinedも "¥0"（表示側で未登録判定したい場合は呼び出し元で処理）
+    function formatMoney(value){ const n = Number(value || 0); return `¥${Math.round(n).toLocaleString('ja-JP')}`; }
+    // 全画面共通：innerHTML に差し込まれる金額は .money-value でラップし、省略禁止・桁揃え・折返禁止を保証する。
+    //   title属性やalert等プレーン文字列が必要な場所は formatMoney() を直接使用する。
+    const yen = n => `<span class="money-value">${formatMoney(n)}</span>`;
+    const yenHtml = yen;
+    const yenKpi = n => `<span class="money-kpi">${formatMoney(n)}</span>`;
+    const yenCell = n => `<span class="money-cell">${formatMoney(n)}</span>`;
     const cpa = (cost, count) => count > 0 ? yen(Math.round(cost / count)) : '-';
 
     // ===== 媒体別 採用進捗（コミット vs 実績） =====
@@ -2370,8 +2417,8 @@
         <div class="hero-card hero-good"><div class="h-label">半年累計実績</div><div class="h-value">${totalActual}<span class="h-unit">名</span></div><div class="h-sub">内定＝入社決定として集計</div></div>
         <div class="hero-card ${totalRemain > 0 ? 'alert' : ''}"><div class="h-label">残り採用人数</div><div class="h-value">${totalRemain}<span class="h-unit">名</span></div><div class="h-sub">${totalRemain > 0 ? '目標までの不足' : '目標達成'}</div></div>
         <div class="hero-card"><div class="h-label">半年達成率</div><div class="h-value">${totalRate}<span class="h-unit">%</span></div><div class="h-sub">実績÷目標</div></div>
-        <div class="hero-card wide"><div class="h-label">期間累計費用（実績）</div><div class="h-value h-value-money" title="${yen(totalCost)}">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(halfYearMediaTargets.periodStart)} 〜 ${escapeHTML(todayStr)}（確定請求のみ）</div></div>
-        <div class="hero-card wide"><div class="h-label">採用単価</div><div class="h-value h-value-money" title="${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">実績費用÷実績採用</div></div>
+        <div class="hero-card wide"><div class="h-label">期間累計費用（実績）</div><div class="h-value money-kpi" title="${formatMoney(totalCost)}">${totalCost > 0 ? yen(totalCost) : '未登録'}</div><div class="h-sub">${escapeHTML(halfYearMediaTargets.periodStart)} 〜 ${escapeHTML(todayStr)}（確定請求のみ）</div></div>
+        <div class="hero-card wide"><div class="h-label">採用単価</div><div class="h-value money-kpi" title="${totalCost > 0 && totalActual > 0 ? formatMoney(Math.round(totalCost / totalActual)) : '-'}">${totalCost > 0 && totalActual > 0 ? yen(Math.round(totalCost / totalActual)) : '-'}</div><div class="h-sub">実績費用÷実績採用</div></div>
       </div>
       ${divergeWarning}
       <div style="margin-top:12px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 16px;">
@@ -2779,18 +2826,20 @@
       // 運用ルール：内定＝入社決定として集計
       const accepted = candidates.filter(c => isHiredCandidate(c)).length;
       const joined = candidates.filter(c => isHiredCandidate(c)).length;
+      // escapeHTML を通すためここは plain string（formatMoney）を使用し、.value に .money-value クラスで保護
+      const cpaPlain = (cost, count) => count > 0 ? formatMoney(Math.round(cost / count)) : '-';
       const groups = [
-        ['総費用', yen(totalCost), '全媒体合計'],
-        ['掲載費用', yen(listingTotal), '固定掲載'],
-        ['成功報酬', yen(successTotal), '採用連動'],
+        ['総費用', formatMoney(totalCost), '全媒体合計'],
+        ['掲載費用', formatMoney(listingTotal), '固定掲載'],
+        ['成功報酬', formatMoney(successTotal), '採用連動'],
         ['応募数', applied, '全体'],
         ['採用・入社決定数', accepted, '内定含む'],
         ['入社決定数（同上）', joined, '内定＝入社扱い'],
-        ['応募単価', cpa(totalCost, applied), '総費用÷応募'],
-        ['内定承諾単価', cpa(totalCost, accepted), '総費用÷承諾'],
-        ['入社決定単価', cpa(totalCost, joined), '総費用÷入社']
+        ['応募単価', cpaPlain(totalCost, applied), '総費用÷応募'],
+        ['内定承諾単価', cpaPlain(totalCost, accepted), '総費用÷承諾'],
+        ['入社決定単価', cpaPlain(totalCost, joined), '総費用÷入社']
       ];
-      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value money-value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
     }
 
     function renderMediaTable(){
@@ -3214,13 +3263,19 @@
       const costDisplay = c.total > 0 ? yen(c.total) : '費用未登録';
       const cpaApplied = c.total > 0 && monthApplied > 0 ? yen(Math.round(c.total / monthApplied)) : '-';
       const cpaHired = c.total > 0 && monthHired > 0 ? yen(Math.round(c.total / monthHired)) : '-';
+      // 金額のプレーン文字列（title用）
+      const totalPlain = c.total > 0 ? formatMoney(c.total) : '未登録';
+      const adPlain = c.ad > 0 ? formatMoney(c.ad) : '未登録';
+      const feePlain = c.fee > 0 ? formatMoney(c.fee) : '未登録';
+      const cpaAppliedPlain = c.total > 0 && monthApplied > 0 ? formatMoney(Math.round(c.total / monthApplied)) : '-';
+      const cpaHiredPlain = c.total > 0 && monthHired > 0 ? formatMoney(Math.round(c.total / monthHired)) : '-';
       el.innerHTML = `<div class="cost-block">
-        <div class="cost-item highlight"><div class="c-label">総採用費</div><div class="c-value" title="${costDisplay}">${costDisplay}</div><div class="c-sub">${ym}</div></div>
-        <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value" title="${c.ad > 0 ? yen(c.ad) : '未登録'}">${c.ad > 0 ? yen(c.ad) : '未登録'}</div><div class="c-sub">Indeed等</div></div>
-        <div class="cost-item"><div class="c-label">紹介手数料</div><div class="c-value" title="${c.fee > 0 ? yen(c.fee) : '未登録'}">${c.fee > 0 ? yen(c.fee) : '未登録'}</div><div class="c-sub">PLEX等</div></div>
+        <div class="cost-item highlight"><div class="c-label">総採用費</div><div class="c-value" title="${totalPlain}">${costDisplay}</div><div class="c-sub">${ym}</div></div>
+        <div class="cost-item"><div class="c-label">求人広告費</div><div class="c-value" title="${adPlain}">${c.ad > 0 ? yen(c.ad) : '未登録'}</div><div class="c-sub">Indeed等</div></div>
+        <div class="cost-item"><div class="c-label">紹介手数料</div><div class="c-value" title="${feePlain}">${c.fee > 0 ? yen(c.fee) : '未登録'}</div><div class="c-sub">PLEX等</div></div>
         <div class="cost-item"><div class="c-label">今月応募</div><div class="c-value">${monthApplied}<span style="font-size:14px;color:var(--muted);margin-left:4px;">名</span></div><div class="c-sub">応募日ベース</div></div>
-        <div class="cost-item"><div class="c-label">応募単価</div><div class="c-value" title="${cpaApplied}">${cpaApplied}</div><div class="c-sub">総費用÷応募</div></div>
-        <div class="cost-item"><div class="c-label">採用単価</div><div class="c-value" title="${cpaHired}">${cpaHired}</div><div class="c-sub">総費用÷採用</div></div>
+        <div class="cost-item"><div class="c-label">応募単価</div><div class="c-value" title="${cpaAppliedPlain}">${cpaApplied}</div><div class="c-sub">総費用÷応募</div></div>
+        <div class="cost-item"><div class="c-label">採用単価</div><div class="c-value" title="${cpaHiredPlain}">${cpaHired}</div><div class="c-sub">総費用÷採用</div></div>
       </div>`;
     }
 
@@ -3232,15 +3287,16 @@
       const listing = c.listing, success = c.success, other = c.other;
       const total = c.total;
       const stats = getMonthlyApplicantStats(ym, '', '');
+      const cpaPlain = (cost, count) => count > 0 ? formatMoney(Math.round(cost / count)) : '-';
       const groups = [
-        ['今月の総費用', yen(total), '掲載+成功報酬+その他'],
+        ['今月の総費用', formatMoney(total), '掲載+成功報酬+その他'],
         ['今月の応募数', stats.applied, '応募ベース'],
         ['今月の内定承諾数', stats.accepted, '採用確定'],
-        ['今月の応募単価', cpa(total, stats.applied), '総費用÷応募'],
-        ['今月の内定承諾単価', cpa(total, stats.accepted), '総費用÷承諾'],
-        ['今月の入社決定単価', cpa(total, stats.joined), '総費用÷入社']
+        ['今月の応募単価', cpaPlain(total, stats.applied), '総費用÷応募'],
+        ['今月の内定承諾単価', cpaPlain(total, stats.accepted), '総費用÷承諾'],
+        ['今月の入社決定単価', cpaPlain(total, stats.joined), '総費用÷入社']
       ];
-      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
+      target.innerHTML = groups.map(([l,v,sub]) => `<div class="card metric"><div class="label">${escapeHTML(l)}</div><div class="value money-value">${escapeHTML(v)}</div><div class="sub">${escapeHTML(sub)}</div></div>`).join('');
     }
 
     // ===== 派生ビュー再計算：candidates/plans/mediaCosts 変更時は必ずここを通す =====
@@ -4123,7 +4179,7 @@
       ].filter(s => s.rate !== null);
       const bottleneck = stages.length ? stages.reduce((min, s) => s.rate < min.rate ? s : min, stages[0]) : null;
       keypoints.push({ label: 'ボトルネック', text: bottleneck ? `${bottleneck.name}が最も低く ${bottleneck.rate}%。ここが最優先の改善ポイント。` : '選考データが不足しており判定できません。' });
-      keypoints.push({ label: '費用', text: cost.total === 0 ? '費用未登録（請求書を取り込むか手動登録してください）' : `総採用費 ${yen(cost.total)}（広告${yen(cost.ad)} + 紹介${yen(cost.fee)}）` });
+      keypoints.push({ label: '費用', text: cost.total === 0 ? '費用未登録（請求書を取り込むか手動登録してください）' : `総採用費 ${formatMoney(cost.total)}（広告${formatMoney(cost.ad)} + 紹介${formatMoney(cost.fee)}）` });
       const kpEl = $('reportKeyPoints');
       if(kpEl){
         kpEl.innerHTML = `<div class="keypoint-list">${keypoints.map((k, i) => `<div class="keypoint-card"><span class="keypoint-num">0${i+1}</span><strong>${escapeHTML(k.label)}</strong><p>${escapeHTML(k.text)}</p></div>`).join('')}</div>`;
@@ -4437,9 +4493,9 @@
           costEl.innerHTML = `<div style="margin-bottom:14px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;">
             <div style="font-size:12px;color:var(--muted);font-weight:900;margin-bottom:6px;">費用構成比</div>
             <div style="display:flex;height:22px;border-radius:11px;overflow:hidden;background:#eaf0f7;margin-bottom:10px;">
-              ${cost.ad > 0 ? `<div style="width:${pct(cost.ad)}%;background:#2563eb;" title="求人広告費 ${yen(cost.ad)} (${Math.round(pct(cost.ad))}%)"></div>` : ''}
-              ${cost.fee > 0 ? `<div style="width:${pct(cost.fee)}%;background:#7c3aed;" title="紹介手数料 ${yen(cost.fee)} (${Math.round(pct(cost.fee))}%)"></div>` : ''}
-              ${other > 0 ? `<div style="width:${pct(other)}%;background:#94a3b8;" title="その他 ${yen(other)} (${Math.round(pct(other))}%)"></div>` : ''}
+              ${cost.ad > 0 ? `<div style="width:${pct(cost.ad)}%;background:#2563eb;" title="求人広告費 ${formatMoney(cost.ad)} (${Math.round(pct(cost.ad))}%)"></div>` : ''}
+              ${cost.fee > 0 ? `<div style="width:${pct(cost.fee)}%;background:#7c3aed;" title="紹介手数料 ${formatMoney(cost.fee)} (${Math.round(pct(cost.fee))}%)"></div>` : ''}
+              ${other > 0 ? `<div style="width:${pct(other)}%;background:#94a3b8;" title="その他 ${formatMoney(other)} (${Math.round(pct(other))}%)"></div>` : ''}
             </div>
             <div style="display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap;">
               <span><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px;margin-right:4px;"></span>求人広告費 <strong style="color:var(--navy);">${yen(cost.ad)}</strong>（${Math.round(pct(cost.ad))}%）</span>
