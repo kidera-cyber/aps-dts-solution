@@ -5383,13 +5383,25 @@
     }
 
     // ===== 請求書テキスト正規化・金額パース =====
+    //   pdf.js は日本語PDFを「請 求 日」のように字間空白を入れて抽出する傾向がある。
+    //   NFKC で康熙部首（⽇⾦⼩等）を標準漢字に戻した後、CJK文字間の空白のみ折畳む。
+    //   半角英数・記号前後の空白は保持（例: `2026/11/01` や `¥275,000` を壊さない）。
     function normalizeInvoiceText(text){
-      return String(text || '')
+      let s = String(text || '')
         .normalize('NFKC')
-        .replace(/ /g, ' ')
-        .replace(/[ \t]+/g, ' ')
+        .replace(/\u00A0/g, ' ')
+        .replace(/\u3000/g, ' ')
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n');
+      // 残存康熙部首 → 標準漢字（NFKCで変換されない数個の救済）
+      s = s.replace(/\u2EC4/g, '西');
+      // CJK文字間の1〜2文字空白を削除。3回パスで隣接3文字以上も処理
+      const reBetween = /([\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uFF66-\uFF9F])[ \t]+([\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uFF66-\uFF9F])/g;
+      s = s.replace(reBetween, '$1$2');
+      s = s.replace(reBetween, '$1$2');
+      s = s.replace(reBetween, '$1$2');
+      s = s.replace(/[ \t]+/g, ' ');
+      return s;
     }
 
     function parseMoney(value){
@@ -5432,6 +5444,8 @@
 
     function detectInvoiceVendor(text){
       const T = normalizeInvoiceText(text);
+      // Guidable を最優先で検出（PLEX/Indeed と文字列が被らないため）
+      if(/Guidable|ガイダブル/i.test(T)) return 'Guidable';
       if(/株式会社\s*プレックス|プレックス|PLEX/i.test(T)) return 'PLEX';
       if(/INV-?\d+/i.test(T) && !/indeed\s*チャージ/i.test(T)) return 'PLEX';
       if(/HRドメイン|HR\s?domain/i.test(T)) return 'HRDomain';
@@ -5442,9 +5456,250 @@
     // 請求書テキストから構造化データを抽出（ディスパッチャ）
     function parseInvoiceText(text, fileName){
       const vendor = detectInvoiceVendor(text);
+      console.log('[PDF INVOICE] vendor detected:', vendor);
       if(vendor === 'PLEX') return parsePlexInvoice(text, fileName);
-      // Generic は既存のHRドメイン型ロジックで解析
-      return parseHRDomainInvoice(text, fileName);
+      if(vendor === 'Guidable') return parseGuidableInvoice(text, fileName);
+      if(vendor === 'HRDomain') return parseHRDomainInvoice(text, fileName);
+      return parseGenericInvoice(text, fileName);
+    }
+
+    // ===== 請求書共通ヘルパ：ラベル近傍の金額抽出 =====
+    //   ¥記号付き → カンマ区切り数値 → 連続数値 の順に探し、最初に見つかった妥当な値を返す
+    //   「10%」などの小さな文字列は除外（最低値100以上を要求）
+    function pickMoneyNearInvoiceLabel(T, labels, opts){
+      const o = opts || {};
+      const maxDist = o.maxDist || 150;
+      const minVal = o.minVal || 100;
+      for(const label of labels){
+        const idx = T.indexOf(label);
+        if(idx < 0) continue;
+        const after = T.slice(idx + label.length, idx + label.length + maxDist);
+        // パターン1: ¥記号付き
+        const mYen = after.match(/[¥￥]\s*([\d,]+)/);
+        if(mYen){ const v = parseMoney(mYen[1]); if(v && v >= minVal) return v; }
+        // パターン2: カンマ区切り数値（1,000以上）
+        const mComma = after.match(/\b([\d]{1,3}(?:,\d{3})+)\b/);
+        if(mComma){ const v = parseMoney(mComma[1]); if(v && v >= minVal) return v; }
+        // パターン3: 連続数値（4桁以上）
+        const mNum = after.match(/\b(\d{4,})\s*円?/);
+        if(mNum){ const v = parseMoney(mNum[1]); if(v && v >= minVal) return v; }
+      }
+      return null;
+    }
+
+    // ===== 日付抽出：ラベル近傍の最初の日付をYYYY-MM-DDへ =====
+    //   対応形式: 2026/11/01 / 2026-11-01 / 2026.11.01 / 2026年11月1日
+    function pickDateNearInvoiceLabel(T, labels, opts){
+      const o = opts || {};
+      const maxDist = o.maxDist || 60;
+      for(const label of labels){
+        const idx = T.indexOf(label);
+        if(idx < 0) continue;
+        const window = T.slice(idx + label.length, idx + label.length + maxDist);
+        const m = window.match(/(\d{4})[\/\-.年]\s*(\d{1,2})[\/\-.月]\s*(\d{1,2})\s*日?/);
+        if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      }
+      return '';
+    }
+
+    // ===== Guidable株式会社 専用パーサ（月額掲載費・分割請求対応） =====
+    function parseGuidableInvoice(text, fileName){
+      const T = normalizeInvoiceText(text);
+      const stages = {};
+      const log = (stage, value) => { stages[stage] = value; console.log(`[PDF INVOICE] ${stage}:`, value); };
+      log('vendor', 'Guidable株式会社');
+
+      // --- 請求書番号 ---
+      const invNumMatch = T.match(/請求書番号[:：\s]*([A-Za-z0-9\-]+)/);
+      const invoiceNumber = invNumMatch ? invNumMatch[1].trim() : '';
+      log('invoice number', invoiceNumber || '(未検出)');
+
+      // --- 請求日 ---
+      const invoiceDate = pickDateNearInvoiceLabel(T, ['請求日', 'ご請求日'], { maxDist: 60 });
+      log('invoice date', invoiceDate || '(未検出)');
+
+      // --- 支払期限 ---
+      const dueDate = pickDateNearInvoiceLabel(T, ['お支払期限', '支払期限', 'お支払期日', '支払期日', '入金期日', '振込期日'], { maxDist: 60 });
+      log('due date', dueDate || '(未検出)');
+
+      // --- 分割回数 【5回目/全6回】 ---
+      let installmentCurrent = 0, installmentTotal = 0;
+      const instMatch = T.match(/【\s*(\d+)\s*回目\s*[\/／]\s*全\s*(\d+)\s*回\s*】/);
+      if(instMatch){ installmentCurrent = Number(instMatch[1]); installmentTotal = Number(instMatch[2]); }
+      log('installment', instMatch ? `${installmentCurrent}/${installmentTotal}` : '(未検出)');
+
+      // --- ご請求金額（税込総額） ---
+      let total = pickMoneyNearInvoiceLabel(T, ['ご請求金額', 'ご請求額', '請求金額', '請求額', '合計金額', 'TOTAL', 'Total']);
+      // 「合計」ラベル（複数ある場合は最後＝税込合計）
+      if(!total){
+        const allTotals = [...T.matchAll(/合計(?!金額)[\s\S]{0,30}?[¥￥]?\s*([\d,]+)/g)];
+        if(allTotals.length){
+          const lastVal = parseMoney(allTotals[allTotals.length - 1][1]);
+          if(lastVal && lastVal >= 100) total = lastVal;
+        }
+      }
+      log('total', total || '(未検出)');
+
+      // --- 税抜小計 ---
+      let subtotal = pickMoneyNearInvoiceLabel(T, ['小計 税抜', '税抜 小計', '小計(税抜)', '小計（税抜）', '小計']);
+      log('subtotal', subtotal || '(未検出)');
+
+      // --- 税額（「消費税 10%」の "10" を拾わないよう ¥記号優先 or 「税額」ラベル） ---
+      let tax = pickMoneyNearInvoiceLabel(T, ['税額', '消費税額']);
+      if(!tax){
+        // 「消費税 10% ...  ¥25,000」のような離れた金額。10%スキップして次の金額を取る
+        const m = T.match(/消費税[^¥￥]*?[¥￥]\s*([\d,]+)/);
+        if(m){ const v = parseMoney(m[1]); if(v && v >= 100) tax = v; }
+      }
+      // それでも tax が subtotal より大きい場合は差分から再計算
+      if(tax && subtotal && tax > subtotal) tax = null;
+      log('tax', tax || '(未検出)');
+
+      // --- 税抜/税込 整合計算 ---
+      if(!subtotal && total && tax) subtotal = total - tax;
+      if(!tax && total && subtotal) tax = total - subtotal;
+      if(!total && subtotal && tax) total = subtotal + tax;
+      if(!total && subtotal) total = Math.round(subtotal * 1.1);
+      if(!subtotal && total) subtotal = Math.round(total / 1.1);
+      if(!tax && total && subtotal) tax = total - subtotal;
+
+      // --- 明細抽出 ---
+      // パターン: 「YYYY/MM/DD サポートプラン ¥250,000 1 ¥250,000」
+      const items = [];
+      const itemRe = /(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})\s+([^\n¥￥]+?)\s+[¥￥]\s*([\d,]+)\s+(\d+)\s+[¥￥]\s*([\d,]+)/g;
+      let im;
+      while((im = itemRe.exec(T)) !== null){
+        const dateIso = parseJpDate(im[1]);
+        const description = im[2].trim();
+        const unitPrice = parseMoney(im[3]);
+        const quantity = Number(im[4]) || 1;
+        const amount = parseMoney(im[5]);
+        if(amount) items.push({
+          date: dateIso || '',
+          description, biko: description,
+          unitPrice: unitPrice || amount,
+          quantity, amount
+        });
+      }
+      // フォールバック1: 日付と金額のペアだけで抽出
+      if(items.length === 0){
+        const simpleRe = /(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})\s+([^\n¥￥]{2,30}?)\s+[¥￥]\s*([\d,]+)/g;
+        let sm;
+        while((sm = simpleRe.exec(T)) !== null){
+          const amount = parseMoney(sm[3]);
+          if(amount && amount >= 1000){
+            items.push({
+              date: parseJpDate(sm[1]) || '',
+              description: sm[2].trim(), biko: sm[2].trim(),
+              unitPrice: amount, quantity: 1, amount
+            });
+          }
+        }
+      }
+      // フォールバック2: subtotal/total から単品明細を生成
+      if(items.length === 0 && (subtotal || total)){
+        const amt = subtotal || Math.round(total / 1.1);
+        items.push({
+          date: invoiceDate || '',
+          description: 'サポートプラン', biko: 'サポートプラン',
+          unitPrice: amt, quantity: 1, amount: amt
+        });
+      }
+      log('items', items.length ? items.map(i => `${i.description}(${i.amount})`).join(', ') : '(未検出)');
+
+      const yearMonth = invoiceDate ? invoiceDate.slice(0,7) : '';
+      const seed = `Guidable|${invoiceNumber}|${invoiceDate}|${total}`;
+      const invoiceId = 'inv_' + btoa(unescape(encodeURIComponent(seed))).replace(/[^A-Za-z0-9]/g,'').slice(0,16);
+
+      const parseStatus = (invoiceDate && total && items.length > 0) ? 'SUCCESS'
+                        : ((invoiceDate || total) ? 'PARTIAL' : 'FAILED');
+      log('result', parseStatus);
+
+      return {
+        vendor: 'Guidable株式会社',
+        media: 'Guidable',
+        costType: 'media',                 // ← PLEX成功報酬型ではなく掲載課金型
+        feeTypeHint: '掲載課金型',
+        invoiceDate, dueDate, invoiceNumber,
+        installmentCurrent, installmentTotal,
+        subtotal: subtotal || 0,
+        tax: tax || 0,
+        total: total || 0,
+        yearMonth,
+        invoiceId,
+        sourceFileName: fileName,
+        items,
+        parseStatus,
+        rawTextLength: T.length,
+        _debug: { vendor: 'Guidable', fileName, stages }
+      };
+    }
+
+    // ===== 汎用パーサ（未知媒体用フォールバック：請求書番号・請求日・合計のみ取得） =====
+    function parseGenericInvoice(text, fileName){
+      const T = normalizeInvoiceText(text);
+      const stages = {};
+      const log = (k, v) => { stages[k] = v; console.log(`[PDF INVOICE] (generic) ${k}:`, v); };
+      log('vendor', '(未知媒体)');
+
+      const invNumMatch = T.match(/請求書番号[:：\s]*([A-Za-z0-9\-]+)/);
+      const invoiceNumber = invNumMatch ? invNumMatch[1].trim() : '';
+      log('invoice number', invoiceNumber || '(未検出)');
+
+      const invoiceDate = pickDateNearInvoiceLabel(T, ['請求日', 'ご請求日'], { maxDist: 60 });
+      log('invoice date', invoiceDate || '(未検出)');
+      const dueDate = pickDateNearInvoiceLabel(T, ['お支払期限', '支払期限', 'お支払期日', '支払期日'], { maxDist: 60 });
+      log('due date', dueDate || '(未検出)');
+
+      let total = pickMoneyNearInvoiceLabel(T, ['ご請求金額', 'ご請求額', '請求金額', '請求額', '合計', 'TOTAL', 'Total']);
+      let subtotal = pickMoneyNearInvoiceLabel(T, ['小計', '税抜']);
+      let tax = pickMoneyNearInvoiceLabel(T, ['税額', '消費税額']);
+      if(!tax){ const m = T.match(/消費税[^¥￥]*?[¥￥]\s*([\d,]+)/); if(m){ const v = parseMoney(m[1]); if(v && v >= 100) tax = v; } }
+      if(!total && subtotal && tax) total = subtotal + tax;
+      if(!subtotal && total && tax) subtotal = total - tax;
+      log('total', total || '(未検出)');
+      log('subtotal', subtotal || '(未検出)');
+      log('tax', tax || '(未検出)');
+
+      // 請求元：請求書番号ラベル付近 or 「株式会社...」の最初
+      let vendor = '';
+      const vMatch = T.match(/((?:株式会社|有限会社|合同会社)\s*[぀-ヿ一-鿿A-Za-z0-9]{1,30})/);
+      if(vMatch) vendor = vMatch[1].trim();
+      log('vendor name', vendor || '(未検出)');
+
+      const items = [];
+      if((subtotal || total) && items.length === 0){
+        items.push({
+          date: invoiceDate || '',
+          description: vendor || '請求明細',
+          biko: vendor || '請求明細',
+          unitPrice: subtotal || total,
+          quantity: 1,
+          amount: subtotal || total
+        });
+      }
+
+      const yearMonth = invoiceDate ? invoiceDate.slice(0,7) : '';
+      const seed = `Generic|${vendor}|${invoiceNumber}|${invoiceDate}|${total}`;
+      const invoiceId = 'inv_' + btoa(unescape(encodeURIComponent(seed))).replace(/[^A-Za-z0-9]/g,'').slice(0,16);
+
+      const parseStatus = (invoiceDate && total && items.length > 0) ? 'SUCCESS'
+                        : ((invoiceDate || total) ? 'PARTIAL' : 'FAILED');
+      log('result', parseStatus);
+
+      return {
+        vendor: vendor || '(未知の請求元)',
+        media: normalizeMediaName(vendor) || '',
+        costType: 'media',
+        invoiceDate, dueDate, invoiceNumber,
+        subtotal: subtotal || 0, tax: tax || 0, total: total || 0,
+        yearMonth, invoiceId,
+        sourceFileName: fileName,
+        items,
+        parseStatus,
+        rawTextLength: T.length,
+        _debug: { vendor: 'Generic', fileName, stages }
+      };
     }
 
     // ===== PLEX（人材紹介手数料）専用パーサ（座標非依存・多段フォールバック） =====
@@ -5791,27 +6046,44 @@
         console.log('[PDF PARSE] preview:', text.slice(0, 500));
         const parsed = parseInvoiceText(text, file.name);
         console.log('[PDF PARSE] parsed:', parsed);
-        // 失敗条件：明細0件 かつ 合計金額も取れない場合のみ失敗
-        if(parsed.items.length === 0 && !parsed.total && !parsed.subtotal){
-          const missing = [];
-          if(!parsed.invoiceDate) missing.push('請求日');
-          if(parsed.items.length === 0) missing.push('明細金額');
-          if(!parsed.total && !parsed.subtotal) missing.push('請求金額');
-          throw new Error(`請求書の解析に失敗しました。以下が確認できませんでした：${missing.join(' / ')}。ブラウザConsole（F12）に詳細ログが出ています。`);
+
+        // 取得状況の可視化：各フィールドの OK / NG を一覧化
+        const got = {
+          '請求元': !!parsed.vendor && parsed.vendor !== '(未知の請求元)',
+          '請求書番号': !!parsed.invoiceNumber,
+          '請求日': !!parsed.invoiceDate,
+          '請求金額（税込）': !!parsed.total,
+          '税抜小計': !!parsed.subtotal,
+          '消費税': !!parsed.tax,
+          '明細': parsed.items.length > 0
+        };
+        console.log('[PDF INVOICE] field summary:', got);
+
+        // 失敗判定：請求日 と 請求金額（税込or税抜）の両方が取れないときのみ失敗
+        //   どちらか片方でも取れていれば PARTIAL として preview を開く
+        const hasDate = !!parsed.invoiceDate;
+        const hasMoney = !!(parsed.total || parsed.subtotal);
+        if(!hasDate && !hasMoney){
+          const details = Object.entries(got).map(([k,ok]) => `${ok ? '✓' : '✗'} ${k}`).join(' ／ ');
+          throw new Error(`請求書の解析に失敗しました（請求日・請求金額の両方が未検出）。取得状況：${details}。ブラウザConsole（F12）に詳細ログが出ています。`);
         }
         // 明細合計と小計の整合性チェック
         const itemsTotal = parsed.items.reduce((a,i) => a + i.amount, 0);
-        const mismatch = parsed.subtotal && itemsTotal !== parsed.subtotal;
+        const mismatch = parsed.subtotal && itemsTotal !== parsed.subtotal && itemsTotal > 0;
         parsedInvoiceCache = parsed;
         openInvoicePreview(parsed, mismatch, itemsTotal);
+
+        // メッセージ：SUCCESS / PARTIAL を明示
         const warnMissing = [];
         if(!parsed.invoiceDate) warnMissing.push('請求日');
         if(parsed.items.length === 0) warnMissing.push('明細');
+        if(!parsed.total) warnMissing.push('請求金額');
+        const status = parsed.parseStatus || (warnMissing.length === 0 ? 'SUCCESS' : 'PARTIAL');
         setImportMessage('mediaCostCsvImportMessage',
-          warnMissing.length
-            ? `PDF解析：${warnMissing.join('・')}が未検出。プレビューで手動修正できます。`
-            : 'PDF解析完了。プレビュー画面で内容確認後に登録してください。',
-          warnMissing.length ? 'info' : 'success'
+          status === 'SUCCESS'
+            ? '✅ PDF解析完了。プレビュー画面で内容確認後に登録してください。'
+            : `⚠ 部分解析：${warnMissing.join('・')}が未検出。プレビューで手動修正してから保存できます。`,
+          status === 'SUCCESS' ? 'success' : 'info'
         );
       }catch(err){
         console.error('[PDF IMPORT] failed:', err);
@@ -5944,6 +6216,7 @@
       }
 
       const isFee = parsed.costType === 'recruitment_fee';
+      const isGuidable = /guidable|ガイダブル/i.test(parsed.vendor || '') || /guidable/i.test(parsed.media || '');
       // mediaCosts オブジェクト生成（プレビュー編集値を反映）
       const newRecords = finalItems.map((it, idx) => {
         const media = normalizeMediaName(it.__media || parsed.media);
@@ -5953,24 +6226,32 @@
         const applicantName = it.applicantName || '';
         const cand = isFee ? findCandidateByName(applicantName) : null;
         const feeType = isFee ? '成功報酬型' : '掲載課金型';
+        // Guidable等の月額請求で、明細1件に invoice 全体がマッピングされる場合は
+        // 実際にPALが支払う税込総額を fixedListingCost とする（部分計上を防ぐ）
+        const useTotalForListing = !isFee && isGuidable && parsed.total && finalItems.length === 1;
+        const listingCost = isFee ? 0 : (useTotalForListing ? parsed.total : it.amount);
+        const installmentNote = (parsed.installmentCurrent && parsed.installmentTotal)
+          ? ` ／ 分割：${parsed.installmentCurrent}回目/全${parsed.installmentTotal}回` : '';
         return normalizeMediaCost({
           id: `${parsed.invoiceId}_${idx}`,
           feeType,
           name: media,
-          jobTitle: isFee ? (applicantName ? `${applicantName}（紹介手数料）` : '人材紹介手数料') : (it.biko || ''),
+          jobTitle: isFee ? (applicantName ? `${applicantName}（紹介手数料）` : '人材紹介手数料') : (it.biko || it.description || ''),
           targetJob: job,
           source: media.toLowerCase(),
-          startDate: it.postedDate || parsed.transactionDate || '',
+          startDate: it.postedDate || it.date || parsed.transactionDate || '',
           costMonth: yearMonth,
           billingMonth: parsed.invoiceDate ? parsed.invoiceDate.slice(0,7) : yearMonth,
           allocationType: '単月計上',
-          fixedListingCost: isFee ? 0 : it.amount,
+          fixedListingCost: listingCost,
           successFeePerHire: isFee ? it.amount : 0,
           successFeeType: isFee ? '固定金額' : '固定金額',
           feeTriggerStatus: isFee ? '内定承諾' : '内定承諾',
           manualBillableCount: isFee ? 1 : 0,
-          memo: isFee ? `PDF取込：${parsed.sourceFileName}｜対象：${applicantName || '-'}` : `PDF取込：${parsed.sourceFileName}｜備考：${it.biko || ''}`,
-          billingMemo: `請求元：${parsed.vendor || ''} ／ 請求日：${parsed.invoiceDate} ／ 期日：${parsed.dueDate}${parsed.invoiceNumber ? ' ／ 請求書番号：' + parsed.invoiceNumber : ''}`,
+          memo: isFee
+            ? `PDF取込：${parsed.sourceFileName}｜対象：${applicantName || '-'}`
+            : `PDF取込：${parsed.sourceFileName}｜備考：${it.biko || it.description || ''}${installmentNote}`,
+          billingMemo: `請求元：${parsed.vendor || ''} ／ 請求日：${parsed.invoiceDate} ／ 期日：${parsed.dueDate}${parsed.invoiceNumber ? ' ／ 請求書番号：' + parsed.invoiceNumber : ''}${installmentNote}`,
           costType: parsed.costType || (isFee ? 'recruitment_fee' : 'media'),
           yearMonth, vendor: parsed.vendor || '', media, applicantName,
           candidateId: (it.candidateId || (cand ? cand.id : '')),
